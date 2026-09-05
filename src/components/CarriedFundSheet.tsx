@@ -2,10 +2,18 @@
 
 import { useState, type FormEvent } from "react";
 import { Sheet } from "@/components/Sheet";
-import { AmountInput, Field, OptionGroup, SubmitButton, TextInput } from "@/components/FormControls";
+import {
+  AmountInput,
+  Field,
+  FormError,
+  OptionGroup,
+  SubmitButton,
+  TextInput,
+} from "@/components/FormControls";
 import { formatINR } from "@/lib/format";
 import { carriedFundKindLabels } from "@/lib/carriedFund";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { CarriedFundKind } from "@/lib/types";
 
 const kindOptions: { value: CarriedFundKind; label: string }[] = [
@@ -20,13 +28,29 @@ export function CarriedFundSheet({ open, onClose }: { open: boolean; onClose: ()
   const [kind, setKind] = useState<CarriedFundKind>("cash");
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
+  const { submitting, error, run } = useAsyncAction();
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (amount <= 0 || !memberId) return;
-    addCarriedFund({ memberId, kind, amount, note: note.trim() || undefined });
-    setAmount(0);
-    setNote("");
+    run(() => addCarriedFund({ memberId, kind, amount, note: note.trim() || undefined }), () => {
+      setAmount(0);
+      setNote("");
+    });
+  }
+
+  async function handleRemove(fundId: string) {
+    setRemovingId(fundId);
+    setRemoveError(null);
+    try {
+      await removeCarriedFund(fundId);
+    } catch (e) {
+      setRemoveError(e instanceof Error ? e.message : "Couldn't remove that entry.");
+    } finally {
+      setRemovingId(null);
+    }
   }
 
   return (
@@ -60,13 +84,15 @@ export function CarriedFundSheet({ open, onClose }: { open: boolean; onClose: ()
             </span>
             <button
               type="button"
-              onClick={() => removeCarriedFund(fund.id)}
-              className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[0.72rem] font-semibold text-ink-soft"
+              onClick={() => handleRemove(fund.id)}
+              disabled={removingId === fund.id}
+              className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[0.72rem] font-semibold text-ink-soft disabled:opacity-40"
             >
               Remove
             </button>
           </div>
         ))}
+        <FormError message={removeError} />
       </div>
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4 border-t border-border pt-5">
@@ -90,7 +116,8 @@ export function CarriedFundSheet({ open, onClose }: { open: boolean; onClose: ()
             placeholder="e.g. bank name, FD maturity date"
           />
         </Field>
-        <SubmitButton>Add</SubmitButton>
+        <FormError message={error} />
+        <SubmitButton disabled={submitting}>Add</SubmitButton>
       </form>
     </Sheet>
   );

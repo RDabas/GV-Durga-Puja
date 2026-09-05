@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AccountSheet } from "@/components/AccountSheet";
 import { ChevronRightIcon, TrishulIcon } from "@/components/icons";
 import { YearSheet } from "@/components/YearSheet";
 import { usePujaData } from "@/lib/store";
@@ -16,19 +17,25 @@ function formatDateRange(startISO: string, endISO: string): string {
 export function AppHeader({ subtitle }: { subtitle?: string }) {
   const { activeYear } = usePujaData();
   const [switching, setSwitching] = useState(false);
+  const [account, setAccount] = useState(false);
   const isHistory = activeYear.status === "archived";
 
   return (
     <header className="shrink-0 px-5 pb-3 pt-[calc(1rem+env(safe-area-inset-top))]">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setAccount(true)}
+          aria-label="Account"
+          className="flex items-center gap-2"
+        >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-brand to-brand-strong shadow-sm">
             <TrishulIcon className="h-[17px] w-[17px]" />
           </span>
           <span className="font-display text-[1.22rem] font-extrabold text-ink">
             GV Durga Puja
           </span>
-        </div>
+        </button>
         <button
           type="button"
           onClick={() => setSwitching(true)}
@@ -48,6 +55,7 @@ export function AppHeader({ subtitle }: { subtitle?: string }) {
       </p>
 
       <YearSheet open={switching} onClose={() => setSwitching(false)} />
+      <AccountSheet open={account} onClose={() => setAccount(false)} />
     </header>
   );
 }

@@ -5,11 +5,13 @@ import { Sheet } from "@/components/Sheet";
 import {
   AmountInput,
   Field,
+  FormError,
   OptionGroup,
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 import { today } from "@/lib/format";
 import type { PaymentInput } from "@/lib/store";
 import type { PaymentMode } from "@/lib/types";
@@ -39,7 +41,7 @@ export function PaymentSheet({
   subtitle?: string;
   /** e.g. "Received by" for a sponsor, "Paid by" for a vendor. */
   memberLabel: string;
-  onSubmit: (input: PaymentInput) => void;
+  onSubmit: (input: PaymentInput) => Promise<void>;
   onClose: () => void;
 }) {
   const { members } = usePujaData();
@@ -48,14 +50,19 @@ export function PaymentSheet({
   const [memberId, setMemberId] = useState(members[0]?.id ?? "");
   const [paymentDate, setPaymentDate] = useState(today());
   const [note, setNote] = useState("");
+  const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (amount <= 0 || !memberId) return;
-    onSubmit({ amount, mode, memberId, paymentDate, note: note.trim() || undefined });
-    setAmount(0);
-    setNote("");
-    onClose();
+    run(
+      () => onSubmit({ amount, mode, memberId, paymentDate, note: note.trim() || undefined }),
+      () => {
+        setAmount(0);
+        setNote("");
+        onClose();
+      },
+    );
   }
 
   return (
@@ -93,7 +100,8 @@ export function PaymentSheet({
           />
         </Field>
 
-        <SubmitButton>Record payment</SubmitButton>
+        <FormError message={error} />
+        <SubmitButton disabled={submitting}>Record payment</SubmitButton>
       </form>
     </Sheet>
   );

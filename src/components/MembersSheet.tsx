@@ -2,8 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { Sheet } from "@/components/Sheet";
-import { Field, OptionGroup, SubmitButton, TextInput } from "@/components/FormControls";
+import { Field, FormError, OptionGroup, SubmitButton, TextInput } from "@/components/FormControls";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { CommitteeMember } from "@/lib/types";
 
 const roleOptions: { value: CommitteeMember["role"]; label: string }[] = [
@@ -22,12 +23,15 @@ function EditMemberRow({
   const [name, setName] = useState(member.name);
   const [phone, setPhone] = useState(member.phone ?? "");
   const [role, setRole] = useState(member.role);
+  const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    updateMember(member.id, { name: name.trim(), phone: phone.trim() || undefined, role });
-    onDone();
+    run(
+      () => updateMember(member.id, { name: name.trim(), phone: phone.trim() || undefined, role }),
+      onDone,
+    );
   }
 
   return (
@@ -45,6 +49,7 @@ function EditMemberRow({
           placeholder="Optional"
         />
       </Field>
+      <FormError message={error} />
       <div className="flex gap-2">
         <button
           type="button"
@@ -55,7 +60,8 @@ function EditMemberRow({
         </button>
         <button
           type="submit"
-          className="flex-1 rounded-xl bg-brand py-2 text-[0.8rem] font-semibold text-white"
+          disabled={submitting}
+          className="flex-1 rounded-xl bg-brand py-2 text-[0.8rem] font-semibold text-white disabled:opacity-60"
         >
           Save
         </button>
@@ -70,14 +76,30 @@ export function MembersSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<CommitteeMember["role"]>("collector");
+  const { submitting, error, run } = useAsyncAction();
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    addMember({ name: name.trim(), phone: phone.trim() || undefined, role });
-    setName("");
-    setPhone("");
-    setRole("collector");
+    run(() => addMember({ name: name.trim(), phone: phone.trim() || undefined, role }), () => {
+      setName("");
+      setPhone("");
+      setRole("collector");
+    });
+  }
+
+  async function handleRemove(memberId: string) {
+    setRemovingId(memberId);
+    setRemoveError(null);
+    try {
+      await removeMember(memberId);
+    } catch (e) {
+      setRemoveError(e instanceof Error ? e.message : "Couldn't remove that member.");
+    } finally {
+      setRemovingId(null);
+    }
   }
 
   return (
@@ -105,6 +127,9 @@ export function MembersSheet({ open, onClose }: { open: boolean; onClose: () => 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.86rem] font-semibold text-ink">
                     {member.name}
+                    {!member.authUserId && (
+                      <span className="ml-1.5 font-normal text-ink-faint">· no login yet</span>
+                    )}
                   </span>
                   <span className="mt-0.5 block text-[0.7rem] capitalize text-ink-faint">
                     {member.role}
@@ -120,8 +145,8 @@ export function MembersSheet({ open, onClose }: { open: boolean; onClose: () => 
                 </button>
                 <button
                   type="button"
-                  onClick={() => removeMember(member.id)}
-                  disabled={!removable}
+                  onClick={() => handleRemove(member.id)}
+                  disabled={!removable || removingId === member.id}
                   className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[0.72rem] font-semibold text-ink-soft disabled:opacity-40"
                 >
                   Remove
@@ -137,6 +162,7 @@ export function MembersSheet({ open, onClose }: { open: boolean; onClose: () => 
             </div>
           );
         })}
+        <FormError message={removeError} />
       </div>
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4 border-t border-border pt-5">
@@ -157,7 +183,8 @@ export function MembersSheet({ open, onClose }: { open: boolean; onClose: () => 
             placeholder="Optional"
           />
         </Field>
-        <SubmitButton>Add member</SubmitButton>
+        <FormError message={error} />
+        <SubmitButton disabled={submitting}>Add member</SubmitButton>
       </form>
     </Sheet>
   );

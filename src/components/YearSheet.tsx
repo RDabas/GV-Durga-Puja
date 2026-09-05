@@ -2,15 +2,18 @@
 
 import { useState, type FormEvent } from "react";
 import { Sheet } from "@/components/Sheet";
-import { AmountInput, Field, SubmitButton, TextInput } from "@/components/FormControls";
+import { AmountInput, Field, FormError, SubmitButton, TextInput } from "@/components/FormControls";
 import { formatINR } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 
 type Mode = "switch" | "edit" | "new";
 
 export function YearSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { years, activeYear, setActiveYear, startYear, updateYear } = usePujaData();
   const [mode, setMode] = useState<Mode>("switch");
+  const edit = useAsyncAction();
+  const create = useAsyncAction();
 
   const [goal, setGoal] = useState(activeYear.collectionGoal);
   const [shashthi, setShashthi] = useState(activeYear.shashthiDate);
@@ -28,24 +31,30 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
   function handleEdit(e: FormEvent) {
     e.preventDefault();
-    updateYear(activeYear.id, {
-      collectionGoal: goal,
-      shashthiDate: shashthi,
-      dashamiDate: dashami,
-    });
-    close();
+    edit.run(
+      () =>
+        updateYear(activeYear.id, {
+          collectionGoal: goal,
+          shashthiDate: shashthi,
+          dashamiDate: dashami,
+        }),
+      close,
+    );
   }
 
   function handleNew(e: FormEvent) {
     e.preventDefault();
     if (!newShashthi || !newDashami) return;
-    startYear({
-      year: newYear,
-      shashthiDate: newShashthi,
-      dashamiDate: newDashami,
-      collectionGoal: newGoal,
-    });
-    close();
+    create.run(
+      () =>
+        startYear({
+          year: newYear,
+          shashthiDate: newShashthi,
+          dashamiDate: newDashami,
+          collectionGoal: newGoal,
+        }),
+      close,
+    );
   }
 
   const sorted = [...years].sort((a, b) => b.year - a.year);
@@ -138,7 +147,8 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
               onChange={(e) => setDashami(e.target.value)}
             />
           </Field>
-          <SubmitButton>Save {activeYear.year}</SubmitButton>
+          <FormError message={edit.error} />
+          <SubmitButton disabled={edit.submitting}>Save {activeYear.year}</SubmitButton>
         </form>
       )}
 
@@ -167,7 +177,8 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
           <p className="text-[0.72rem] text-ink-faint">
             {activeYear.year} stays as history — nothing is deleted.
           </p>
-          <SubmitButton>Start {newYear}</SubmitButton>
+          <FormError message={create.error} />
+          <SubmitButton disabled={create.submitting}>Start {newYear}</SubmitButton>
         </form>
       )}
     </Sheet>

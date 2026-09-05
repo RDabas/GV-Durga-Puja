@@ -5,10 +5,12 @@ import { Sheet } from "@/components/Sheet";
 import {
   AmountInput,
   Field,
+  FormError,
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 
 export function VendorExpenseSheet({
   open,
@@ -22,21 +24,27 @@ export function VendorExpenseSheet({
   const [serviceType, setServiceType] = useState("");
   const [phone, setPhone] = useState("");
   const [totalAmount, setTotalAmount] = useState(0);
+  const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!vendorName.trim()) return;
-    addVendorExpense({
-      vendorName: vendorName.trim(),
-      serviceType: serviceType.trim() || "Other",
-      phone: phone.trim() || undefined,
-      totalAmount,
-    });
-    setVendorName("");
-    setServiceType("");
-    setPhone("");
-    setTotalAmount(0);
-    onClose();
+    run(
+      () =>
+        addVendorExpense({
+          vendorName: vendorName.trim(),
+          serviceType: serviceType.trim() || "Other",
+          phone: phone.trim() || undefined,
+          totalAmount,
+        }),
+      () => {
+        setVendorName("");
+        setServiceType("");
+        setPhone("");
+        setTotalAmount(0);
+        onClose();
+      },
+    );
   }
 
   return (
@@ -71,7 +79,8 @@ export function VendorExpenseSheet({
           />
         </Field>
 
-        <SubmitButton>Add bill</SubmitButton>
+        <FormError message={error} />
+        <SubmitButton disabled={submitting}>Add bill</SubmitButton>
       </form>
     </Sheet>
   );

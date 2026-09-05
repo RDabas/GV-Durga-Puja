@@ -5,11 +5,13 @@ import { Sheet } from "@/components/Sheet";
 import {
   AmountInput,
   Field,
+  FormError,
   OptionGroup,
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { SponsorType } from "@/lib/types";
 
 const typeOptions: { value: SponsorType; label: string }[] = [
@@ -25,22 +27,28 @@ export function SponsorSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [stallDetails, setStallDetails] = useState("");
   const [contact, setContact] = useState("");
   const [amountPledged, setAmountPledged] = useState(0);
+  const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    addSponsor({
-      name: name.trim(),
-      type,
-      stallDetails: type === "stall" ? stallDetails.trim() || undefined : undefined,
-      contact: contact.trim() || undefined,
-      amountPledged,
-    });
-    setName("");
-    setStallDetails("");
-    setContact("");
-    setAmountPledged(0);
-    onClose();
+    run(
+      () =>
+        addSponsor({
+          name: name.trim(),
+          type,
+          stallDetails: type === "stall" ? stallDetails.trim() || undefined : undefined,
+          contact: contact.trim() || undefined,
+          amountPledged,
+        }),
+      () => {
+        setName("");
+        setStallDetails("");
+        setContact("");
+        setAmountPledged(0);
+        onClose();
+      },
+    );
   }
 
   return (
@@ -81,7 +89,8 @@ export function SponsorSheet({ open, onClose }: { open: boolean; onClose: () => 
           />
         </Field>
 
-        <SubmitButton>Add sponsor</SubmitButton>
+        <FormError message={error} />
+        <SubmitButton disabled={submitting}>Add sponsor</SubmitButton>
       </form>
     </Sheet>
   );

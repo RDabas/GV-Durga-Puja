@@ -71,13 +71,25 @@ export function OptionGroup<T extends string>({
   );
 }
 
-export function SubmitButton({ children }: { children: ReactNode }) {
+export function SubmitButton({
+  children,
+  disabled,
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="submit"
-      className="w-full rounded-xl bg-brand py-3 text-[0.9rem] font-semibold text-white active:scale-[0.99]"
+      disabled={disabled}
+      className="w-full rounded-xl bg-brand py-3 text-[0.9rem] font-semibold text-white active:scale-[0.99] disabled:opacity-60"
     >
       {children}
     </button>
   );
+}
+
+export function FormError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return <p className="text-[0.8rem] text-critical">{message}</p>;
 }

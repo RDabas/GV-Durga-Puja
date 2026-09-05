@@ -5,11 +5,13 @@ import { Sheet } from "@/components/Sheet";
 import {
   AmountInput,
   Field,
+  FormError,
   OptionGroup,
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 import { today } from "@/lib/format";
 import type {
   ContributionKind,
@@ -86,6 +88,7 @@ export function ContributionSheet({
   const received = status === "paid" || status === "partial";
   const promised = status === "promised";
   const takesBhog = kind !== "money";
+  const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -94,25 +97,26 @@ export function ContributionSheet({
       .map((n) => n.trim())
       .filter(Boolean);
 
-    // saveOwner returns the id so a flat that had no owner still gets its
-    // contribution attached to the owner it just created.
-    const target = isOwner
-      ? { ownerId: saveOwner(house.id, parsed) }
-      : { houseId: house.id };
-    if (!isOwner) saveTenants(house.id, parsed);
+    run(async () => {
+      // saveOwner returns the id so a flat that had no owner still gets its
+      // contribution attached to the owner it just created.
+      const target = isOwner
+        ? { ownerId: await saveOwner(house.id, parsed) }
+        : { houseId: house.id };
+      if (!isOwner) await saveTenants(house.id, parsed);
 
-    saveContribution(target, {
-      collectorId: received ? collectorId : undefined,
-      moneyAmount: received || promised ? moneyAmount : 0,
-      bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
-      contributionKind: kind,
-      paymentMode: received ? mode : "pending",
-      status,
-      paymentDate: received ? paymentDate : undefined,
-      note: note.trim() || undefined,
-      followUpNote: followUpNote.trim() || undefined,
-    });
-    onClose();
+      await saveContribution(target, {
+        collectorId: received ? collectorId : undefined,
+        moneyAmount: received || promised ? moneyAmount : 0,
+        bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
+        contributionKind: kind,
+        paymentMode: received ? mode : "pending",
+        status,
+        paymentDate: received ? paymentDate : undefined,
+        note: note.trim() || undefined,
+        followUpNote: followUpNote.trim() || undefined,
+      });
+    }, onClose);
   }
 
   return (
@@ -199,7 +203,8 @@ export function ContributionSheet({
           </Field>
         )}
 
-        <SubmitButton>Save</SubmitButton>
+        <FormError message={error} />
+        <SubmitButton disabled={submitting}>Save</SubmitButton>
       </form>
     </Sheet>
   );
