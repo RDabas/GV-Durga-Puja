@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --ground: #f5f4f8;
+  --ground-alt: #ecebf1;
+  --surface: #ffffff;
+  --surface-sunken: #f8f7fb;
+  --border: #e2e0ea;
+  --ink: #1f1a26;
+  --ink-soft: #635d70;
+  --ink-faint: #9b95a8;
+  --brand: #8c2743;
+  --brand-strong: #6f1d35;
+  --brand-tint: #fbe9ee;
+  --gold: #c9862a;
+  --gold-tint: #fbeed9;
+  --success: #1c8f6b;
+  --success-tint: #dff3ec;
+  --warning: #b5750f;
+  --warning-tint: #fbecd4;
+  --critical: #c8373f;
+  --critical-tint: #fbe6e6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #17131d;
+    --ground-alt: #1d1824;
+    --surface: #211c2a;
+    --surface-sunken: #1a1520;
+    --border: #332c3e;
+    --ink: #f1eef5;
+    --ink-soft: #b6afc4;
+    --ink-faint: #7d7690;
+    --brand: #e46b86;
+    --brand-strong: #f0899f;
+    --brand-tint: #3a1c26;
+    --gold: #e6b25c;
+    --gold-tint: #3a2c14;
+    --success: #4cc9a2;
+    --success-tint: #133629;
+    --warning: #e6b25c;
+    --warning-tint: #3a2c14;
+    --critical: #ef7b81;
+    --critical-tint: #3a1c1e;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #17131d;
+  --ground-alt: #1d1824;
+  --surface: #211c2a;
+  --surface-sunken: #1a1520;
+  --border: #332c3e;
+  --ink: #f1eef5;
+  --ink-soft: #b6afc4;
+  --ink-faint: #7d7690;
+  --brand: #e46b86;
+  --brand-strong: #f0899f;
+  --brand-tint: #3a1c26;
+  --gold: #e6b25c;
+  --gold-tint: #3a2c14;
+  --success: #4cc9a2;
+  --success-tint: #133629;
+  --warning: #e6b25c;
+  --warning-tint: #3a2c14;
+  --critical: #ef7b81;
+  --critical-tint: #3a1c1e;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-ground-alt: var(--ground-alt);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-tint: var(--brand-tint);
+  --color-gold: var(--gold);
+  --color-gold-tint: var(--gold-tint);
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-warning: var(--warning);
+  --color-warning-tint: var(--warning-tint);
+  --color-critical: var(--critical);
+  --color-critical-tint: var(--critical-tint);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+}
+
+::selection {
+  background: var(--color-brand);
+  color: white;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
