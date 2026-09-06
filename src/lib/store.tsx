@@ -25,7 +25,7 @@ import {
   dbStartYear,
   dbUpdateMember,
   dbUpdateYear,
-  fetchAll,
+  fetchAllWithRetry,
   type LiveData,
 } from "@/lib/supabase/queries";
 import type {
@@ -181,14 +181,14 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
 
   const load = useCallback(async () => {
     try {
-      applyFresh(await fetchAll(supabase));
+      applyFresh(await fetchAllWithRetry(supabase));
     } catch (e) {
       applyError(e);
     }
   }, [supabase, applyFresh, applyError]);
 
   useEffect(() => {
-    fetchAll(supabase).then(applyFresh).catch(applyError);
+    fetchAllWithRetry(supabase).then(applyFresh).catch(applyError);
   }, [supabase, applyFresh, applyError]);
 
   const value = useMemo<PujaStore | null>(() => {

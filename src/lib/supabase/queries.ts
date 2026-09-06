@@ -320,6 +320,22 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
   };
 }
 
+/**
+ * A JWT minted a moment ago can occasionally get rejected by PostgREST as
+ * "issued in the future" — a few seconds of clock drift between Supabase's
+ * own auth service and its API gateway, most visible right after a fresh
+ * sign-in. It self-resolves almost immediately, so retry once rather than
+ * showing the user an error for something that isn't really broken.
+ */
+export async function fetchAllWithRetry(supabase: SupabaseClient): Promise<LiveData> {
+  try {
+    return await fetchAll(supabase);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return fetchAll(supabase);
+  }
+}
+
 // --- Mutations ---------------------------------------------------------------
 // Each takes the Supabase client plus app-shaped input and writes snake_case
 // rows. None of these touch local state — src/lib/store.tsx re-fetches (or
