@@ -10,8 +10,10 @@ import { usePujaData } from "@/lib/store";
 export default function VendorsPage() {
   const { vendorExpenses, addVendorPayment, deleteVendorExpense } = usePujaData();
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [payingFor, setPayingFor] = useState<string | null>(null);
 
+  const editing = vendorExpenses.find((e) => e.id === editingId);
   const paying = vendorExpenses.find((e) => e.id === payingFor);
 
   return (
@@ -35,11 +37,21 @@ export default function VendorsPage() {
           key={expense.id}
           expense={expense}
           onRecordPayment={() => setPayingFor(expense.id)}
+          onEdit={() => setEditingId(expense.id)}
           onDelete={() => deleteVendorExpense(expense.id)}
         />
       ))}
 
       <VendorExpenseSheet open={adding} onClose={() => setAdding(false)} />
+
+      {editing && (
+        <VendorExpenseSheet
+          key={editing.id}
+          open
+          expense={editing}
+          onClose={() => setEditingId(null)}
+        />
+      )}
 
       {paying && (
         <PaymentSheet

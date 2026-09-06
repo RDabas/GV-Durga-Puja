@@ -562,6 +562,30 @@ export async function dbAddVendorExpense(
   if (error) throw new Error(error.message);
 }
 
+/** Corrects a vendor bill entered wrong — the vendor's own name/service/phone and the bill's total/notes. */
+export async function dbUpdateVendorExpense(
+  supabase: SupabaseClient,
+  vendorId: string,
+  expenseId: string,
+  input: { vendorName: string; serviceType: string; phone?: string; totalAmount: number; notes?: string },
+): Promise<void> {
+  const vendorUpdate = await supabase
+    .from("vendors")
+    .update({
+      name: input.vendorName,
+      service_type: input.serviceType,
+      phone: input.phone ?? null,
+    })
+    .eq("id", vendorId);
+  if (vendorUpdate.error) throw new Error(vendorUpdate.error.message);
+
+  const expenseUpdate = await supabase
+    .from("vendor_expenses")
+    .update({ total_amount: input.totalAmount, notes: input.notes ?? null })
+    .eq("id", expenseId);
+  if (expenseUpdate.error) throw new Error(expenseUpdate.error.message);
+}
+
 /**
  * Each vendor bill created its own dedicated vendor row (never shared/reused
  * across bills), so deleting the vendor cascades through vendor_expenses to

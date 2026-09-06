@@ -26,6 +26,7 @@ import {
   dbSaveTenants,
   dbStartYear,
   dbUpdateMember,
+  dbUpdateVendorExpense,
   dbUpdateYear,
   fetchAllWithRetry,
   type LiveData,
@@ -154,6 +155,7 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   addSponsorPayment: (sponsorId: string, input: PaymentInput) => Promise<void>;
   deleteSponsor: (sponsorId: string) => Promise<void>;
   addVendorExpense: (input: VendorExpenseInput) => Promise<void>;
+  updateVendorExpense: (expenseId: string, input: VendorExpenseInput) => Promise<void>;
   addVendorPayment: (expenseId: string, input: PaymentInput) => Promise<void>;
   deleteVendorExpense: (expenseId: string) => Promise<void>;
   reload: () => Promise<void>;
@@ -303,6 +305,12 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       },
       addVendorExpense: async (input) => {
         await dbAddVendorExpense(supabase, activeYear.id, input);
+        await load();
+      },
+      updateVendorExpense: async (expenseId, input) => {
+        const expense = data.vendorExpenses.find((e) => e.id === expenseId);
+        if (!expense) throw new Error("That vendor bill is no longer here.");
+        await dbUpdateVendorExpense(supabase, expense.vendorId, expenseId, input);
         await load();
       },
       addVendorPayment: async (expenseId, input) => {

@@ -137,6 +137,15 @@ export default function DashboardPage() {
       });
     }
 
+    // Owners and tenants were pushed as two separate groups above — sort by
+    // each entry's anchor flat so the list reads in a sensible flat order
+    // instead of "every owner, then every tenant" in DB order.
+    entries.sort(
+      (a, b) =>
+        a.house.block.localeCompare(b.house.block) ||
+        a.house.floor - b.house.floor ||
+        a.house.flatNo.localeCompare(b.house.flatNo),
+    );
     return entries;
   }, [owners, houses, contributionFor]);
 
