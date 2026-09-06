@@ -300,7 +300,10 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
     await Promise.all([
       supabase.from("puja_years").select("*").order("year", { ascending: true }),
       supabase.from("owners").select("*"),
-      supabase.from("houses").select("*"),
+      // Explicit order, not just insertion order: Postgres doesn't guarantee
+      // row order without one, so without this, saving any contribution and
+      // reloading could reshuffle flats within a floor on the Collect tab.
+      supabase.from("houses").select("*").order("block").order("floor").order("flat_no"),
       supabase.from("committee_members").select("*").order("name", { ascending: true }),
       supabase.from("contributions").select("*"),
       supabase.from("fund_transfers").select("*"),
