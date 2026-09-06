@@ -80,8 +80,14 @@ export default function CollectPage() {
                   tenantContribution={tenantContribution}
                   ownerCollector={memberName(ownerContribution?.collectorId)}
                   tenantCollector={memberName(tenantContribution?.collectorId)}
-                  ownerAssignedTo={memberName(ownerContribution?.assignedToMemberId)}
-                  tenantAssignedTo={memberName(tenantContribution?.assignedToMemberId)}
+                  ownerAssignedTo={
+                    memberName(ownerContribution?.assignedToMemberId) ??
+                    ownerContribution?.assignedToName
+                  }
+                  tenantAssignedTo={
+                    memberName(tenantContribution?.assignedToMemberId) ??
+                    tenantContribution?.assignedToName
+                  }
                   ownerPreviousYear={owner ? previousYearInfo[owner.id] : undefined}
                   tenantPreviousYear={previousYearInfo[house.id]}
                   onEditOwner={() => setEditing({ house, role: "owner" })}

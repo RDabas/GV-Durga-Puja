@@ -17,6 +17,7 @@ const followUpFilters: { value: FollowUpFilter; label: string }[] = [
   { value: "active", label: "All" },
   { value: "promised", label: "Promised" },
   { value: "partial", label: "Partial" },
+  { value: "pending", label: "Pending" },
   { value: "not_home", label: "Nobody home" },
   { value: "not_visited", label: "Not visited" },
 ];
@@ -35,7 +36,7 @@ function followUpDescription(
   contribution: Contribution | undefined,
   memberName: (memberId?: string) => string | undefined,
 ): string {
-  const assignee = memberName(contribution?.assignedToMemberId);
+  const assignee = memberName(contribution?.assignedToMemberId) ?? contribution?.assignedToName;
   const assignedTag = assignee ? `assigned to ${assignee}` : undefined;
 
   switch (status) {
@@ -50,6 +51,10 @@ function followUpDescription(
         .join(" · ");
     case "not_home":
       return [contribution?.followUpNote ?? "No one was home — go back", assignedTag]
+        .filter(Boolean)
+        .join(" · ");
+    case "pending":
+      return [contribution?.followUpNote ?? "Spoke to them — payment pending", assignedTag]
         .filter(Boolean)
         .join(" · ");
     case "partial":
@@ -140,7 +145,12 @@ export default function DashboardPage() {
   const followUps = followUpEntries.filter((e) => {
     if (blockFilter !== "all" && !e.blocks.includes(blockFilter)) return false;
     if (statusFilter === "active") {
-      return e.status === "promised" || e.status === "partial" || e.status === "not_home";
+      return (
+        e.status === "promised" ||
+        e.status === "partial" ||
+        e.status === "pending" ||
+        e.status === "not_home"
+      );
     }
     return e.status === statusFilter;
   });

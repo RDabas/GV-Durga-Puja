@@ -24,9 +24,21 @@ const statusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "paid", label: "Paid" },
   { value: "partial", label: "Partial" },
   { value: "promised", label: "Promised" },
+  { value: "pending", label: "Pending" },
   { value: "not_home", label: "Nobody home" },
   { value: "not_visited", label: "Not visited" },
 ];
+
+function followUpNoteLabel(status: ContributionStatus): string {
+  switch (status) {
+    case "promised":
+      return "Follow-up note";
+    case "pending":
+      return "Note — what did they say?";
+    default:
+      return "Note for next visit";
+  }
+}
 
 const kindOptions: { value: ContributionKind; label: string }[] = [
   { value: "money", label: "Money" },
@@ -84,13 +96,15 @@ export function ContributionSheet({
   const [paymentDate, setPaymentDate] = useState(contribution?.paymentDate ?? today());
   const [note, setNote] = useState(contribution?.note ?? "");
   const [followUpNote, setFollowUpNote] = useState(contribution?.followUpNote ?? "");
-  const [assignedToMemberId, setAssignedToMemberId] = useState(
-    contribution?.assignedToMemberId ?? "",
+  const [assignedTo, setAssignedTo] = useState(
+    contribution?.assignedToMemberId ?? (contribution?.assignedToName ? "other" : ""),
   );
+  const [assignedToName, setAssignedToName] = useState(contribution?.assignedToName ?? "");
 
   const received = status === "paid" || status === "partial";
   const promised = status === "promised";
-  const needsFollowUp = status === "not_home" || status === "not_visited";
+  const needsFollowUp =
+    status === "not_home" || status === "not_visited" || status === "pending";
   const takesBhog = kind !== "money";
   const { submitting, error, run } = useAsyncAction();
 
@@ -111,7 +125,10 @@ export function ContributionSheet({
 
       await saveContribution(target, {
         collectorId: received ? collectorId : undefined,
-        assignedToMemberId: needsFollowUp ? assignedToMemberId || undefined : undefined,
+        assignedToMemberId:
+          needsFollowUp && assignedTo && assignedTo !== "other" ? assignedTo : undefined,
+        assignedToName:
+          needsFollowUp && assignedTo === "other" ? assignedToName.trim() || undefined : undefined,
         moneyAmount: received || promised ? moneyAmount : 0,
         bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
         contributionKind: kind,
@@ -197,28 +214,46 @@ export function ContributionSheet({
         )}
 
         {(status === "promised" || needsFollowUp) && (
-          <Field label={status === "promised" ? "Follow-up note" : "Note for next visit"}>
+          <Field label={followUpNoteLabel(status)}>
             <TextInput
               value={followUpNote}
               onChange={(e) => setFollowUpNote(e.target.value)}
               placeholder={
-                status === "promised" ? "e.g. said after the 12th" : "e.g. try again evening"
+                status === "promised"
+                  ? "e.g. said after the 12th"
+                  : status === "pending"
+                    ? "e.g. checking with spouse, will confirm"
+                    : "e.g. try again evening"
               }
             />
           </Field>
         )}
 
         {needsFollowUp && (
-          <Field label="Assign follow-up to">
-            <OptionGroup
-              value={assignedToMemberId}
-              onChange={setAssignedToMemberId}
-              options={[
-                { value: "", label: "Unassigned" },
-                ...members.map((m) => ({ value: m.id, label: m.name })),
-              ]}
-            />
-          </Field>
+          <>
+            <Field label="Assign follow-up to">
+              <OptionGroup
+                value={assignedTo}
+                onChange={setAssignedTo}
+                options={[
+                  { value: "", label: "Unassigned" },
+                  ...members.map((m) => ({ value: m.id, label: m.name })),
+                  { value: "other", label: "Someone else" },
+                ]}
+              />
+            </Field>
+
+            {assignedTo === "other" && (
+              <Field label="Name">
+                <TextInput
+                  value={assignedToName}
+                  onChange={(e) => setAssignedToName(e.target.value)}
+                  placeholder="e.g. a family member or the guard"
+                  autoFocus
+                />
+              </Field>
+            )}
+          </>
         )}
 
         <FormError message={error} />

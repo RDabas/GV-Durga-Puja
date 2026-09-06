@@ -5,7 +5,7 @@ create extension if not exists "pgcrypto";
 
 create type block_letter as enum ('A', 'B', 'C', 'D', 'E', 'F', 'G');
 create type payment_mode as enum ('cash', 'gpay', 'phonepe', 'other_upi', 'pending');
-create type contribution_status as enum ('paid', 'partial', 'promised', 'not_visited', 'not_home');
+create type contribution_status as enum ('paid', 'partial', 'promised', 'pending', 'not_visited', 'not_home');
 create type contribution_kind as enum ('money', 'bhog_grocery', 'both');
 create type sponsor_type as enum ('outside', 'stall', 'no_stall');
 create type committee_role as enum ('admin', 'collector');
@@ -71,7 +71,10 @@ create table contributions (
   collector_id uuid references committee_members(id),
   -- Who should go back for a "nobody home"/"not visited" flat — separate
   -- from collector_id, which only ever names who actually took the money.
+  -- assigned_to_name covers someone not in committee_members (a family
+  -- member, a guard); at most one of the two is set at a time.
   assigned_to_member_id uuid references committee_members(id),
+  assigned_to_name text,
   money_amount numeric(10, 2) not null default 0,
   bhog_grocery_amount numeric(10, 2) not null default 0,
   contribution_kind contribution_kind not null default 'money',

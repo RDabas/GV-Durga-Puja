@@ -6,6 +6,7 @@ export type ContributionStatus =
   | "paid"
   | "partial"
   | "promised"
+  | "pending"
   | "not_visited"
   | "not_home";
 
@@ -59,8 +60,13 @@ export interface Contribution {
   houseId?: string;
   ownerId?: string;
   collectorId?: string;
-  /** Who should go back for a "nobody home"/"not visited" flat — separate from collectorId. */
+  /**
+   * Who should go back for a "nobody home"/"not visited" flat — separate
+   * from collectorId. assignedToName covers someone not in the committee
+   * (a family member, a guard); at most one of the two is set at a time.
+   */
   assignedToMemberId?: string;
+  assignedToName?: string;
   moneyAmount: number;
   bhogGroceryAmount: number;
   contributionKind: ContributionKind;

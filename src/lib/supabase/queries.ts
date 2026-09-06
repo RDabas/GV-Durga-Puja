@@ -68,6 +68,7 @@ interface ContributionRow {
   year_id: string;
   collector_id: string | null;
   assigned_to_member_id: string | null;
+  assigned_to_name: string | null;
   money_amount: number;
   bhog_grocery_amount: number;
   contribution_kind: ContributionKind;
@@ -189,6 +190,7 @@ const mapContribution = (r: ContributionRow): Contribution => ({
   ownerId: r.owner_id ?? undefined,
   collectorId: r.collector_id ?? undefined,
   assignedToMemberId: r.assigned_to_member_id ?? undefined,
+  assignedToName: r.assigned_to_name ?? undefined,
   moneyAmount: r.money_amount,
   bhogGroceryAmount: r.bhog_grocery_amount,
   contributionKind: r.contribution_kind,
@@ -434,6 +436,7 @@ export async function dbRemoveCarriedFund(supabase: SupabaseClient, fundId: stri
 interface ContributionWrite {
   collectorId?: string;
   assignedToMemberId?: string;
+  assignedToName?: string;
   moneyAmount: number;
   bhogGroceryAmount: number;
   contributionKind: ContributionKind;
@@ -457,6 +460,7 @@ export async function dbSaveContribution(
     owner_id: "ownerId" in payer ? payer.ownerId : null,
     collector_id: input.collectorId ?? null,
     assigned_to_member_id: input.assignedToMemberId ?? null,
+    assigned_to_name: input.assignedToName ?? null,
     money_amount: input.moneyAmount,
     bhog_grocery_amount: input.bhogGroceryAmount,
     contribution_kind: input.contributionKind,

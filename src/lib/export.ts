@@ -9,6 +9,7 @@ const statusLabels: Record<ContributionStatus, string> = {
   paid: "Paid",
   partial: "Partial",
   promised: "Promised",
+  pending: "Pending",
   not_visited: "Not visited",
   not_home: "Nobody home",
 };
