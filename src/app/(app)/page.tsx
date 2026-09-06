@@ -9,10 +9,13 @@ import { usePujaData } from "@/lib/store";
 export default function DashboardPage() {
   const { contributions, sponsors, vendorExpenses, houses, owners } = usePujaData();
 
-  // Promised amounts are tracked but not yet in hand, so they're excluded here.
-  const collected = contributions
+  const paidAmount = contributions
     .filter((c) => c.status === "paid" || c.status === "partial")
     .reduce((sum, c) => sum + c.moneyAmount + c.bhogGroceryAmount, 0);
+  const promisedAmount = contributions
+    .filter((c) => c.status === "promised")
+    .reduce((sum, c) => sum + c.moneyAmount, 0);
+  const totalExpected = paidAmount + promisedAmount;
   // A flat counts as visited once either its tenant or its owner has an entry.
   const flatsVisited = houses.filter((h) => {
     const tenant = contributions.find((c) => c.houseId === h.id);
@@ -56,12 +59,29 @@ export default function DashboardPage() {
         <div className="col-span-2 rounded-2xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
           <div className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-ink-faint">
             <CoinsIcon className="h-[13px] w-[13px]" />
-            Collected from houses
+            From houses
           </div>
-          <div className="mt-0.5 font-display text-2xl font-bold tabular-nums text-ink">
-            {formatINR(collected)}
+          <div className="mt-2.5 flex justify-between text-[0.72rem] text-ink-faint">
+            <span>
+              Paid
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(paidAmount)}
+              </b>
+            </span>
+            <span>
+              Promised
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(promisedAmount)}
+              </b>
+            </span>
+            <span>
+              Total
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(totalExpected)}
+              </b>
+            </span>
           </div>
-          <div className="mt-0.5 text-[0.72rem] tabular-nums text-ink-soft">
+          <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
             {flatsVisited} of {houses.length} flats visited
           </div>
         </div>
