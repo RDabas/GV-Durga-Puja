@@ -440,6 +440,39 @@ export async function dbRemoveCarriedFund(supabase: SupabaseClient, fundId: stri
   if (error) throw new Error(error.message);
 }
 
+/** One member handing collected money to another — moves it out of one balance in hand and into the other's. */
+export async function dbAddFundTransfer(
+  supabase: SupabaseClient,
+  yearId: string,
+  input: {
+    fromMemberId?: string;
+    toMemberId?: string;
+    amount: number;
+    mode: TransferMode;
+    transferDate: string;
+    note?: string;
+  },
+): Promise<void> {
+  const { error } = await supabase.from("fund_transfers").insert({
+    year_id: yearId,
+    from_member_id: input.fromMemberId ?? null,
+    to_member_id: input.toMemberId ?? null,
+    amount: input.amount,
+    mode: input.mode,
+    transfer_date: input.transferDate,
+    note: input.note ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function dbRemoveFundTransfer(
+  supabase: SupabaseClient,
+  transferId: string,
+): Promise<void> {
+  const { error } = await supabase.from("fund_transfers").delete().eq("id", transferId);
+  if (error) throw new Error(error.message);
+}
+
 interface ContributionWrite {
   collectorId?: string;
   assignedToMemberId?: string;

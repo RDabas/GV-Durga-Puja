@@ -12,6 +12,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import {
   dbAddCarriedFund,
+  dbAddFundTransfer,
   dbAddMember,
   dbAddSponsor,
   dbAddSponsorPayment,
@@ -20,6 +21,7 @@ import {
   dbDeleteSponsor,
   dbDeleteVendorExpense,
   dbRemoveCarriedFund,
+  dbRemoveFundTransfer,
   dbRemoveMember,
   dbSaveContribution,
   dbSaveOwner,
@@ -42,6 +44,7 @@ import type {
   PaymentMode,
   PujaYear,
   SponsorType,
+  TransferMode,
 } from "@/lib/types";
 
 /**
@@ -109,6 +112,15 @@ export interface CarriedFundInput {
   note?: string;
 }
 
+export interface FundTransferInput {
+  fromMemberId?: string;
+  toMemberId?: string;
+  amount: number;
+  mode: TransferMode;
+  transferDate: string;
+  note?: string;
+}
+
 export interface PreviousYearInfo {
   amount: number;
   status: ContributionStatus;
@@ -151,6 +163,8 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   removeMember: (memberId: string) => Promise<void>;
   addCarriedFund: (input: CarriedFundInput) => Promise<void>;
   removeCarriedFund: (fundId: string) => Promise<void>;
+  addFundTransfer: (input: FundTransferInput) => Promise<void>;
+  removeFundTransfer: (transferId: string) => Promise<void>;
   saveContribution: (payer: PayerRef, input: ContributionInput) => Promise<void>;
   addSponsor: (input: SponsorInput) => Promise<void>;
   updateSponsor: (sponsorId: string, input: SponsorInput) => Promise<void>;
@@ -286,6 +300,14 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       },
       removeCarriedFund: async (fundId) => {
         await dbRemoveCarriedFund(supabase, fundId);
+        await load();
+      },
+      addFundTransfer: async (input) => {
+        await dbAddFundTransfer(supabase, activeYear.id, input);
+        await load();
+      },
+      removeFundTransfer: async (transferId) => {
+        await dbRemoveFundTransfer(supabase, transferId);
         await load();
       },
       saveContribution: async (payer, input) => {

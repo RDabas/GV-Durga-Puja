@@ -9,7 +9,7 @@ create type contribution_status as enum ('paid', 'partial', 'promised', 'pending
 create type contribution_kind as enum ('money', 'bhog_grocery', 'both');
 create type sponsor_type as enum ('outside', 'stall', 'no_stall');
 create type committee_role as enum ('admin', 'collector');
-create type transfer_mode as enum ('cash', 'online');
+create type transfer_mode as enum ('cash', 'gpay', 'phonepe', 'other_upi');
 create type carried_fund_kind as enum ('cash', 'fd', 'bank');
 
 -- One row per Navratri event. Everything financial is scoped by year_id so
@@ -274,6 +274,8 @@ create policy "committee can log fund_transfers" on fund_transfers
   );
 create policy "admins manage fund_transfers" on fund_transfers
   for update using (is_committee_admin());
+create policy "admins delete fund_transfers" on fund_transfers
+  for delete using (is_committee_admin());
 
 create policy "committee can read carried_funds" on carried_funds
   for select using (is_committee_member());

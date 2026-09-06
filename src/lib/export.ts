@@ -252,7 +252,7 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
       from: memberName(t.fromMemberId) ?? "(outside committee)",
       to: memberName(t.toMemberId) ?? "(outside committee)",
       amount: t.amount,
-      mode: t.mode === "cash" ? "Cash" : "Online",
+      mode: paymentModeLabels[t.mode],
       note: t.note ?? "",
     });
   }

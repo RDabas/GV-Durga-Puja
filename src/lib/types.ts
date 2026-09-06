@@ -16,7 +16,7 @@ export type SponsorType = "outside" | "stall" | "no_stall";
 
 export type VendorPaymentStatus = "paid_full" | "installment" | "not_paid";
 
-export type TransferMode = "cash" | "online";
+export type TransferMode = "cash" | "gpay" | "phonepe" | "other_upi";
 
 export interface PujaYear {
   id: string;

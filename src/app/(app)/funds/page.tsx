@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CarriedFundSheet } from "@/components/CarriedFundSheet";
+import { FundTransferSheet } from "@/components/FundTransferSheet";
 import { MembersSheet } from "@/components/MembersSheet";
 import { PaymentBreakdown } from "@/components/PaymentBreakdown";
 import { formatINR } from "@/lib/format";
@@ -14,6 +15,7 @@ export default function FundsPage() {
     usePujaData();
   const [managingMembers, setManagingMembers] = useState(false);
   const [managingCarriedFunds, setManagingCarriedFunds] = useState(false);
+  const [managingTransfers, setManagingTransfers] = useState(false);
 
   const balances = committeeBalances(
     members,
@@ -31,6 +33,13 @@ export default function FundsPage() {
           Who&rsquo;s holding the money
         </p>
         <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setManagingTransfers(true)}
+            className="text-[0.72rem] font-semibold text-brand"
+          >
+            Hand over
+          </button>
           <button
             type="button"
             onClick={() => setManagingCarriedFunds(true)}
@@ -56,6 +65,7 @@ export default function FundsPage() {
               collected,
               sponsorReceived,
               handedOver,
+              received,
               vendorPaid,
               carriedCash,
               carriedFd,
@@ -82,6 +92,7 @@ export default function FundsPage() {
                     Collected {formatINR(collected)}
                     {sponsorReceived > 0 && ` · sponsors ${formatINR(sponsorReceived)}`}
                     {carried > 0 && ` · carried over ${formatINR(carried)}`}
+                    {received > 0 && ` · received ${formatINR(received)}`}
                     {handedOver > 0 && ` · handed over ${formatINR(handedOver)}`}
                     {vendorPaid > 0 && ` · paid vendor ${formatINR(vendorPaid)}`}
                   </div>
@@ -120,6 +131,7 @@ export default function FundsPage() {
         open={managingCarriedFunds}
         onClose={() => setManagingCarriedFunds(false)}
       />
+      <FundTransferSheet open={managingTransfers} onClose={() => setManagingTransfers(false)} />
     </div>
   );
 }
