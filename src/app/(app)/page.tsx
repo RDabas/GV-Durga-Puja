@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ContributionSheet } from "@/components/ContributionSheet";
 import { Pill } from "@/components/Pill";
 import { CoinsIcon, DownloadIcon, PlusIcon, ReceiptIcon } from "@/components/icons";
 import { exportPujaDataToExcel } from "@/lib/export";
@@ -9,7 +10,7 @@ import { knownBlocks } from "@/lib/directory";
 import { formatINR } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
-import type { Block, Contribution, ContributionStatus } from "@/lib/types";
+import type { Block, Contribution, ContributionStatus, House } from "@/lib/types";
 
 type FollowUpFilter = "active" | ContributionStatus;
 
@@ -31,6 +32,9 @@ interface FollowUpEntry {
   blocks: Block[];
   status: ContributionStatus;
   contribution?: Contribution;
+  /** Anchor for editing — for an owner entry, any one of their flats works. */
+  house: House;
+  role: "owner" | "tenant";
 }
 
 function followUpDescription(
@@ -75,25 +79,11 @@ export default function DashboardPage() {
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
   const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
   const [statusFilter, setStatusFilter] = useState<FollowUpFilter>("active");
+  const [moneyBlockFilter, setMoneyBlockFilter] = useState<Block | "all">("all");
+  const [editing, setEditing] = useState<{ house: House; role: "owner" | "tenant" } | null>(
+    null,
+  );
 
-  const paidAmount = contributions
-    .filter((c) => c.status === "paid" || c.status === "partial")
-    .reduce((sum, c) => sum + c.moneyAmount + c.bhogGroceryAmount, 0);
-  const promisedAmount = contributions
-    .filter((c) => c.status === "promised")
-    .reduce((sum, c) => sum + c.moneyAmount, 0);
-  const totalExpected = paidAmount + promisedAmount;
-  // A flat counts as visited once either its tenant or its owner has an entry.
-  const flatsVisited = houses.filter((h) => {
-    const tenant = contributions.find((c) => c.houseId === h.id);
-    const owner = h.ownerId
-      ? contributions.find((c) => c.ownerId === h.ownerId)
-      : undefined;
-    return (
-      (tenant && tenant.status !== "not_visited") ||
-      (owner && owner.status !== "not_visited")
-    );
-  }).length;
   const sponsorReceived = sponsors.reduce(
     (sum, s) => sum + s.payments.reduce((ps, p) => ps + p.amount, 0),
     0,
@@ -123,6 +113,8 @@ export default function DashboardPage() {
         blocks: [...new Set(ownerHouses.map((h) => h.block))],
         status: contribution?.status ?? "not_visited",
         contribution,
+        house: ownerHouses[0],
+        role: "owner",
       });
     }
 
@@ -138,11 +130,41 @@ export default function DashboardPage() {
         blocks: [house.block],
         status: contribution?.status ?? "not_visited",
         contribution,
+        house,
+        role: "tenant",
       });
     }
 
     return entries;
   }, [owners, houses, contributionFor]);
+
+  // Money stats reuse the same per-owner/per-flat entries as the follow-up
+  // list, so an owner spanning several blocks is counted once per block they
+  // hold a flat in — consistent with how the follow-up list attributes them.
+  const moneyEntries =
+    moneyBlockFilter === "all"
+      ? followUpEntries
+      : followUpEntries.filter((e) => e.blocks.includes(moneyBlockFilter));
+  const paidAmount = moneyEntries
+    .filter((e) => e.status === "paid" || e.status === "partial")
+    .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
+  const promisedAmount = moneyEntries
+    .filter((e) => e.status === "promised")
+    .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0), 0);
+  const totalExpected = paidAmount + promisedAmount;
+  const housesInMoneyBlock =
+    moneyBlockFilter === "all" ? houses : houses.filter((h) => h.block === moneyBlockFilter);
+  // A flat counts as visited once either its tenant or its owner has an entry.
+  const flatsVisited = housesInMoneyBlock.filter((h) => {
+    const tenant = contributions.find((c) => c.houseId === h.id);
+    const owner = h.ownerId
+      ? contributions.find((c) => c.ownerId === h.ownerId)
+      : undefined;
+    return (
+      (tenant && tenant.status !== "not_visited") ||
+      (owner && owner.status !== "not_visited")
+    );
+  }).length;
 
   const followUps = followUpEntries.filter((e) => {
     if (blockFilter !== "all" && !e.blocks.includes(blockFilter)) return false;
@@ -165,6 +187,35 @@ export default function DashboardPage() {
             <CoinsIcon className="h-[13px] w-[13px]" />
             From houses
           </div>
+
+          <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+            <button
+              type="button"
+              onClick={() => setMoneyBlockFilter("all")}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold ${
+                moneyBlockFilter === "all"
+                  ? "bg-brand text-white"
+                  : "border border-border bg-surface text-ink-soft"
+              }`}
+            >
+              All blocks
+            </button>
+            {knownBlocks.map((block) => (
+              <button
+                key={block}
+                type="button"
+                onClick={() => setMoneyBlockFilter(block)}
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold ${
+                  moneyBlockFilter === block
+                    ? "bg-brand text-white"
+                    : "border border-border bg-surface text-ink-soft"
+                }`}
+              >
+                {block}
+              </button>
+            ))}
+          </div>
+
           <div className="mt-2.5 flex justify-between text-[0.72rem] text-ink-faint">
             <span>
               Paid
@@ -186,7 +237,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
-            {flatsVisited} of {houses.length} flats visited
+            {flatsVisited} of {housesInMoneyBlock.length} flats visited
           </div>
         </div>
         <div className="rounded-2xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
@@ -261,10 +312,12 @@ export default function DashboardPage() {
           {followUps.length === 0 && (
             <p className="p-3 text-[0.8rem] text-ink-faint">Nothing matches this filter.</p>
           )}
-          {followUps.map(({ key, badge, name, flatInfo, status, contribution }, i) => (
-            <div
+          {followUps.map(({ key, badge, name, flatInfo, status, contribution, house, role }, i) => (
+            <button
+              type="button"
               key={key}
-              className={`flex items-start gap-3 p-3 ${i > 0 ? "border-t border-border" : ""}`}
+              onClick={() => setEditing({ house, role })}
+              className={`flex w-full items-start gap-3 p-3 text-left transition active:scale-[0.99] ${i > 0 ? "border-t border-border" : ""}`}
             >
               <span className="flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-ground-alt px-1 font-display text-[0.78rem] font-bold text-ink-soft">
                 {badge}
@@ -278,7 +331,7 @@ export default function DashboardPage() {
                 <div className="mt-1 text-[0.68rem] font-semibold text-ink-soft">{flatInfo}</div>
               </div>
               <Pill tone={status} />
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -322,6 +375,16 @@ export default function DashboardPage() {
           <p className="mt-1.5 px-0.5 text-[0.75rem] text-critical">{exportError}</p>
         )}
       </div>
+
+      {editing && (
+        <ContributionSheet
+          key={`${editing.house.id}-${editing.role}`}
+          open
+          house={editing.house}
+          role={editing.role}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   );
 }
