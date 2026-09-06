@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { Pill } from "@/components/Pill";
-import { CoinsIcon, PlusIcon, ReceiptIcon } from "@/components/icons";
+import { CoinsIcon, DownloadIcon, PlusIcon, ReceiptIcon } from "@/components/icons";
+import { exportPujaDataToExcel } from "@/lib/export";
 import { formatINR } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 
 export default function DashboardPage() {
-  const { contributions, sponsors, vendorExpenses, houses, owners } = usePujaData();
+  const store = usePujaData();
+  const { contributions, sponsors, vendorExpenses, houses, owners } = store;
+  const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
 
   const paidAmount = contributions
     .filter((c) => c.status === "paid" || c.status === "partial")
@@ -162,7 +166,21 @@ export default function DashboardPage() {
             </span>
             Add vendor bill
           </Link>
+          <button
+            type="button"
+            onClick={() => runExport(() => exportPujaDataToExcel(store))}
+            disabled={exporting}
+            className="col-span-2 flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] disabled:opacity-60"
+          >
+            <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
+              <DownloadIcon className="h-[15px] w-[15px]" />
+            </span>
+            {exporting ? "Preparing export…" : "Export to Excel"}
+          </button>
         </div>
+        {exportError && (
+          <p className="mt-1.5 px-0.5 text-[0.75rem] text-critical">{exportError}</p>
+        )}
       </div>
     </>
   );

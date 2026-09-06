@@ -127,7 +127,7 @@ function memberIsReferenced(data: LiveData, memberId: string): boolean {
   );
 }
 
-interface PujaStore extends Omit<LiveData, "years"> {
+export interface PujaStore extends Omit<LiveData, "years"> {
   years: PujaYear[];
   activeYear: PujaYear;
   /** Keyed by house id or owner id — the two id spaces never collide. */
