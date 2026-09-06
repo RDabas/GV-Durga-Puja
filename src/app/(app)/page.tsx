@@ -20,9 +20,10 @@ const followUpStatusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "not_visited", label: "Not visited" },
 ];
 
-// Excludes "not_visited" by default — it's usually the biggest bucket by
-// far, so it stays opt-in rather than swamping the list on first load.
-const defaultFollowUpStatuses: ContributionStatus[] = ["promised", "partial", "pending", "not_home"];
+// Pending and Nobody home are the two that actually need someone to go back
+// — Promised/Partial are already committed and Not visited is usually the
+// biggest bucket by far, so both stay opt-in rather than the default view.
+const defaultFollowUpStatuses: ContributionStatus[] = ["pending", "not_home"];
 
 interface FollowUpEntry {
   key: string;

@@ -178,7 +178,15 @@ export function ContributionSheet({
         </Field>
 
         {(received || promised) && kind !== "bhog_grocery" && (
-          <Field label={promised ? "Amount promised" : "Amount received"}>
+          <Field
+            label={
+              promised
+                ? originalPledgeAmount > 0
+                  ? "Amount remaining"
+                  : "Amount promised"
+                : "Amount received"
+            }
+          >
             <AmountInput value={moneyAmount} onChange={setMoneyAmount} autoFocus={received} />
           </Field>
         )}
@@ -188,7 +196,7 @@ export function ContributionSheet({
             <AmountInput value={originalPledgeAmount} onChange={setOriginalPledgeAmount} />
             <p className="mt-1.5 text-[0.72rem] text-ink-faint">
               Fill this in only if part of the promise was already covered another way
-              (e.g. they paid a vendor bill directly) — then &ldquo;Amount promised&rdquo;
+              (e.g. they paid a vendor bill directly) — then &ldquo;Amount remaining&rdquo;
               above becomes what&rsquo;s still pending. Leave at 0 for a plain promise.
             </p>
           </Field>
