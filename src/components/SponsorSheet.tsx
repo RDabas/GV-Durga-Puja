@@ -12,7 +12,7 @@ import {
 } from "@/components/FormControls";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
-import type { SponsorType } from "@/lib/types";
+import type { Sponsor, SponsorType } from "@/lib/types";
 
 const typeOptions: { value: SponsorType; label: string }[] = [
   { value: "outside", label: "Outside" },
@@ -20,27 +20,36 @@ const typeOptions: { value: SponsorType; label: string }[] = [
   { value: "no_stall", label: "No stall" },
 ];
 
-export function SponsorSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { addSponsor } = usePujaData();
-  const [name, setName] = useState("");
-  const [type, setType] = useState<SponsorType>("outside");
-  const [stallDetails, setStallDetails] = useState("");
-  const [contact, setContact] = useState("");
-  const [amountPledged, setAmountPledged] = useState(0);
+export function SponsorSheet({
+  open,
+  sponsor,
+  onClose,
+}: {
+  open: boolean;
+  /** Present to edit an existing sponsor (fixing a typo'd name or amount); absent to add a new one. */
+  sponsor?: Sponsor;
+  onClose: () => void;
+}) {
+  const { addSponsor, updateSponsor } = usePujaData();
+  const [name, setName] = useState(sponsor?.name ?? "");
+  const [type, setType] = useState<SponsorType>(sponsor?.type ?? "outside");
+  const [stallDetails, setStallDetails] = useState(sponsor?.stallDetails ?? "");
+  const [contact, setContact] = useState(sponsor?.contact ?? "");
+  const [amountPledged, setAmountPledged] = useState(sponsor?.amountPledged ?? 0);
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    const input = {
+      name: name.trim(),
+      type,
+      stallDetails: type === "stall" ? stallDetails.trim() || undefined : undefined,
+      contact: contact.trim() || undefined,
+      amountPledged,
+    };
     run(
-      () =>
-        addSponsor({
-          name: name.trim(),
-          type,
-          stallDetails: type === "stall" ? stallDetails.trim() || undefined : undefined,
-          contact: contact.trim() || undefined,
-          amountPledged,
-        }),
+      () => (sponsor ? updateSponsor(sponsor.id, input) : addSponsor(input)),
       () => {
         setName("");
         setStallDetails("");
@@ -52,7 +61,7 @@ export function SponsorSheet({ open, onClose }: { open: boolean; onClose: () => 
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Add sponsor">
+    <Sheet open={open} onClose={onClose} title={sponsor ? "Edit sponsor" : "Add sponsor"}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Name">
           <TextInput
@@ -90,7 +99,9 @@ export function SponsorSheet({ open, onClose }: { open: boolean; onClose: () => 
         </Field>
 
         <FormError message={error} />
-        <SubmitButton disabled={submitting} submitting={submitting}>Add sponsor</SubmitButton>
+        <SubmitButton disabled={submitting} submitting={submitting}>
+          {sponsor ? "Save" : "Add sponsor"}
+        </SubmitButton>
       </form>
     </Sheet>
   );

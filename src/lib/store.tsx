@@ -26,6 +26,7 @@ import {
   dbSaveTenants,
   dbStartYear,
   dbUpdateMember,
+  dbUpdateSponsor,
   dbUpdateVendorExpense,
   dbUpdateYear,
   fetchAllWithRetry,
@@ -152,6 +153,7 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   removeCarriedFund: (fundId: string) => Promise<void>;
   saveContribution: (payer: PayerRef, input: ContributionInput) => Promise<void>;
   addSponsor: (input: SponsorInput) => Promise<void>;
+  updateSponsor: (sponsorId: string, input: SponsorInput) => Promise<void>;
   addSponsorPayment: (sponsorId: string, input: PaymentInput) => Promise<void>;
   deleteSponsor: (sponsorId: string) => Promise<void>;
   addVendorExpense: (input: VendorExpenseInput) => Promise<void>;
@@ -293,6 +295,10 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       },
       addSponsor: async (input) => {
         await dbAddSponsor(supabase, activeYear.id, input);
+        await load();
+      },
+      updateSponsor: async (sponsorId, input) => {
+        await dbUpdateSponsor(supabase, sponsorId, input);
         await load();
       },
       addSponsorPayment: async (sponsorId, input) => {

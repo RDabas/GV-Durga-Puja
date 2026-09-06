@@ -10,8 +10,10 @@ import { usePujaData } from "@/lib/store";
 export default function SponsorsPage() {
   const { sponsors, addSponsorPayment, deleteSponsor } = usePujaData();
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [payingFor, setPayingFor] = useState<string | null>(null);
 
+  const editing = sponsors.find((s) => s.id === editingId);
   const paying = sponsors.find((s) => s.id === payingFor);
 
   return (
@@ -35,11 +37,21 @@ export default function SponsorsPage() {
           key={sponsor.id}
           sponsor={sponsor}
           onRecordPayment={() => setPayingFor(sponsor.id)}
+          onEdit={() => setEditingId(sponsor.id)}
           onDelete={() => deleteSponsor(sponsor.id)}
         />
       ))}
 
       <SponsorSheet open={adding} onClose={() => setAdding(false)} />
+
+      {editing && (
+        <SponsorSheet
+          key={editing.id}
+          open
+          sponsor={editing}
+          onClose={() => setEditingId(null)}
+        />
+      )}
 
       {paying && (
         <PaymentSheet

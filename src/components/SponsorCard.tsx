@@ -12,10 +12,12 @@ import { usePujaData } from "@/lib/store";
 export function SponsorCard({
   sponsor,
   onRecordPayment,
+  onEdit,
   onDelete,
 }: {
   sponsor: Sponsor;
   onRecordPayment?: () => void;
+  onEdit?: () => void;
   onDelete?: () => Promise<void>;
 }) {
   const { memberName } = usePujaData();
@@ -62,14 +64,27 @@ export function SponsorCard({
           ))}
         </div>
       )}
-      {onRecordPayment && (
-        <button
-          type="button"
-          onClick={onRecordPayment}
-          className="mt-3 w-full rounded-xl border border-border py-2 text-[0.78rem] font-semibold text-ink-soft active:scale-[0.99]"
-        >
-          Record payment
-        </button>
+      {(onEdit || onRecordPayment) && (
+        <div className="mt-3 flex gap-2">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex-1 rounded-xl border border-border py-2 text-[0.78rem] font-semibold text-ink-soft active:scale-[0.99]"
+            >
+              Edit sponsor
+            </button>
+          )}
+          {onRecordPayment && (
+            <button
+              type="button"
+              onClick={onRecordPayment}
+              className="flex-1 rounded-xl border border-border py-2 text-[0.78rem] font-semibold text-ink-soft active:scale-[0.99]"
+            >
+              Record payment
+            </button>
+          )}
+        </div>
       )}
       {onDelete && !confirming && (
         <button

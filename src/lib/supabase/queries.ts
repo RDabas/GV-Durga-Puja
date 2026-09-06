@@ -510,6 +510,33 @@ export async function dbAddSponsor(
   if (error) throw new Error(error.message);
 }
 
+/** Corrects a sponsor entered wrong — name, type, pledge amount, etc. */
+export async function dbUpdateSponsor(
+  supabase: SupabaseClient,
+  sponsorId: string,
+  input: {
+    name: string;
+    type: SponsorType;
+    stallDetails?: string;
+    contact?: string;
+    amountPledged: number;
+    notes?: string;
+  },
+): Promise<void> {
+  const { error } = await supabase
+    .from("sponsors")
+    .update({
+      name: input.name,
+      type: input.type,
+      stall_details: input.stallDetails ?? null,
+      contact: input.contact ?? null,
+      amount_pledged: input.amountPledged,
+      notes: input.notes ?? null,
+    })
+    .eq("id", sponsorId);
+  if (error) throw new Error(error.message);
+}
+
 /** Cascades to its sponsor_payments — use when a sponsor was entered wrong. */
 export async function dbDeleteSponsor(supabase: SupabaseClient, sponsorId: string): Promise<void> {
   const { error } = await supabase.from("sponsors").delete().eq("id", sponsorId);
