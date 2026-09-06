@@ -49,9 +49,7 @@ function followUpDescription(
     case "promised":
       return [
         contribution && contribution.moneyAmount > 0
-          ? contribution.originalPledgeAmount != null
-            ? `Promised ${formatINR(contribution.moneyAmount)} of ${formatINR(contribution.originalPledgeAmount)}`
-            : `Promised ${formatINR(contribution.moneyAmount)}`
+          ? `Promised ${formatINR(contribution.moneyAmount)}`
           : "Promised to pay",
         contribution?.followUpNote,
       ]
@@ -338,6 +336,11 @@ export default function DashboardPage() {
                 <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
                   {followUpDescription(status, contribution, memberName)}
                 </div>
+                {contribution?.originalPledgeAmount != null && (
+                  <div className="mt-0.5 text-[0.72rem] font-semibold text-gold">
+                    of {formatINR(contribution.originalPledgeAmount)} originally promised
+                  </div>
+                )}
                 {/* Never truncated — a long name shouldn't be able to hide which flat(s) this is. */}
                 <div className="mt-1 text-[0.68rem] font-semibold text-ink-soft">{flatInfo}</div>
               </div>

@@ -66,6 +66,11 @@ function PayerRow({
             Follow up: {assignedToName}
           </span>
         )}
+        {contribution?.followUpNote && (
+          <span className="mt-1 block text-[0.7rem] text-ink-soft">
+            {contribution.followUpNote}
+          </span>
+        )}
       </span>
       <span className="shrink-0 text-right">
         <span className="block text-[0.88rem] font-bold tabular-nums text-ink">
@@ -74,7 +79,7 @@ function PayerRow({
             : "—"}
         </span>
         {contribution?.originalPledgeAmount != null && (
-          <span className="mt-0.5 block text-[0.62rem] tabular-nums text-ink-faint">
+          <span className="mt-0.5 block whitespace-nowrap text-[0.7rem] font-semibold tabular-nums text-gold">
             of {formatINR(contribution.originalPledgeAmount)} pledged
           </span>
         )}
