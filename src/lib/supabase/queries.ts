@@ -70,6 +70,7 @@ interface ContributionRow {
   assigned_to_member_id: string | null;
   assigned_to_name: string | null;
   money_amount: number;
+  original_pledge_amount: number | null;
   bhog_grocery_amount: number;
   contribution_kind: ContributionKind;
   payment_mode: PaymentMode;
@@ -137,6 +138,7 @@ interface VendorPaymentRow {
   payment_date: string;
   mode: PaymentMode;
   note: string | null;
+  self_funded: boolean;
 }
 
 interface VendorExpenseRow {
@@ -192,6 +194,7 @@ const mapContribution = (r: ContributionRow): Contribution => ({
   assignedToMemberId: r.assigned_to_member_id ?? undefined,
   assignedToName: r.assigned_to_name ?? undefined,
   moneyAmount: r.money_amount,
+  originalPledgeAmount: r.original_pledge_amount ?? undefined,
   bhogGroceryAmount: r.bhog_grocery_amount,
   contributionKind: r.contribution_kind,
   paymentMode: r.payment_mode,
@@ -259,6 +262,7 @@ const mapVendorPayment = (r: VendorPaymentRow): VendorPayment => ({
   paymentDate: r.payment_date,
   mode: r.mode,
   note: r.note ?? undefined,
+  selfFunded: r.self_funded,
 });
 
 const mapVendorExpense = (r: VendorExpenseRow): VendorExpense => ({
@@ -441,6 +445,7 @@ interface ContributionWrite {
   assignedToMemberId?: string;
   assignedToName?: string;
   moneyAmount: number;
+  originalPledgeAmount?: number;
   bhogGroceryAmount: number;
   contributionKind: ContributionKind;
   paymentMode: PaymentMode;
@@ -465,6 +470,7 @@ export async function dbSaveContribution(
     assigned_to_member_id: input.assignedToMemberId ?? null,
     assigned_to_name: input.assignedToName ?? null,
     money_amount: input.moneyAmount,
+    original_pledge_amount: input.originalPledgeAmount ?? null,
     bhog_grocery_amount: input.bhogGroceryAmount,
     contribution_kind: input.contributionKind,
     payment_mode: input.paymentMode,
@@ -516,6 +522,7 @@ interface PaymentWrite {
   paymentDate: string;
   mode: PaymentMode;
   note?: string;
+  selfFunded?: boolean;
 }
 
 export async function dbAddSponsorPayment(
@@ -580,6 +587,7 @@ export async function dbAddVendorPayment(
     payment_date: input.paymentDate,
     mode: input.mode,
     note: input.note ?? null,
+    self_funded: input.selfFunded ?? false,
   });
   if (error) throw new Error(error.message);
 }

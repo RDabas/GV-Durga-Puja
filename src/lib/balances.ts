@@ -50,9 +50,12 @@ export function committeeBalances(
       .filter((p) => p.memberId === member.id)
       .reduce((sum, p) => sum + p.amount, 0);
 
+    // A self-funded payment came out of the member's own pocket (typically
+    // offsetting their own resident pledge), never out of committee cash
+    // they were holding, so it shouldn't dock their balance in hand.
     const vendorPaid = vendorExpenses
       .flatMap((e) => e.payments)
-      .filter((p) => p.memberId === member.id)
+      .filter((p) => p.memberId === member.id && !p.selfFunded)
       .reduce((sum, p) => sum + p.amount, 0);
 
     const handedOver = transfers

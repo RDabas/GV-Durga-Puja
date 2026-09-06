@@ -48,6 +48,7 @@ export default function VendorsPage() {
           title="Record vendor payment"
           subtitle={paying.vendor.name}
           memberLabel="Paid by"
+          allowSelfFunded
           onSubmit={(input) => addVendorPayment(paying.id, input)}
           onClose={() => setPayingFor(null)}
         />

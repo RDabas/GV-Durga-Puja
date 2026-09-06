@@ -49,7 +49,9 @@ function followUpDescription(
     case "promised":
       return [
         contribution && contribution.moneyAmount > 0
-          ? `Promised ${formatINR(contribution.moneyAmount)}`
+          ? contribution.originalPledgeAmount != null
+            ? `Promised ${formatINR(contribution.moneyAmount)} of ${formatINR(contribution.originalPledgeAmount)}`
+            : `Promised ${formatINR(contribution.moneyAmount)}`
           : "Promised to pay",
         contribution?.followUpNote,
       ]

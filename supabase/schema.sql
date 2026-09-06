@@ -76,6 +76,9 @@ create table contributions (
   assigned_to_member_id uuid references committee_members(id),
   assigned_to_name text,
   money_amount numeric(10, 2) not null default 0,
+  -- Set only when money_amount (while promised) was reduced from a larger
+  -- original pledge, e.g. part of it settled by paying a vendor directly.
+  original_pledge_amount numeric(10, 2),
   bhog_grocery_amount numeric(10, 2) not null default 0,
   contribution_kind contribution_kind not null default 'money',
   payment_mode payment_mode not null default 'pending',
@@ -187,6 +190,10 @@ create table vendor_payments (
   payment_date date not null default current_date,
   mode payment_mode not null default 'cash',
   note text,
+  -- Paid from member_id's own pocket (e.g. offsetting their own resident
+  -- pledge) rather than committee cash, so it shouldn't reduce their balance
+  -- in hand the way a normal vendor payment does.
+  self_funded boolean not null default false,
   created_at timestamptz not null default now()
 );
 

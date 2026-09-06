@@ -68,6 +68,12 @@ export interface Contribution {
   assignedToMemberId?: string;
   assignedToName?: string;
   moneyAmount: number;
+  /**
+   * Set only when a "promised" moneyAmount has been reduced from a larger
+   * original pledge (e.g. part of it was settled by paying a vendor bill
+   * directly) — lets the UI show "X of Y pledged" instead of just X.
+   */
+  originalPledgeAmount?: number;
   bhogGroceryAmount: number;
   contributionKind: ContributionKind;
   paymentMode: PaymentMode;
@@ -111,12 +117,14 @@ export interface Vendor {
 export interface VendorPayment {
   id: string;
   vendorExpenseId: string;
-  /** Which committee member handed this over — it comes out of their balance in hand. */
+  /** Which committee member handed this over — it comes out of their balance in hand, unless selfFunded. */
   memberId: string;
   amount: number;
   paymentDate: string;
   mode: PaymentMode;
   note?: string;
+  /** Paid from the member's own pocket (e.g. offsetting their own resident pledge), not committee cash. */
+  selfFunded: boolean;
 }
 
 export interface VendorExpense {

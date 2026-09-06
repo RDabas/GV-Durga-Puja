@@ -184,6 +184,7 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
     { header: "Amount", key: "amount", width: 14 },
     { header: "Mode", key: "mode", width: 12 },
     { header: "Paid By", key: "paidBy", width: 16 },
+    { header: "Self-funded", key: "selfFunded", width: 12 },
     { header: "Note", key: "note", width: 30 },
   ];
   for (const e of vendorExpenses) {
@@ -194,6 +195,7 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
         amount: p.amount,
         mode: paymentModeLabels[p.mode],
         paidBy: memberName(p.memberId) ?? "",
+        selfFunded: p.selfFunded ? "Yes" : "",
         note: p.note ?? "",
       });
     }

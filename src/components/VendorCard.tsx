@@ -73,6 +73,7 @@ export function VendorCard({
               <span>
                 {formatShortDate(p.paymentDate)} · {paymentModeLabels[p.mode]} · paid by{" "}
                 <span className="font-semibold text-ink-soft">{memberName(p.memberId)}</span>
+                {p.selfFunded && " · self-funded"}
               </span>
               <span className="shrink-0 tabular-nums text-ink-soft">{formatINR(p.amount)}</span>
             </div>

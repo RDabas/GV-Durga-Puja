@@ -33,6 +33,7 @@ export function PaymentSheet({
   title,
   subtitle,
   memberLabel,
+  allowSelfFunded,
   onSubmit,
   onClose,
 }: {
@@ -41,6 +42,8 @@ export function PaymentSheet({
   subtitle?: string;
   /** e.g. "Received by" for a sponsor, "Paid by" for a vendor. */
   memberLabel: string;
+  /** Vendor payments only — a committee member who is also a resident can pay a bill straight out of their own pocket. */
+  allowSelfFunded?: boolean;
   onSubmit: (input: PaymentInput) => Promise<void>;
   onClose: () => void;
 }) {
@@ -50,16 +53,26 @@ export function PaymentSheet({
   const [memberId, setMemberId] = useState(members[0]?.id ?? "");
   const [paymentDate, setPaymentDate] = useState(today());
   const [note, setNote] = useState("");
+  const [selfFunded, setSelfFunded] = useState(false);
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (amount <= 0 || !memberId) return;
     run(
-      () => onSubmit({ amount, mode, memberId, paymentDate, note: note.trim() || undefined }),
+      () =>
+        onSubmit({
+          amount,
+          mode,
+          memberId,
+          paymentDate,
+          note: note.trim() || undefined,
+          selfFunded: allowSelfFunded ? selfFunded : undefined,
+        }),
       () => {
         setAmount(0);
         setNote("");
+        setSelfFunded(false);
         onClose();
       },
     );
@@ -99,6 +112,21 @@ export function PaymentSheet({
             placeholder="Optional"
           />
         </Field>
+
+        {allowSelfFunded && (
+          <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+            <input
+              type="checkbox"
+              checked={selfFunded}
+              onChange={(e) => setSelfFunded(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+            />
+            <span className="text-[0.8rem] text-ink-soft">
+              Paid from their own pocket, not committee cash — won&rsquo;t count against their
+              balance in hand.
+            </span>
+          </label>
+        )}
 
         <FormError message={error} />
         <SubmitButton disabled={submitting} submitting={submitting}>Record payment</SubmitButton>

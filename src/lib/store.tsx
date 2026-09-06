@@ -67,6 +67,8 @@ export interface PaymentInput {
   paymentDate: string;
   mode: PaymentMode;
   note?: string;
+  /** Vendor payments only — paid from the member's own pocket, so it shouldn't reduce their balance in hand. */
+  selfFunded?: boolean;
 }
 
 export interface SponsorInput {

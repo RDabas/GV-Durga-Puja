@@ -73,6 +73,11 @@ function PayerRow({
             ? formatINR(contribution.moneyAmount)
             : "—"}
         </span>
+        {contribution?.originalPledgeAmount != null && (
+          <span className="mt-0.5 block text-[0.62rem] tabular-nums text-ink-faint">
+            of {formatINR(contribution.originalPledgeAmount)} pledged
+          </span>
+        )}
         {previousYear && (
           <>
             <span className="mt-0.5 block text-[0.66rem] tabular-nums text-ink-faint">

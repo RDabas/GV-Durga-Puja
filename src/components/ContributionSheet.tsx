@@ -130,6 +130,13 @@ export function ContributionSheet({
         assignedToName:
           needsFollowUp && assignedTo === "other" ? assignedToName.trim() || undefined : undefined,
         moneyAmount: received || promised ? moneyAmount : 0,
+        // Only meaningful alongside the promised amount it was set for — an
+        // edit that changes the amount supersedes whatever pledge it traced
+        // back to, so don't carry a now-stale "of ₹X pledged" forward.
+        originalPledgeAmount:
+          promised && moneyAmount === (contribution?.moneyAmount ?? 0)
+            ? contribution?.originalPledgeAmount
+            : undefined,
         bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
         contributionKind: kind,
         paymentMode: received ? mode : "pending",
