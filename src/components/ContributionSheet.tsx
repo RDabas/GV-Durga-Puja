@@ -89,6 +89,9 @@ export function ContributionSheet({
     !contribution || contribution.paymentMode === "pending" ? "cash" : contribution.paymentMode,
   );
   const [moneyAmount, setMoneyAmount] = useState(contribution?.moneyAmount ?? 0);
+  const [originalPledgeAmount, setOriginalPledgeAmount] = useState(
+    contribution?.originalPledgeAmount ?? 0,
+  );
   const [bhogAmount, setBhogAmount] = useState(contribution?.bhogGroceryAmount ?? 0);
   const [collectorId, setCollectorId] = useState(
     contribution?.collectorId ?? members[0]?.id ?? "",
@@ -130,13 +133,11 @@ export function ContributionSheet({
         assignedToName:
           needsFollowUp && assignedTo === "other" ? assignedToName.trim() || undefined : undefined,
         moneyAmount: received || promised ? moneyAmount : 0,
-        // Only meaningful alongside the promised amount it was set for — an
-        // edit that changes the amount supersedes whatever pledge it traced
-        // back to, so don't carry a now-stale "of ₹X pledged" forward.
+        // Only meaningful when it's actually more than what's still pending —
+        // otherwise there's nothing to track, so drop it rather than store a
+        // number that no longer means anything.
         originalPledgeAmount:
-          promised && moneyAmount === (contribution?.moneyAmount ?? 0)
-            ? contribution?.originalPledgeAmount
-            : undefined,
+          promised && originalPledgeAmount > moneyAmount ? originalPledgeAmount : undefined,
         bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
         contributionKind: kind,
         paymentMode: received ? mode : "pending",
@@ -179,6 +180,17 @@ export function ContributionSheet({
         {(received || promised) && kind !== "bhog_grocery" && (
           <Field label={promised ? "Amount promised" : "Amount received"}>
             <AmountInput value={moneyAmount} onChange={setMoneyAmount} autoFocus={received} />
+          </Field>
+        )}
+
+        {promised && (
+          <Field label="Originally promised, if higher (optional)">
+            <AmountInput value={originalPledgeAmount} onChange={setOriginalPledgeAmount} />
+            <p className="mt-1.5 text-[0.72rem] text-ink-faint">
+              Fill this in only if part of the promise was already covered another way
+              (e.g. they paid a vendor bill directly) — then &ldquo;Amount promised&rdquo;
+              above becomes what&rsquo;s still pending. Leave at 0 for a plain promise.
+            </p>
           </Field>
         )}
 
