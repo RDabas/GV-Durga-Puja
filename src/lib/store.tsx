@@ -90,7 +90,6 @@ export interface YearInput {
   year: number;
   shashthiDate: string;
   dashamiDate: string;
-  collectionGoal: number;
 }
 
 export interface MemberInput {

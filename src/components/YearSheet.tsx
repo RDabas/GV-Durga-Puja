@@ -3,7 +3,6 @@
 import { useState, type FormEvent } from "react";
 import { Sheet } from "@/components/Sheet";
 import { AmountInput, Field, FormError, SubmitButton, TextInput } from "@/components/FormControls";
-import { formatINR } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 
@@ -15,12 +14,10 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
   const edit = useAsyncAction();
   const create = useAsyncAction();
 
-  const [goal, setGoal] = useState(activeYear.collectionGoal);
   const [shashthi, setShashthi] = useState(activeYear.shashthiDate);
   const [dashami, setDashami] = useState(activeYear.dashamiDate);
 
   const [newYear, setNewYear] = useState(activeYear.year + 1);
-  const [newGoal, setNewGoal] = useState(activeYear.collectionGoal);
   const [newShashthi, setNewShashthi] = useState("");
   const [newDashami, setNewDashami] = useState("");
 
@@ -34,7 +31,6 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
     edit.run(
       () =>
         updateYear(activeYear.id, {
-          collectionGoal: goal,
           shashthiDate: shashthi,
           dashamiDate: dashami,
         }),
@@ -51,7 +47,6 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
           year: newYear,
           shashthiDate: newShashthi,
           dashamiDate: newDashami,
-          collectionGoal: newGoal,
         }),
       close,
     );
@@ -90,9 +85,6 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
                   >
                     {year.year}
                   </span>
-                  <span className="mt-0.5 block text-[0.72rem] tabular-nums text-ink-faint">
-                    Goal {formatINR(year.collectionGoal)}
-                  </span>
                 </span>
                 <span className="shrink-0 text-[0.7rem] font-semibold uppercase tracking-wide text-ink-faint">
                   {year.status === "active" ? "Current" : "History"}
@@ -105,7 +97,6 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
             <button
               type="button"
               onClick={() => {
-                setGoal(activeYear.collectionGoal);
                 setShashthi(activeYear.shashthiDate);
                 setDashami(activeYear.dashamiDate);
                 setMode("edit");
@@ -130,14 +121,12 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
       {mode === "edit" && (
         <form onSubmit={handleEdit} className="space-y-4">
-          <Field label="Collection goal">
-            <AmountInput value={goal} onChange={setGoal} autoFocus />
-          </Field>
           <Field label="Shashthi">
             <TextInput
               type="date"
               value={shashthi}
               onChange={(e) => setShashthi(e.target.value)}
+              autoFocus
             />
           </Field>
           <Field label="Dashami">
@@ -156,9 +145,6 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
         <form onSubmit={handleNew} className="space-y-4">
           <Field label="Year">
             <AmountInput value={newYear} onChange={setNewYear} />
-          </Field>
-          <Field label="Collection goal">
-            <AmountInput value={newGoal} onChange={setNewGoal} />
           </Field>
           <Field label="Shashthi">
             <TextInput

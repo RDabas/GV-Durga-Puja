@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { Pill } from "@/components/Pill";
-import { ProgressBar } from "@/components/ProgressBar";
 import { CoinsIcon, PlusIcon, ReceiptIcon } from "@/components/icons";
 import { formatINR } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
 
 export default function DashboardPage() {
-  const { activeYear, contributions, sponsors, vendorExpenses, houses, owners } = usePujaData();
+  const { contributions, sponsors, vendorExpenses, houses, owners } = usePujaData();
 
   // Promised amounts are tracked but not yet in hand, so they're excluded here.
   const collected = contributions
@@ -63,9 +62,8 @@ export default function DashboardPage() {
             {formatINR(collected)}
           </div>
           <div className="mt-0.5 text-[0.72rem] tabular-nums text-ink-soft">
-            of {formatINR(activeYear.collectionGoal)} goal · {flatsVisited} of {houses.length} flats
+            {flatsVisited} of {houses.length} flats visited
           </div>
-          <ProgressBar percent={(collected / activeYear.collectionGoal) * 100} />
         </div>
         <div className="rounded-2xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
           <div className="text-[0.72rem] font-semibold text-ink-faint">Sponsors</div>

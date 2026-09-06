@@ -35,7 +35,6 @@ interface YearRow {
   shashthi_date: string;
   dashami_date: string;
   status: "active" | "archived";
-  collection_goal: number;
 }
 
 interface OwnerRow {
@@ -156,7 +155,6 @@ const mapYear = (r: YearRow): PujaYear => ({
   shashthiDate: r.shashthi_date,
   dashamiDate: r.dashami_date,
   status: r.status,
-  collectionGoal: r.collection_goal,
 });
 
 const mapOwner = (r: OwnerRow): Owner => ({
@@ -578,7 +576,7 @@ export async function dbAddVendorPayment(
 /** Archives whatever year was active and starts a new one. Returns the new year's id. */
 export async function dbStartYear(
   supabase: SupabaseClient,
-  input: { year: number; shashthiDate: string; dashamiDate: string; collectionGoal: number },
+  input: { year: number; shashthiDate: string; dashamiDate: string },
 ): Promise<string> {
   const archived = await supabase
     .from("puja_years")
@@ -592,7 +590,6 @@ export async function dbStartYear(
       year: input.year,
       shashthi_date: input.shashthiDate,
       dashami_date: input.dashamiDate,
-      collection_goal: input.collectionGoal,
       status: "active",
     })
     .select()
@@ -603,10 +600,9 @@ export async function dbStartYear(
 export async function dbUpdateYear(
   supabase: SupabaseClient,
   yearId: string,
-  patch: { collectionGoal?: number; shashthiDate?: string; dashamiDate?: string },
+  patch: { shashthiDate?: string; dashamiDate?: string },
 ): Promise<void> {
   const row: Record<string, unknown> = {};
-  if (patch.collectionGoal !== undefined) row.collection_goal = patch.collectionGoal;
   if (patch.shashthiDate !== undefined) row.shashthi_date = patch.shashthiDate;
   if (patch.dashamiDate !== undefined) row.dashami_date = patch.dashamiDate;
 

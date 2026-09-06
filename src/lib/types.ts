@@ -23,7 +23,6 @@ export interface PujaYear {
   shashthiDate: string;
   dashamiDate: string;
   status: "active" | "archived";
-  collectionGoal: number;
 }
 
 /**
