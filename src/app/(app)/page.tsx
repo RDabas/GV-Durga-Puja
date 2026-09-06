@@ -1,17 +1,61 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { Pill } from "@/components/Pill";
 import { CoinsIcon, DownloadIcon, PlusIcon, ReceiptIcon } from "@/components/icons";
 import { exportPujaDataToExcel } from "@/lib/export";
+import { knownBlocks } from "@/lib/directory";
 import { formatINR } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
+import type { Block, Contribution, ContributionStatus } from "@/lib/types";
+
+type FollowUpFilter = "active" | ContributionStatus;
+
+const followUpFilters: { value: FollowUpFilter; label: string }[] = [
+  { value: "active", label: "All" },
+  { value: "promised", label: "Promised" },
+  { value: "partial", label: "Partial" },
+  { value: "not_home", label: "Nobody home" },
+  { value: "not_visited", label: "Not visited" },
+];
+
+interface FollowUpEntry {
+  key: string;
+  badge: string;
+  title: string;
+  blocks: Block[];
+  status: ContributionStatus;
+  contribution?: Contribution;
+}
+
+function followUpDescription(status: ContributionStatus, contribution?: Contribution): string {
+  switch (status) {
+    case "promised":
+      return [
+        contribution && contribution.moneyAmount > 0
+          ? `Promised ${formatINR(contribution.moneyAmount)}`
+          : "Promised to pay",
+        contribution?.followUpNote,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    case "not_home":
+      return contribution?.followUpNote ?? "No one was home — go back";
+    case "partial":
+      return `Partial — ${formatINR(contribution?.moneyAmount ?? 0)} so far`;
+    default:
+      return "Not visited yet";
+  }
+}
 
 export default function DashboardPage() {
   const store = usePujaData();
-  const { contributions, sponsors, vendorExpenses, houses, owners } = store;
+  const { contributions, sponsors, vendorExpenses, houses, owners, contributionFor } = store;
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
+  const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<FollowUpFilter>("active");
 
   const paidAmount = contributions
     .filter((c) => c.status === "paid" || c.status === "partial")
@@ -41,21 +85,53 @@ export default function DashboardPage() {
   );
   const vendorPending = vendorExpenses.reduce((sum, e) => sum + e.totalAmount, 0) - vendorPaid;
 
-  const followUps = contributions
-    .filter(
-      (c) => c.status === "promised" || c.status === "partial" || c.status === "not_home",
-    )
-    .map((c) => {
-      const house = c.houseId ? houses.find((h) => h.id === c.houseId) : undefined;
-      const owner = c.ownerId ? owners.find((o) => o.id === c.ownerId) : undefined;
-      return {
-        contribution: c,
-        badge: house ? house.flatNo : "OWN",
-        title: house
-          ? `${house.block}-${house.flatNo} · ${house.tenantNames.join(", ") || "Tenant"}`
-          : `${owner?.names.join(", ") ?? "Owner"} · owner`,
-      };
-    });
+  // Every flat and every owner gets an entry even with no contribution row
+  // yet — "not visited" is the implicit default, same as FlatCard shows it,
+  // so this list can answer "who haven't we been to" as well as who's
+  // promised, partial, or not home.
+  const followUpEntries = useMemo<FollowUpEntry[]>(() => {
+    const entries: FollowUpEntry[] = [];
+
+    for (const owner of owners) {
+      const ownerHouses = houses.filter((h) => h.ownerId === owner.id);
+      if (ownerHouses.length === 0) continue;
+      const contribution = contributionFor({ ownerId: owner.id });
+      entries.push({
+        key: `owner-${owner.id}`,
+        badge: "OWN",
+        title: `${owner.names.join(", ")} · owner (${ownerHouses
+          .map((h) => `${h.block}-${h.flatNo}`)
+          .join(", ")})`,
+        blocks: [...new Set(ownerHouses.map((h) => h.block))],
+        status: contribution?.status ?? "not_visited",
+        contribution,
+      });
+    }
+
+    for (const house of houses) {
+      const contribution = contributionFor({ houseId: house.id });
+      const hasTenant = house.tenantNames.length > 0 || contribution !== undefined;
+      if (!hasTenant) continue;
+      entries.push({
+        key: `tenant-${house.id}`,
+        badge: house.flatNo,
+        title: `${house.block}-${house.flatNo} · ${house.tenantNames.join(", ") || "Tenant"}`,
+        blocks: [house.block],
+        status: contribution?.status ?? "not_visited",
+        contribution,
+      });
+    }
+
+    return entries;
+  }, [owners, houses, contributionFor]);
+
+  const followUps = followUpEntries.filter((e) => {
+    if (blockFilter !== "all" && !e.blocks.includes(blockFilter)) return false;
+    if (statusFilter === "active") {
+      return e.status === "promised" || e.status === "partial" || e.status === "not_home";
+    }
+    return e.status === statusFilter;
+  });
 
   return (
     <>
@@ -111,10 +187,59 @@ export default function DashboardPage() {
         <p className="mb-2 px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
           Needs follow-up
         </p>
+
+        <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+          <button
+            type="button"
+            onClick={() => setBlockFilter("all")}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold ${
+              blockFilter === "all"
+                ? "bg-brand text-white"
+                : "border border-border bg-surface text-ink-soft"
+            }`}
+          >
+            All blocks
+          </button>
+          {knownBlocks.map((block) => (
+            <button
+              key={block}
+              type="button"
+              onClick={() => setBlockFilter(block)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold ${
+                blockFilter === block
+                  ? "bg-brand text-white"
+                  : "border border-border bg-surface text-ink-soft"
+              }`}
+            >
+              {block}
+            </button>
+          ))}
+        </div>
+
+        <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+          {followUpFilters.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setStatusFilter(value)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold ${
+                statusFilter === value
+                  ? "bg-brand text-white"
+                  : "border border-border bg-surface text-ink-soft"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-          {followUps.map(({ contribution, badge, title }, i) => (
+          {followUps.length === 0 && (
+            <p className="p-3 text-[0.8rem] text-ink-faint">Nothing matches this filter.</p>
+          )}
+          {followUps.map(({ key, badge, title, status, contribution }, i) => (
             <div
-              key={contribution.id}
+              key={key}
               className={`flex items-center gap-3 p-3 ${i > 0 ? "border-t border-border" : ""}`}
             >
               <span className="flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-ground-alt px-1 font-display text-[0.78rem] font-bold text-ink-soft">
@@ -123,21 +248,10 @@ export default function DashboardPage() {
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[0.88rem] font-semibold text-ink">{title}</div>
                 <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
-                  {contribution.status === "promised"
-                    ? [
-                        contribution.moneyAmount > 0
-                          ? `Promised ${formatINR(contribution.moneyAmount)}`
-                          : "Promised to pay",
-                        contribution.followUpNote,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")
-                    : contribution.status === "not_home"
-                      ? contribution.followUpNote ?? "No one was home — go back"
-                      : `Partial — ${formatINR(contribution.moneyAmount)} so far`}
+                  {followUpDescription(status, contribution)}
                 </div>
               </div>
-              <Pill tone={contribution.status} />
+              <Pill tone={status} />
             </div>
           ))}
         </div>
