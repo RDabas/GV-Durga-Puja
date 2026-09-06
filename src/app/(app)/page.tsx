@@ -49,7 +49,7 @@ function followUpDescription(
     case "promised":
       return [
         contribution && contribution.moneyAmount > 0
-          ? `Promised ${formatINR(contribution.moneyAmount)}`
+          ? `Promised ${formatINR(contribution.originalPledgeAmount ?? contribution.moneyAmount)}`
           : "Promised to pay",
         contribution?.followUpNote,
       ]
@@ -338,7 +338,8 @@ export default function DashboardPage() {
                 </div>
                 {contribution?.originalPledgeAmount != null && (
                   <div className="mt-0.5 text-[0.72rem] font-semibold text-gold">
-                    of {formatINR(contribution.originalPledgeAmount)} originally promised
+                    {formatINR(contribution.moneyAmount)} remaining of{" "}
+                    {formatINR(contribution.originalPledgeAmount)}
                   </div>
                 )}
                 {/* Never truncated — a long name shouldn't be able to hide which flat(s) this is. */}

@@ -74,13 +74,16 @@ function PayerRow({
       </span>
       <span className="shrink-0 text-right">
         <span className="block text-[0.88rem] font-bold tabular-nums text-ink">
-          {contribution && contribution.moneyAmount > 0
-            ? formatINR(contribution.moneyAmount)
-            : "—"}
+          {contribution?.originalPledgeAmount != null
+            ? formatINR(contribution.originalPledgeAmount)
+            : contribution && contribution.moneyAmount > 0
+              ? formatINR(contribution.moneyAmount)
+              : "—"}
         </span>
         {contribution?.originalPledgeAmount != null && (
           <span className="mt-0.5 block whitespace-nowrap text-[0.7rem] font-semibold tabular-nums text-gold">
-            of {formatINR(contribution.originalPledgeAmount)} pledged
+            {formatINR(contribution.moneyAmount)} remaining of{" "}
+            {formatINR(contribution.originalPledgeAmount)}
           </span>
         )}
         {previousYear && (
