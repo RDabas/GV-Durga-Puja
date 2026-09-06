@@ -12,16 +12,17 @@ import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { Block, Contribution, ContributionStatus, House } from "@/lib/types";
 
-type FollowUpFilter = "active" | ContributionStatus;
-
-const followUpFilters: { value: FollowUpFilter; label: string }[] = [
-  { value: "active", label: "All" },
+const followUpStatusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "promised", label: "Promised" },
   { value: "partial", label: "Partial" },
   { value: "pending", label: "Pending" },
   { value: "not_home", label: "Nobody home" },
   { value: "not_visited", label: "Not visited" },
 ];
+
+// Excludes "not_visited" by default — it's usually the biggest bucket by
+// far, so it stays opt-in rather than swamping the list on first load.
+const defaultFollowUpStatuses: ContributionStatus[] = ["promised", "partial", "pending", "not_home"];
 
 interface FollowUpEntry {
   key: string;
@@ -78,7 +79,7 @@ export default function DashboardPage() {
     store;
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
   const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
-  const [statusFilter, setStatusFilter] = useState<FollowUpFilter>("active");
+  const [statusFilters, setStatusFilters] = useState<ContributionStatus[]>(defaultFollowUpStatuses);
   const [moneyBlockFilter, setMoneyBlockFilter] = useState<Block | "all">("all");
   const [editing, setEditing] = useState<{ house: House; role: "owner" | "tenant" } | null>(
     null,
@@ -177,15 +178,7 @@ export default function DashboardPage() {
 
   const followUps = followUpEntries.filter((e) => {
     if (blockFilter !== "all" && !e.blocks.includes(blockFilter)) return false;
-    if (statusFilter === "active") {
-      return (
-        e.status === "promised" ||
-        e.status === "partial" ||
-        e.status === "pending" ||
-        e.status === "not_home"
-      );
-    }
-    return e.status === statusFilter;
+    return statusFilters.includes(e.status);
   });
 
   return (
@@ -301,13 +294,28 @@ export default function DashboardPage() {
         </div>
 
         <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
-          {followUpFilters.map(({ value, label }) => (
+          <button
+            type="button"
+            onClick={() => setStatusFilters(followUpStatusOptions.map((o) => o.value))}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold ${
+              statusFilters.length === followUpStatusOptions.length
+                ? "bg-brand text-white"
+                : "border border-border bg-surface text-ink-soft"
+            }`}
+          >
+            All
+          </button>
+          {followUpStatusOptions.map(({ value, label }) => (
             <button
               key={value}
               type="button"
-              onClick={() => setStatusFilter(value)}
+              onClick={() =>
+                setStatusFilters((prev) =>
+                  prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value],
+                )
+              }
               className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold ${
-                statusFilter === value
+                statusFilters.includes(value)
                   ? "bg-brand text-white"
                   : "border border-border bg-surface text-ink-soft"
               }`}
