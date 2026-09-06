@@ -84,9 +84,13 @@ export function ContributionSheet({
   const [paymentDate, setPaymentDate] = useState(contribution?.paymentDate ?? today());
   const [note, setNote] = useState(contribution?.note ?? "");
   const [followUpNote, setFollowUpNote] = useState(contribution?.followUpNote ?? "");
+  const [assignedToMemberId, setAssignedToMemberId] = useState(
+    contribution?.assignedToMemberId ?? "",
+  );
 
   const received = status === "paid" || status === "partial";
   const promised = status === "promised";
+  const needsFollowUp = status === "not_home" || status === "not_visited";
   const takesBhog = kind !== "money";
   const { submitting, error, run } = useAsyncAction();
 
@@ -107,6 +111,7 @@ export function ContributionSheet({
 
       await saveContribution(target, {
         collectorId: received ? collectorId : undefined,
+        assignedToMemberId: needsFollowUp ? assignedToMemberId || undefined : undefined,
         moneyAmount: received || promised ? moneyAmount : 0,
         bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
         contributionKind: kind,
@@ -191,7 +196,7 @@ export function ContributionSheet({
           </>
         )}
 
-        {(status === "promised" || status === "not_home") && (
+        {(status === "promised" || needsFollowUp) && (
           <Field label={status === "promised" ? "Follow-up note" : "Note for next visit"}>
             <TextInput
               value={followUpNote}
@@ -203,8 +208,21 @@ export function ContributionSheet({
           </Field>
         )}
 
+        {needsFollowUp && (
+          <Field label="Assign follow-up to">
+            <OptionGroup
+              value={assignedToMemberId}
+              onChange={setAssignedToMemberId}
+              options={[
+                { value: "", label: "Unassigned" },
+                ...members.map((m) => ({ value: m.id, label: m.name })),
+              ]}
+            />
+          </Field>
+        )}
+
         <FormError message={error} />
-        <SubmitButton disabled={submitting}>Save</SubmitButton>
+        <SubmitButton disabled={submitting} submitting={submitting}>Save</SubmitButton>
       </form>
     </Sheet>
   );

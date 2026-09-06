@@ -30,7 +30,14 @@ interface FollowUpEntry {
   contribution?: Contribution;
 }
 
-function followUpDescription(status: ContributionStatus, contribution?: Contribution): string {
+function followUpDescription(
+  status: ContributionStatus,
+  contribution: Contribution | undefined,
+  memberName: (memberId?: string) => string | undefined,
+): string {
+  const assignee = memberName(contribution?.assignedToMemberId);
+  const assignedTag = assignee ? `assigned to ${assignee}` : undefined;
+
   switch (status) {
     case "promised":
       return [
@@ -42,17 +49,22 @@ function followUpDescription(status: ContributionStatus, contribution?: Contribu
         .filter(Boolean)
         .join(" · ");
     case "not_home":
-      return contribution?.followUpNote ?? "No one was home — go back";
+      return [contribution?.followUpNote ?? "No one was home — go back", assignedTag]
+        .filter(Boolean)
+        .join(" · ");
     case "partial":
       return `Partial — ${formatINR(contribution?.moneyAmount ?? 0)} so far`;
     default:
-      return "Not visited yet";
+      return [contribution?.followUpNote ?? "Not visited yet", assignedTag]
+        .filter(Boolean)
+        .join(" · ");
   }
 }
 
 export default function DashboardPage() {
   const store = usePujaData();
-  const { contributions, sponsors, vendorExpenses, houses, owners, contributionFor } = store;
+  const { contributions, sponsors, vendorExpenses, houses, owners, contributionFor, memberName } =
+    store;
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
   const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
   const [statusFilter, setStatusFilter] = useState<FollowUpFilter>("active");
@@ -248,7 +260,7 @@ export default function DashboardPage() {
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[0.88rem] font-semibold text-ink">{title}</div>
                 <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
-                  {followUpDescription(status, contribution)}
+                  {followUpDescription(status, contribution, memberName)}
                 </div>
               </div>
               <Pill tone={status} />

@@ -48,7 +48,10 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
         <p className="text-[0.75rem] text-critical">Passwords don&rsquo;t match.</p>
       )}
       <FormError message={error} />
-      <SubmitButton disabled={submitting || password.length < 6 || password !== confirm}>
+      <SubmitButton
+        disabled={submitting || password.length < 6 || password !== confirm}
+        submitting={submitting}
+      >
         Update password
       </SubmitButton>
     </form>

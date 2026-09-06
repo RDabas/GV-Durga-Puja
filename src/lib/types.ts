@@ -59,6 +59,8 @@ export interface Contribution {
   houseId?: string;
   ownerId?: string;
   collectorId?: string;
+  /** Who should go back for a "nobody home"/"not visited" flat — separate from collectorId. */
+  assignedToMemberId?: string;
   moneyAmount: number;
   bhogGroceryAmount: number;
   contributionKind: ContributionKind;

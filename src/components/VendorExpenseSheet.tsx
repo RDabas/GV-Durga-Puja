@@ -80,7 +80,7 @@ export function VendorExpenseSheet({
         </Field>
 
         <FormError message={error} />
-        <SubmitButton disabled={submitting}>Add bill</SubmitButton>
+        <SubmitButton disabled={submitting} submitting={submitting}>Add bill</SubmitButton>
       </form>
     </Sheet>
   );

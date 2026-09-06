@@ -137,7 +137,9 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
             />
           </Field>
           <FormError message={edit.error} />
-          <SubmitButton disabled={edit.submitting}>Save {activeYear.year}</SubmitButton>
+          <SubmitButton disabled={edit.submitting} submitting={edit.submitting}>
+            Save {activeYear.year}
+          </SubmitButton>
         </form>
       )}
 
@@ -164,7 +166,9 @@ export function YearSheet({ open, onClose }: { open: boolean; onClose: () => voi
             {activeYear.year} stays as history — nothing is deleted.
           </p>
           <FormError message={create.error} />
-          <SubmitButton disabled={create.submitting}>Start {newYear}</SubmitButton>
+          <SubmitButton disabled={create.submitting} submitting={create.submitting}>
+            Start {newYear}
+          </SubmitButton>
         </form>
       )}
     </Sheet>

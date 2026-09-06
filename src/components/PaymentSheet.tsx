@@ -101,7 +101,7 @@ export function PaymentSheet({
         </Field>
 
         <FormError message={error} />
-        <SubmitButton disabled={submitting}>Record payment</SubmitButton>
+        <SubmitButton disabled={submitting} submitting={submitting}>Record payment</SubmitButton>
       </form>
     </Sheet>
   );

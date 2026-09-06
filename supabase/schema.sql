@@ -69,6 +69,9 @@ create table contributions (
   owner_id uuid references owners(id) on delete cascade,
   year_id uuid not null references puja_years(id) on delete cascade,
   collector_id uuid references committee_members(id),
+  -- Who should go back for a "nobody home"/"not visited" flat — separate
+  -- from collector_id, which only ever names who actually took the money.
+  assigned_to_member_id uuid references committee_members(id),
   money_amount numeric(10, 2) not null default 0,
   bhog_grocery_amount numeric(10, 2) not null default 0,
   contribution_kind contribution_kind not null default 'money',

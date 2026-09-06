@@ -117,7 +117,7 @@ export function CarriedFundSheet({ open, onClose }: { open: boolean; onClose: ()
           />
         </Field>
         <FormError message={error} />
-        <SubmitButton disabled={submitting}>Add</SubmitButton>
+        <SubmitButton disabled={submitting} submitting={submitting}>Add</SubmitButton>
       </form>
     </Sheet>
   );

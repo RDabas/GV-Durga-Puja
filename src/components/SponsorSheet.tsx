@@ -90,7 +90,7 @@ export function SponsorSheet({ open, onClose }: { open: boolean; onClose: () => 
         </Field>
 
         <FormError message={error} />
-        <SubmitButton disabled={submitting}>Add sponsor</SubmitButton>
+        <SubmitButton disabled={submitting} submitting={submitting}>Add sponsor</SubmitButton>
       </form>
     </Sheet>
   );

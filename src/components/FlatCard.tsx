@@ -16,6 +16,7 @@ function PayerRow({
   hint,
   contribution,
   collectorName,
+  assignedToName,
   previousYear,
   onClick,
 }: {
@@ -24,6 +25,7 @@ function PayerRow({
   hint?: string;
   contribution?: Contribution;
   collectorName?: string;
+  assignedToName?: string;
   previousYear?: PreviousYearInfo;
   onClick: () => void;
 }) {
@@ -59,6 +61,11 @@ function PayerRow({
             {contribution?.paymentDate && formatShortDate(contribution.paymentDate)}
           </span>
         )}
+        {assignedToName && (
+          <span className="mt-1 block truncate text-[0.68rem] font-semibold text-brand">
+            Follow up: {assignedToName}
+          </span>
+        )}
       </span>
       <span className="shrink-0 text-right">
         <span className="block text-[0.88rem] font-bold tabular-nums text-ink">
@@ -90,6 +97,8 @@ export function FlatCard({
   tenantContribution,
   ownerCollector,
   tenantCollector,
+  ownerAssignedTo,
+  tenantAssignedTo,
   ownerPreviousYear,
   tenantPreviousYear,
   onEditOwner,
@@ -102,6 +111,8 @@ export function FlatCard({
   tenantContribution?: Contribution;
   ownerCollector?: string;
   tenantCollector?: string;
+  ownerAssignedTo?: string;
+  tenantAssignedTo?: string;
   ownerPreviousYear?: PreviousYearInfo;
   tenantPreviousYear?: PreviousYearInfo;
   onEditOwner: () => void;
@@ -132,6 +143,7 @@ export function FlatCard({
         hint={ownerFlatCount > 1 ? `Owns ${ownerFlatCount} flats — pays once` : undefined}
         contribution={ownerContribution}
         collectorName={ownerCollector}
+        assignedToName={ownerAssignedTo}
         previousYear={ownerPreviousYear}
         onClick={onEditOwner}
       />
@@ -145,6 +157,7 @@ export function FlatCard({
             names={summarise(house.tenantNames)}
             contribution={tenantContribution}
             collectorName={tenantCollector}
+            assignedToName={tenantAssignedTo}
             previousYear={tenantPreviousYear}
             onClick={onEditTenant}
           />

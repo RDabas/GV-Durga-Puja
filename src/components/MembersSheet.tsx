@@ -61,9 +61,12 @@ function EditMemberRow({
         <button
           type="submit"
           disabled={submitting}
-          className="flex-1 rounded-xl bg-brand py-2 text-[0.8rem] font-semibold text-white disabled:opacity-60"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand py-2 text-[0.8rem] font-semibold text-white disabled:opacity-60"
         >
-          Save
+          {submitting && (
+            <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+          )}
+          {submitting ? "Saving…" : "Save"}
         </button>
       </div>
     </form>
@@ -184,7 +187,7 @@ export function MembersSheet({ open, onClose }: { open: boolean; onClose: () => 
           />
         </Field>
         <FormError message={error} />
-        <SubmitButton disabled={submitting}>Add member</SubmitButton>
+        <SubmitButton disabled={submitting} submitting={submitting}>Add member</SubmitButton>
       </form>
     </Sheet>
   );

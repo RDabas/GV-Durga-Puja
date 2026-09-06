@@ -74,17 +74,23 @@ export function OptionGroup<T extends string>({
 export function SubmitButton({
   children,
   disabled,
+  submitting,
 }: {
   children: ReactNode;
   disabled?: boolean;
+  /** Distinct from disabled — a form can be disabled for invalid input without a request in flight. */
+  submitting?: boolean;
 }) {
   return (
     <button
       type="submit"
       disabled={disabled}
-      className="w-full rounded-xl bg-brand py-3 text-[0.9rem] font-semibold text-white active:scale-[0.99] disabled:opacity-60"
+      className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-[0.9rem] font-semibold text-white active:scale-[0.99] disabled:opacity-60"
     >
-      {children}
+      {submitting && (
+        <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+      )}
+      {submitting ? "Saving…" : children}
     </button>
   );
 }
