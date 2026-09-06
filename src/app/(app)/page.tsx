@@ -25,7 +25,9 @@ const followUpFilters: { value: FollowUpFilter; label: string }[] = [
 interface FollowUpEntry {
   key: string;
   badge: string;
-  title: string;
+  name: string;
+  /** Kept separate from name — a long name shouldn't be able to truncate this away. */
+  flatInfo: string;
   blocks: Block[];
   status: ContributionStatus;
   contribution?: Contribution;
@@ -116,9 +118,8 @@ export default function DashboardPage() {
       entries.push({
         key: `owner-${owner.id}`,
         badge: "OWN",
-        title: `${owner.names.join(", ")} · owner (${ownerHouses
-          .map((h) => `${h.block}-${h.flatNo}`)
-          .join(", ")})`,
+        name: `${owner.names.join(", ")} · owner`,
+        flatInfo: ownerHouses.map((h) => `${h.block}-${h.flatNo}`).join(", "),
         blocks: [...new Set(ownerHouses.map((h) => h.block))],
         status: contribution?.status ?? "not_visited",
         contribution,
@@ -132,7 +133,8 @@ export default function DashboardPage() {
       entries.push({
         key: `tenant-${house.id}`,
         badge: house.flatNo,
-        title: `${house.block}-${house.flatNo} · ${house.tenantNames.join(", ") || "Tenant"}`,
+        name: house.tenantNames.join(", ") || "Tenant",
+        flatInfo: `${house.block}-${house.flatNo}`,
         blocks: [house.block],
         status: contribution?.status ?? "not_visited",
         contribution,
@@ -259,19 +261,21 @@ export default function DashboardPage() {
           {followUps.length === 0 && (
             <p className="p-3 text-[0.8rem] text-ink-faint">Nothing matches this filter.</p>
           )}
-          {followUps.map(({ key, badge, title, status, contribution }, i) => (
+          {followUps.map(({ key, badge, name, flatInfo, status, contribution }, i) => (
             <div
               key={key}
-              className={`flex items-center gap-3 p-3 ${i > 0 ? "border-t border-border" : ""}`}
+              className={`flex items-start gap-3 p-3 ${i > 0 ? "border-t border-border" : ""}`}
             >
               <span className="flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-ground-alt px-1 font-display text-[0.78rem] font-bold text-ink-soft">
                 {badge}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[0.88rem] font-semibold text-ink">{title}</div>
+                <div className="truncate text-[0.88rem] font-semibold text-ink">{name}</div>
                 <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
                   {followUpDescription(status, contribution, memberName)}
                 </div>
+                {/* Never truncated — a long name shouldn't be able to hide which flat(s) this is. */}
+                <div className="mt-1 text-[0.68rem] font-semibold text-ink-soft">{flatInfo}</div>
               </div>
               <Pill tone={status} />
             </div>
