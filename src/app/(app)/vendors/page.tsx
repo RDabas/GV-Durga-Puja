@@ -8,7 +8,7 @@ import { PlusIcon } from "@/components/icons";
 import { usePujaData } from "@/lib/store";
 
 export default function VendorsPage() {
-  const { vendorExpenses, addVendorPayment } = usePujaData();
+  const { vendorExpenses, addVendorPayment, deleteVendorExpense } = usePujaData();
   const [adding, setAdding] = useState(false);
   const [payingFor, setPayingFor] = useState<string | null>(null);
 
@@ -35,6 +35,7 @@ export default function VendorsPage() {
           key={expense.id}
           expense={expense}
           onRecordPayment={() => setPayingFor(expense.id)}
+          onDelete={() => deleteVendorExpense(expense.id)}
         />
       ))}
 

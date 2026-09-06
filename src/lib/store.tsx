@@ -17,6 +17,8 @@ import {
   dbAddSponsorPayment,
   dbAddVendorExpense,
   dbAddVendorPayment,
+  dbDeleteSponsor,
+  dbDeleteVendorExpense,
   dbRemoveCarriedFund,
   dbRemoveMember,
   dbSaveContribution,
@@ -149,8 +151,10 @@ interface PujaStore extends Omit<LiveData, "years"> {
   saveContribution: (payer: PayerRef, input: ContributionInput) => Promise<void>;
   addSponsor: (input: SponsorInput) => Promise<void>;
   addSponsorPayment: (sponsorId: string, input: PaymentInput) => Promise<void>;
+  deleteSponsor: (sponsorId: string) => Promise<void>;
   addVendorExpense: (input: VendorExpenseInput) => Promise<void>;
   addVendorPayment: (expenseId: string, input: PaymentInput) => Promise<void>;
+  deleteVendorExpense: (expenseId: string) => Promise<void>;
   reload: () => Promise<void>;
 }
 
@@ -292,12 +296,22 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await dbAddSponsorPayment(supabase, sponsorId, input);
         await load();
       },
+      deleteSponsor: async (sponsorId) => {
+        await dbDeleteSponsor(supabase, sponsorId);
+        await load();
+      },
       addVendorExpense: async (input) => {
         await dbAddVendorExpense(supabase, activeYear.id, input);
         await load();
       },
       addVendorPayment: async (expenseId, input) => {
         await dbAddVendorPayment(supabase, expenseId, input);
+        await load();
+      },
+      deleteVendorExpense: async (expenseId) => {
+        const expense = data.vendorExpenses.find((e) => e.id === expenseId);
+        if (!expense) throw new Error("That vendor bill is no longer here.");
+        await dbDeleteVendorExpense(supabase, expense.vendorId);
         await load();
       },
     } satisfies PujaStore;

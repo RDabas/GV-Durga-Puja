@@ -33,13 +33,18 @@ export function Sheet({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden sm:items-center">
       <div aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-black/40" />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative z-10 max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-[26px] border border-border bg-surface px-5 pt-4 pb-6 shadow-xl sm:rounded-[26px]"
+        // Plain vh, not dvh: some mobile browsers/WebViews silently drop an
+        // unsupported dvh value with no max-height at all, letting a long
+        // form (landscape especially, where viewport height is small to
+        // begin with) grow past the screen with no way to reach Save.
+        // overscroll-contain stops the page behind from scrolling through.
+        className="relative z-10 max-h-[80vh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[26px] border border-border bg-surface pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] shadow-xl sm:max-h-[85vh] sm:rounded-[26px]"
       >
         <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-border sm:hidden" />
         <div className="mb-4 flex items-start justify-between gap-3">

@@ -8,7 +8,7 @@ import { PlusIcon } from "@/components/icons";
 import { usePujaData } from "@/lib/store";
 
 export default function SponsorsPage() {
-  const { sponsors, addSponsorPayment } = usePujaData();
+  const { sponsors, addSponsorPayment, deleteSponsor } = usePujaData();
   const [adding, setAdding] = useState(false);
   const [payingFor, setPayingFor] = useState<string | null>(null);
 
@@ -35,6 +35,7 @@ export default function SponsorsPage() {
           key={sponsor.id}
           sponsor={sponsor}
           onRecordPayment={() => setPayingFor(sponsor.id)}
+          onDelete={() => deleteSponsor(sponsor.id)}
         />
       ))}
 

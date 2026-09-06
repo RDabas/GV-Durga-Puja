@@ -495,6 +495,12 @@ export async function dbAddSponsor(
   if (error) throw new Error(error.message);
 }
 
+/** Cascades to its sponsor_payments — use when a sponsor was entered wrong. */
+export async function dbDeleteSponsor(supabase: SupabaseClient, sponsorId: string): Promise<void> {
+  const { error } = await supabase.from("sponsors").delete().eq("id", sponsorId);
+  if (error) throw new Error(error.message);
+}
+
 interface PaymentWrite {
   memberId: string;
   amount: number;
@@ -537,6 +543,19 @@ export async function dbAddVendorExpense(
     total_amount: input.totalAmount,
     notes: input.notes ?? null,
   });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Each vendor bill created its own dedicated vendor row (never shared/reused
+ * across bills), so deleting the vendor cascades through vendor_expenses to
+ * vendor_payments in one step, cleanly removing the whole wrongly-created bill.
+ */
+export async function dbDeleteVendorExpense(
+  supabase: SupabaseClient,
+  vendorId: string,
+): Promise<void> {
+  const { error } = await supabase.from("vendors").delete().eq("id", vendorId);
   if (error) throw new Error(error.message);
 }
 

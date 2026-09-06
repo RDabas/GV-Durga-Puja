@@ -1,19 +1,26 @@
+import { useState } from "react";
 import type { Sponsor } from "@/lib/types";
 import { PaymentBreakdown } from "@/components/PaymentBreakdown";
 import { Pill } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
+import { FormError } from "@/components/FormControls";
 import { formatINR, formatShortDate } from "@/lib/format";
 import { paymentModeBreakdown, paymentModeLabels } from "@/lib/payment";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 import { usePujaData } from "@/lib/store";
 
 export function SponsorCard({
   sponsor,
   onRecordPayment,
+  onDelete,
 }: {
   sponsor: Sponsor;
   onRecordPayment?: () => void;
+  onDelete?: () => Promise<void>;
 }) {
   const { memberName } = usePujaData();
+  const [confirming, setConfirming] = useState(false);
+  const { submitting, error, run } = useAsyncAction();
   const received = sponsor.payments.reduce((sum, p) => sum + p.amount, 0);
   const percent =
     sponsor.amountPledged > 0 ? (received / sponsor.amountPledged) * 100 : 0;
@@ -63,6 +70,41 @@ export function SponsorCard({
         >
           Record payment
         </button>
+      )}
+      {onDelete && !confirming && (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="mt-2 w-full py-1 text-[0.72rem] font-semibold text-critical"
+        >
+          Delete sponsor
+        </button>
+      )}
+      {onDelete && confirming && (
+        <div className="mt-2.5 space-y-2 border-t border-border pt-2.5">
+          <p className="text-[0.75rem] text-ink-faint">
+            Delete this sponsor and all its recorded payments? This can&rsquo;t be undone.
+          </p>
+          <FormError message={error} />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={submitting}
+              className="flex-1 rounded-xl border border-border py-2 text-[0.78rem] font-semibold text-ink-soft disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => run(onDelete)}
+              disabled={submitting}
+              className="flex-1 rounded-xl bg-critical py-2 text-[0.78rem] font-semibold text-white disabled:opacity-60"
+            >
+              {submitting ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
