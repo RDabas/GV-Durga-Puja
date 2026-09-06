@@ -140,9 +140,9 @@ export default function DashboardPage() {
     // instead of "every owner, then every tenant" in DB order.
     entries.sort(
       (a, b) =>
-        a.house.block.localeCompare(b.house.block) ||
-        a.house.floor - b.house.floor ||
-        a.house.flatNo.localeCompare(b.house.flatNo),
+        b.house.block.localeCompare(a.house.block) ||
+        b.house.floor - a.house.floor ||
+        b.house.flatNo.localeCompare(a.house.flatNo),
     );
     return entries;
   }, [owners, houses, contributionFor]);
