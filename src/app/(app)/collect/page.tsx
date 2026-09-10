@@ -22,8 +22,10 @@ export default function CollectPage() {
     contributionFor,
     ownerOf,
     ownerFlatCount,
+    ownerPrimaryHouse,
     previousYearInfo,
     memberName,
+    deleteOwner,
   } = usePujaData();
   const [selectedBlock, setSelectedBlock] = useState<Block>(knownBlocks[0] ?? "A");
   const [search, setSearch] = useState("");
@@ -68,12 +70,16 @@ export default function CollectPage() {
     const owner = ownerOf(house);
     const ownerContribution = owner ? contributionFor({ ownerId: owner.id }) : undefined;
     const tenantContribution = contributionFor({ houseId: house.id });
+    const primaryHouse = owner ? ownerPrimaryHouse(owner.id) : undefined;
+    const isPrimaryOwnerFlat = !owner || !primaryHouse || primaryHouse.id === house.id;
     return (
       <FlatCard
         key={house.id}
         house={house}
         owner={owner}
         ownerFlatCount={owner ? ownerFlatCount(owner.id) : 0}
+        isPrimaryOwnerFlat={isPrimaryOwnerFlat}
+        primaryFlatLabel={primaryHouse ? `${primaryHouse.block}-${primaryHouse.flatNo}` : undefined}
         ownerContribution={ownerContribution}
         tenantContribution={tenantContribution}
         ownerCollector={memberName(ownerContribution?.collectorId)}
@@ -84,6 +90,7 @@ export default function CollectPage() {
         tenantPreviousYear={previousYearInfo[house.id]}
         onEditOwner={() => setEditing({ house, role: "owner" })}
         onEditTenant={() => setEditing({ house, role: "tenant" })}
+        onRemoveOwner={owner ? () => deleteOwner(owner.id) : undefined}
       />
     );
   }

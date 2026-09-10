@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  ActivityEntry,
   CarriedFund,
   CarriedFundKind,
   CommitteeMember,
@@ -41,6 +42,7 @@ interface OwnerRow {
   id: string;
   names: string[];
   phone: string | null;
+  primary_house_id: string | null;
 }
 
 interface HouseRow {
@@ -151,6 +153,14 @@ interface VendorExpenseRow {
   vendor_payments: VendorPaymentRow[];
 }
 
+interface ActivityLogRow {
+  id: string;
+  action: string;
+  summary: string;
+  created_at: string;
+  actor: { name: string } | null;
+}
+
 // --- Row -> app type --------------------------------------------------------
 
 const mapYear = (r: YearRow): PujaYear => ({
@@ -165,6 +175,7 @@ const mapOwner = (r: OwnerRow): Owner => ({
   id: r.id,
   names: r.names,
   phone: r.phone ?? undefined,
+  primaryHouseId: r.primary_house_id ?? undefined,
 });
 
 const mapHouse = (r: HouseRow): House => ({
@@ -275,6 +286,14 @@ const mapVendorExpense = (r: VendorExpenseRow): VendorExpense => ({
   payments: (r.vendor_payments ?? []).map(mapVendorPayment),
 });
 
+const mapActivity = (r: ActivityLogRow): ActivityEntry => ({
+  id: r.id,
+  actorName: r.actor?.name ?? "Someone",
+  action: r.action,
+  summary: r.summary,
+  createdAt: r.created_at,
+});
+
 // --- Fetch everything --------------------------------------------------------
 
 export interface LiveData {
@@ -287,6 +306,8 @@ export interface LiveData {
   carriedFunds: CarriedFund[];
   sponsors: Sponsor[];
   vendorExpenses: VendorExpense[];
+  /** Latest activity_log timestamp, for the nav badge — the log itself is paged separately, not held in memory. */
+  latestActivityAt: string | null;
 }
 
 function unwrap<T>(result: { data: T | null; error: { message: string } | null }, label: string): T {
@@ -300,8 +321,18 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
  * which year you're viewing, and comparing to last year, needs no round trip.
  */
 export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
-  const [years, owners, houses, members, contributions, fundTransfers, carriedFunds, sponsors, vendorExpenses] =
-    await Promise.all([
+  const [
+    years,
+    owners,
+    houses,
+    members,
+    contributions,
+    fundTransfers,
+    carriedFunds,
+    sponsors,
+    vendorExpenses,
+    latestActivity,
+  ] = await Promise.all([
       supabase.from("puja_years").select("*").order("year", { ascending: true }),
       supabase.from("owners").select("*"),
       // Explicit order, not just insertion order: Postgres doesn't guarantee
@@ -314,6 +345,9 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
       supabase.from("carried_funds").select("*"),
       supabase.from("sponsors").select("*, sponsor_payments(*)"),
       supabase.from("vendor_expenses").select("*, vendors(*), vendor_payments(*)"),
+      // Just the latest timestamp, cheap — the full log is paged separately
+      // by the Activity page, never held in the app-wide LiveData snapshot.
+      supabase.from("activity_log").select("created_at").order("created_at", { ascending: false }).limit(1),
     ]);
 
   return {
@@ -326,6 +360,8 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
     carriedFunds: unwrap<CarriedFundRow[]>(carriedFunds, "carriedFunds").map(mapCarriedFund),
     sponsors: unwrap<SponsorRow[]>(sponsors, "sponsors").map(mapSponsor),
     vendorExpenses: unwrap<VendorExpenseRow[]>(vendorExpenses, "vendorExpenses").map(mapVendorExpense),
+    latestActivityAt:
+      unwrap<{ created_at: string }[]>(latestActivity, "latestActivity")[0]?.created_at ?? null,
   };
 }
 
@@ -343,6 +379,29 @@ export async function fetchAllWithRetry(supabase: SupabaseClient): Promise<LiveD
     await new Promise((resolve) => setTimeout(resolve, 800));
     return fetchAll(supabase);
   }
+}
+
+/**
+ * Cursor-paginated (by created_at), not offset-based — offset pagination can
+ * duplicate or skip rows if new entries land while someone's scrolled partway
+ * down the feed; a "less than the oldest row I've already got" cursor can't.
+ * Unlike everything else in LiveData, activity_log grows unboundedly over a
+ * season, so the Activity page fetches this itself instead of it living in
+ * the app-wide snapshot every page holds in memory.
+ */
+export async function fetchActivityPage(
+  supabase: SupabaseClient,
+  before?: string,
+  pageSize = 30,
+): Promise<ActivityEntry[]> {
+  let query = supabase
+    .from("activity_log")
+    .select("*, actor:committee_members(name)")
+    .order("created_at", { ascending: false })
+    .limit(pageSize);
+  if (before) query = query.lt("created_at", before);
+  const result = await query;
+  return unwrap<ActivityLogRow[]>(result, "activityLog").map(mapActivity);
 }
 
 // --- Mutations ---------------------------------------------------------------
@@ -382,7 +441,7 @@ export async function dbSaveOwner(
 
   const inserted = await supabase
     .from("owners")
-    .insert({ names, phone: phone ?? null })
+    .insert({ names, phone: phone ?? null, primary_house_id: houseId })
     .select()
     .single();
   const owner = unwrap<OwnerRow>(inserted, "insert owner");
@@ -390,6 +449,12 @@ export async function dbSaveOwner(
   const { error } = await supabase.from("houses").update({ owner_id: owner.id }).eq("id", houseId);
   if (error) throw new Error(error.message);
   return owner.id;
+}
+
+/** Cascades to their contributions (every year) and clears owner_id on their flats — use when an owner is unreachable. */
+export async function dbDeleteOwner(supabase: SupabaseClient, ownerId: string): Promise<void> {
+  const { error } = await supabase.from("owners").delete().eq("id", ownerId);
+  if (error) throw new Error(error.message);
 }
 
 export async function dbAddMember(
@@ -710,5 +775,23 @@ export async function dbUpdateYear(
   if (patch.dashamiDate !== undefined) row.dashami_date = patch.dashamiDate;
 
   const { error } = await supabase.from("puja_years").update(row).eq("id", yearId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * One row per business mutation, written by src/lib/store.tsx right after
+ * the mutation itself succeeds. Callers swallow failures here — losing an
+ * audit-trail entry must never surface as a failed save.
+ */
+export async function dbLogActivity(
+  supabase: SupabaseClient,
+  input: { actorMemberId: string; yearId?: string; action: string; summary: string },
+): Promise<void> {
+  const { error } = await supabase.from("activity_log").insert({
+    actor_member_id: input.actorMemberId,
+    year_id: input.yearId ?? null,
+    action: input.action,
+    summary: input.summary,
+  });
   if (error) throw new Error(error.message);
 }

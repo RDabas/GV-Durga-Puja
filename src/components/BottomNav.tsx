@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CoinsIcon, CollectIcon, HomeIcon, SponsorsIcon, VendorsIcon } from "@/components/icons";
+import {
+  ActivityIcon,
+  CoinsIcon,
+  CollectIcon,
+  DotIcon,
+  HomeIcon,
+  SponsorsIcon,
+  VendorsIcon,
+} from "@/components/icons";
+import { useActivityUnread } from "@/lib/activitySeen";
+import { usePujaData } from "@/lib/store";
 
 const items = [
   { href: "/", label: "Home", icon: HomeIcon },
@@ -10,10 +20,13 @@ const items = [
   { href: "/funds", label: "Funds", icon: CoinsIcon },
   { href: "/sponsors", label: "Sponsors", icon: SponsorsIcon },
   { href: "/vendors", label: "Vendors", icon: VendorsIcon },
+  { href: "/activity", label: "Activity", icon: ActivityIcon },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { latestActivityAt } = usePujaData();
+  const unread = useActivityUnread(latestActivityAt);
 
   return (
     <nav
@@ -26,11 +39,14 @@ export function BottomNav() {
           <Link
             key={href}
             href={href}
-            className={`flex flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 ${
+            className={`relative flex flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 ${
               active ? "text-brand" : "text-ink-faint"
             }`}
           >
             <Icon className="h-[21px] w-[21px]" />
+            {href === "/activity" && unread && (
+              <DotIcon className="absolute right-2.5 top-0.5 h-[7px] w-[7px] text-critical" />
+            )}
             <span className="text-[0.63rem] font-semibold">{label}</span>
           </Link>
         );

@@ -47,6 +47,13 @@ create table houses (
   unique (block, flat_no)
 );
 
+-- Which flat "counts" for an owner who holds several — the one their
+-- contribution and block attribution are shown against everywhere, so the
+-- same payment doesn't appear to inflate more than one block's total. Set
+-- automatically to whichever flat they were first added through; added here
+-- (not on the owners table above) since it references houses.
+alter table owners add column primary_house_id uuid references houses(id) on delete set null;
+
 -- auth_user_id is nullable: an admin adds a member by name so they can be
 -- picked as "collected by" straight away, and the row is linked to a real
 -- login the first time that person signs in.
@@ -197,6 +204,23 @@ create table vendor_payments (
   created_at timestamptz not null default now()
 );
 
+-- One row per business mutation made through the app — who did what, in a
+-- human-readable sentence, for the committee to review. action is plain text
+-- (not an enum) since new action kinds get added over time and this project
+-- has no migration runner, so a new string is far easier to hand-apply than
+-- an ALTER TYPE ... ADD VALUE. No update/delete policy is defined below,
+-- which (with RLS enabled) makes rows immutable once written — a real audit
+-- log, not editable even by admins.
+create table activity_log (
+  id uuid primary key default gen_random_uuid(),
+  actor_member_id uuid not null references committee_members(id),
+  year_id uuid references puja_years(id) on delete set null,
+  action text not null,
+  summary text not null,
+  created_at timestamptz not null default now()
+);
+create index activity_log_created_at_idx on activity_log (created_at desc);
+
 -- --- Row Level Security -----------------------------------------------------
 -- Every table is restricted to authenticated committee members. Only admins
 -- can write sponsor/vendor financials or edit another collector's entries;
@@ -214,6 +238,7 @@ alter table sponsor_payments enable row level security;
 alter table vendors enable row level security;
 alter table vendor_expenses enable row level security;
 alter table vendor_payments enable row level security;
+alter table activity_log enable row level security;
 
 create function is_committee_member() returns boolean
 language sql security definer stable as $$
@@ -249,6 +274,8 @@ create policy "committee can add owners" on owners
   for insert with check (is_committee_member());
 create policy "committee can update owners" on owners
   for update using (is_committee_member());
+create policy "admins delete owners" on owners
+  for delete using (is_committee_admin());
 
 create policy "committee can read committee_members" on committee_members
   for select using (is_committee_member());
@@ -306,3 +333,11 @@ create policy "committee can read vendor_payments" on vendor_payments
   for select using (is_committee_member());
 create policy "admins manage vendor_payments" on vendor_payments
   for all using (is_committee_admin()) with check (is_committee_admin());
+
+create policy "committee can read activity_log" on activity_log
+  for select using (is_committee_member());
+create policy "committee can log their own activity" on activity_log
+  for insert with check (
+    is_committee_member()
+    and actor_member_id = (select id from committee_members where auth_user_id = auth.uid())
+  );

@@ -35,6 +35,8 @@ export interface Owner {
   id: string;
   names: string[];
   phone?: string;
+  /** Which of their flats their contribution/block attribution is shown against — see store.tsx's ownerPrimaryHouse. */
+  primaryHouseId?: string;
 }
 
 /** A flat in the society directory. */
@@ -180,4 +182,13 @@ export interface CarriedFund {
   kind: CarriedFundKind;
   amount: number;
   note?: string;
+}
+
+/** One row per business mutation made through the app — who did what, in plain language. */
+export interface ActivityEntry {
+  id: string;
+  actorName: string;
+  action: string;
+  summary: string;
+  createdAt: string;
 }

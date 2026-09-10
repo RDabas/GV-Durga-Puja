@@ -1,13 +1,59 @@
-import type { Contribution, House, Owner } from "@/lib/types";
+import { useState } from "react";
+import type { Contribution, ContributionStatus, House, Owner } from "@/lib/types";
 import { Pill } from "@/components/Pill";
 import { PaymentTag } from "@/components/PaymentBreakdown";
+import { FormError } from "@/components/FormControls";
 import { formatINR, formatShortDate } from "@/lib/format";
 import type { PreviousYearInfo } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 
 function summarise(names: string[]): string {
   if (names.length === 0) return "";
   if (names.length <= 2) return names.join(", ");
   return `${names[0]}, ${names[1]} +${names.length - 2}`;
+}
+
+const referenceDotTone: Record<ContributionStatus, string> = {
+  paid: "bg-success",
+  partial: "bg-warning",
+  promised: "bg-gold",
+  pending: "bg-brand",
+  not_home: "bg-critical",
+  not_visited: "bg-ink-faint/40",
+};
+
+/** Shown on a multi-flat owner's non-primary flats instead of the full PayerRow — their money and status already live on the primary flat, so this is just a pointer there. */
+function OwnerReferenceRow({
+  names,
+  primaryFlatLabel,
+  status,
+  onClick,
+}: {
+  names: string;
+  primaryFlatLabel: string;
+  status: ContributionStatus;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition active:scale-[0.99]"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
+          Owner
+        </span>
+        <span className="mt-0.5 block truncate text-[0.82rem] font-semibold text-ink">
+          {names || "—"}
+        </span>
+        <span className="mt-0.5 block truncate text-[0.68rem] text-ink-faint">
+          Paid via {primaryFlatLabel}
+        </span>
+      </span>
+      <span className={`h-2 w-2 shrink-0 rounded-full ${referenceDotTone[status]}`} />
+    </button>
+  );
 }
 
 function PayerRow({
@@ -87,15 +133,10 @@ function PayerRow({
           </span>
         )}
         {previousYear && (
-          <>
-            <span className="mt-0.5 block text-[0.66rem] tabular-nums text-ink-faint">
-              last yr {formatINR(previousYear.amount)}
-            </span>
-            <span className="mt-1 flex flex-wrap items-center justify-end gap-1">
-              <Pill tone={previousYear.status} />
-              <PaymentTag mode={previousYear.mode} />
-            </span>
-          </>
+          <span className="mt-0.5 block whitespace-nowrap text-[0.66rem] tabular-nums text-ink-faint">
+            last yr {formatINR(previousYear.amount)}
+            {previousYear.payerName && ` · ${previousYear.payerName}`}
+          </span>
         )}
       </span>
     </button>
@@ -106,6 +147,8 @@ export function FlatCard({
   house,
   owner,
   ownerFlatCount,
+  isPrimaryOwnerFlat = true,
+  primaryFlatLabel,
   ownerContribution,
   tenantContribution,
   ownerCollector,
@@ -116,10 +159,15 @@ export function FlatCard({
   tenantPreviousYear,
   onEditOwner,
   onEditTenant,
+  onRemoveOwner,
 }: {
   house: House;
   owner?: Owner;
   ownerFlatCount: number;
+  /** False on a multi-flat owner's non-primary flats — shows a compact reference row instead of the full owner row. */
+  isPrimaryOwnerFlat?: boolean;
+  /** "A-113" style label for the owner's primary flat — required whenever isPrimaryOwnerFlat is false. */
+  primaryFlatLabel?: string;
   ownerContribution?: Contribution;
   tenantContribution?: Contribution;
   ownerCollector?: string;
@@ -130,7 +178,10 @@ export function FlatCard({
   tenantPreviousYear?: PreviousYearInfo;
   onEditOwner: () => void;
   onEditTenant: () => void;
+  onRemoveOwner?: () => Promise<void>;
 }) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const { submitting: removing, error: removeError, run: runRemove } = useAsyncAction();
   const anyPaid =
     ownerContribution?.status === "paid" || tenantContribution?.status === "paid";
   const hasTenant = house.tenantNames.length > 0 || tenantContribution !== undefined;
@@ -150,16 +201,66 @@ export function FlatCard({
         </span>
       </div>
 
-      <PayerRow
-        role="Owner"
-        names={owner ? owner.names.join(", ") : ""}
-        hint={ownerFlatCount > 1 ? `Owns ${ownerFlatCount} flats — pays once` : undefined}
-        contribution={ownerContribution}
-        collectorName={ownerCollector}
-        assignedToName={ownerAssignedTo}
-        previousYear={ownerPreviousYear}
-        onClick={onEditOwner}
-      />
+      {owner && !isPrimaryOwnerFlat && primaryFlatLabel ? (
+        <OwnerReferenceRow
+          names={owner.names.join(", ")}
+          primaryFlatLabel={primaryFlatLabel}
+          status={ownerContribution?.status ?? "not_visited"}
+          onClick={onEditOwner}
+        />
+      ) : (
+        <PayerRow
+          role="Owner"
+          names={owner ? owner.names.join(", ") : ""}
+          hint={ownerFlatCount > 1 ? `Owns ${ownerFlatCount} flats — pays once` : undefined}
+          contribution={ownerContribution}
+          collectorName={ownerCollector}
+          assignedToName={ownerAssignedTo}
+          previousYear={ownerPreviousYear}
+          onClick={onEditOwner}
+        />
+      )}
+
+      {owner && onRemoveOwner && (
+        <div className="border-t border-border px-3.5 py-2">
+          {!confirmingRemove ? (
+            <button
+              type="button"
+              onClick={() => setConfirmingRemove(true)}
+              className="text-[0.72rem] font-semibold text-critical"
+            >
+              Remove owner
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[0.72rem] text-ink-faint">
+                {ownerFlatCount > 1
+                  ? `Removes ${owner.names.join(", ")} from all ${ownerFlatCount} flats they own, not just this one, and deletes their recorded contribution. This can't be undone.`
+                  : "Removes this owner and deletes their recorded contribution. This can't be undone."}
+              </p>
+              <FormError message={removeError} />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRemove(false)}
+                  disabled={removing}
+                  className="flex-1 rounded-xl border border-border py-2 text-[0.78rem] font-semibold text-ink-soft disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runRemove(onRemoveOwner)}
+                  disabled={removing}
+                  className="flex-1 rounded-xl bg-critical py-2 text-[0.78rem] font-semibold text-white disabled:opacity-60"
+                >
+                  {removing ? "Removing…" : "Remove"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* No tenant usually means owner-occupied, not missing data — so this
           stays a quiet link rather than an empty row asking to be filled. */}

@@ -31,7 +31,7 @@ interface FollowUpEntry {
   name: string;
   /** Kept separate from name — a long name shouldn't be able to truncate this away. */
   flatInfo: string;
-  blocks: Block[];
+  block: Block;
   status: ContributionStatus;
   contribution?: Contribution;
   /** Anchor for editing — for an owner entry, any one of their flats works. */
@@ -76,8 +76,16 @@ function followUpDescription(
 
 export default function DashboardPage() {
   const store = usePujaData();
-  const { contributions, sponsors, vendorExpenses, houses, owners, contributionFor, memberName } =
-    store;
+  const {
+    contributions,
+    sponsors,
+    vendorExpenses,
+    houses,
+    owners,
+    contributionFor,
+    memberName,
+    ownerPrimaryHouse,
+  } = store;
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
   const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
   const [statusFilters, setStatusFilters] = useState<ContributionStatus[]>(defaultFollowUpStatuses);
@@ -106,16 +114,17 @@ export default function DashboardPage() {
     for (const owner of owners) {
       const ownerHouses = houses.filter((h) => h.ownerId === owner.id);
       if (ownerHouses.length === 0) continue;
+      const primaryHouse = ownerPrimaryHouse(owner.id) ?? ownerHouses[0];
       const contribution = contributionFor({ ownerId: owner.id });
       entries.push({
         key: `owner-${owner.id}`,
         badge: "OWN",
         name: `${owner.names.join(", ")} · owner`,
         flatInfo: ownerHouses.map((h) => `${h.block}-${h.flatNo}`).join(", "),
-        blocks: [...new Set(ownerHouses.map((h) => h.block))],
+        block: primaryHouse.block,
         status: contribution?.status ?? "not_visited",
         contribution,
-        house: ownerHouses[0],
+        house: primaryHouse,
         role: "owner",
       });
     }
@@ -129,7 +138,7 @@ export default function DashboardPage() {
         badge: house.flatNo,
         name: house.tenantNames.join(", ") || "Tenant",
         flatInfo: `${house.block}-${house.flatNo}`,
-        blocks: [house.block],
+        block: house.block,
         status: contribution?.status ?? "not_visited",
         contribution,
         house,
@@ -147,15 +156,16 @@ export default function DashboardPage() {
         b.house.flatNo.localeCompare(a.house.flatNo),
     );
     return entries;
-  }, [owners, houses, contributionFor]);
+  }, [owners, houses, contributionFor, ownerPrimaryHouse]);
 
   // Money stats reuse the same per-owner/per-flat entries as the follow-up
-  // list, so an owner spanning several blocks is counted once per block they
-  // hold a flat in — consistent with how the follow-up list attributes them.
+  // list — an owner spanning several blocks is counted once, against their
+  // primary flat's block only, so the same payment can't inflate more than
+  // one block's total.
   const moneyEntries =
     moneyBlockFilter === "all"
       ? followUpEntries
-      : followUpEntries.filter((e) => e.blocks.includes(moneyBlockFilter));
+      : followUpEntries.filter((e) => e.block === moneyBlockFilter);
   const paidAmount = moneyEntries
     .filter((e) => e.status === "paid" || e.status === "partial")
     .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
@@ -165,12 +175,14 @@ export default function DashboardPage() {
   const totalExpected = paidAmount + promisedAmount;
   const housesInMoneyBlock =
     moneyBlockFilter === "all" ? houses : houses.filter((h) => h.block === moneyBlockFilter);
-  // A flat counts as visited once either its tenant or its owner has an entry.
+  // A flat counts as visited once either its tenant or its owner has an
+  // entry — the owner side only counts on their primary flat, so a
+  // multi-flat owner's one visit doesn't count as visiting every flat.
   const flatsVisited = housesInMoneyBlock.filter((h) => {
     const tenant = contributions.find((c) => c.houseId === h.id);
-    const owner = h.ownerId
-      ? contributions.find((c) => c.ownerId === h.ownerId)
-      : undefined;
+    const isPrimary = h.ownerId ? ownerPrimaryHouse(h.ownerId)?.id === h.id : false;
+    const owner =
+      h.ownerId && isPrimary ? contributions.find((c) => c.ownerId === h.ownerId) : undefined;
     return (
       (tenant && tenant.status !== "not_visited") ||
       (owner && owner.status !== "not_visited")
@@ -178,7 +190,7 @@ export default function DashboardPage() {
   }).length;
 
   const followUps = followUpEntries.filter((e) => {
-    if (blockFilter !== "all" && !e.blocks.includes(blockFilter)) return false;
+    if (blockFilter !== "all" && e.block !== blockFilter) return false;
     return statusFilters.includes(e.status);
   });
 

@@ -18,7 +18,7 @@ const styles = {
 
 export type PillTone = keyof typeof styles;
 
-const labels: Record<PillTone, string> = {
+export const pillLabels: Record<PillTone, string> = {
   paid: "Paid",
   partial: "Partial",
   promised: "Promised",
@@ -39,7 +39,7 @@ export function Pill({ tone, children }: { tone: PillTone; children?: ReactNode 
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold whitespace-nowrap ${styles[tone]}`}
     >
       <DotIcon className="h-[7px] w-[7px]" />
-      {children ?? labels[tone]}
+      {children ?? pillLabels[tone]}
     </span>
   );
 }

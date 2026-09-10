@@ -65,24 +65,21 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
  * was open (AccountSheet itself never unmounts).
  */
 function AccountSheetBody() {
-  const { members } = usePujaData();
+  const { me } = usePujaData();
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [justChanged, setJustChanged] = useState(false);
 
+  // me (from the store) doesn't carry an email — only fetched here, as a
+  // fallback for display before a member is linked to their auth account.
   useEffect(() => {
     createClient()
       .auth.getUser()
-      .then(({ data }) => {
-        setEmail(data.user?.email ?? null);
-        setUserId(data.user?.id ?? null);
-      });
+      .then(({ data }) => setEmail(data.user?.email ?? null));
   }, []);
 
-  const me = members.find((m) => m.authUserId === userId);
   const displayName = me?.name ?? email ?? "…";
 
   async function handleSignOut() {
