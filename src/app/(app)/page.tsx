@@ -112,6 +112,7 @@ export default function DashboardPage() {
     const entries: FollowUpEntry[] = [];
 
     for (const owner of owners) {
+      if (owner.disabled) continue;
       const ownerHouses = houses.filter((h) => h.ownerId === owner.id);
       if (ownerHouses.length === 0) continue;
       const primaryHouse = ownerPrimaryHouse(owner.id) ?? ownerHouses[0];
@@ -181,8 +182,11 @@ export default function DashboardPage() {
   const flatsVisited = housesInMoneyBlock.filter((h) => {
     const tenant = contributions.find((c) => c.houseId === h.id);
     const isPrimary = h.ownerId ? ownerPrimaryHouse(h.ownerId)?.id === h.id : false;
+    const ownerDisabled = h.ownerId ? owners.find((o) => o.id === h.ownerId)?.disabled : false;
     const owner =
-      h.ownerId && isPrimary ? contributions.find((c) => c.ownerId === h.ownerId) : undefined;
+      h.ownerId && isPrimary && !ownerDisabled
+        ? contributions.find((c) => c.ownerId === h.ownerId)
+        : undefined;
     return (
       (tenant && tenant.status !== "not_visited") ||
       (owner && owner.status !== "not_visited")

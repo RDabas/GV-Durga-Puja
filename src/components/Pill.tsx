@@ -14,6 +14,7 @@ const styles = {
   paid_full: "bg-success-tint text-success",
   installment: "bg-warning-tint text-warning",
   not_paid: "bg-ground-alt text-ink-faint",
+  disabled: "bg-ground-alt text-ink-faint",
 } as const;
 
 export type PillTone = keyof typeof styles;
@@ -31,6 +32,7 @@ export const pillLabels: Record<PillTone, string> = {
   paid_full: "Paid full",
   installment: "Installment",
   not_paid: "Not paid",
+  disabled: "Disabled",
 };
 
 export function Pill({ tone, children }: { tone: PillTone; children?: ReactNode }) {

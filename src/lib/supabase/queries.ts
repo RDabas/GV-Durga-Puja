@@ -43,6 +43,7 @@ interface OwnerRow {
   names: string[];
   phone: string | null;
   primary_house_id: string | null;
+  disabled: boolean;
 }
 
 interface HouseRow {
@@ -176,6 +177,7 @@ const mapOwner = (r: OwnerRow): Owner => ({
   names: r.names,
   phone: r.phone ?? undefined,
   primaryHouseId: r.primary_house_id ?? undefined,
+  disabled: r.disabled,
 });
 
 const mapHouse = (r: HouseRow): House => ({
@@ -451,9 +453,13 @@ export async function dbSaveOwner(
   return owner.id;
 }
 
-/** Cascades to their contributions (every year) and clears owner_id on their flats — use when an owner is unreachable. */
-export async function dbDeleteOwner(supabase: SupabaseClient, ownerId: string): Promise<void> {
-  const { error } = await supabase.from("owners").delete().eq("id", ownerId);
+/** Toggles whether an owner counts toward this year's money totals and follow-up lists — their record and history stay intact either way. */
+export async function dbSetOwnerDisabled(
+  supabase: SupabaseClient,
+  ownerId: string,
+  disabled: boolean,
+): Promise<void> {
+  const { error } = await supabase.from("owners").update({ disabled }).eq("id", ownerId);
   if (error) throw new Error(error.message);
 }
 

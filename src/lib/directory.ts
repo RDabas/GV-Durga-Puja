@@ -432,7 +432,7 @@ function ownerIdFor(names: string[]): string {
   if (existing) return existing;
   const id = `owner-${ownerIdByKey.size + 1}`;
   ownerIdByKey.set(key, id);
-  ownerList.push({ id, names });
+  ownerList.push({ id, names, disabled: false });
   return id;
 }
 

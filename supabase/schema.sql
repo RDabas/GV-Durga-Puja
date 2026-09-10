@@ -54,6 +54,12 @@ create table houses (
 -- (not on the owners table above) since it references houses.
 alter table owners add column primary_house_id uuid references houses(id) on delete set null;
 
+-- An unreachable owner on a flat that still has a tenant can be disabled
+-- instead of deleted: their record (and history) stays intact, but they're
+-- excluded from this year's money totals and follow-up lists until someone
+-- re-enables them.
+alter table owners add column disabled boolean not null default false;
+
 -- auth_user_id is nullable: an admin adds a member by name so they can be
 -- picked as "collected by" straight away, and the row is linked to a real
 -- login the first time that person signs in.

@@ -20,7 +20,6 @@ import {
   dbAddSponsorPayment,
   dbAddVendorExpense,
   dbAddVendorPayment,
-  dbDeleteOwner,
   dbDeleteSponsor,
   dbDeleteVendorExpense,
   dbLogActivity,
@@ -30,6 +29,7 @@ import {
   dbSaveContribution,
   dbSaveOwner,
   dbSaveTenants,
+  dbSetOwnerDisabled,
   dbStartYear,
   dbUpdateMember,
   dbUpdateSponsor,
@@ -165,7 +165,7 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   updateYear: (yearId: string, patch: Partial<YearInput>) => Promise<void>;
   saveTenants: (houseId: string, names: string[], phone?: string) => Promise<void>;
   saveOwner: (houseId: string, names: string[], phone?: string) => Promise<string>;
-  deleteOwner: (ownerId: string) => Promise<void>;
+  setOwnerDisabled: (ownerId: string, disabled: boolean) => Promise<void>;
   addMember: (input: MemberInput) => Promise<void>;
   updateMember: (memberId: string, patch: MemberInput) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
@@ -359,13 +359,12 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await load();
         return ownerId;
       },
-      deleteOwner: async (ownerId) => {
+      setOwnerDisabled: async (ownerId, disabled) => {
         const owner = data.owners.find((o) => o.id === ownerId);
-        const flats = data.houses.filter((h) => h.ownerId === ownerId);
-        await dbDeleteOwner(supabase, ownerId);
+        await dbSetOwnerDisabled(supabase, ownerId, disabled);
         await logActivity(
-          "owner.delete",
-          `removed owner ${owner?.names.join(", ") ?? "?"} from ${flats.length} flat${flats.length === 1 ? "" : "s"} (${flats.map((h) => `${h.block}-${h.flatNo}`).join(", ")})`,
+          disabled ? "owner.disable" : "owner.enable",
+          `${disabled ? "disabled" : "re-enabled"} owner ${owner?.names.join(", ") ?? "?"}`,
         );
         await load();
       },

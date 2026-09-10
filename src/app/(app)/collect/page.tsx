@@ -25,7 +25,7 @@ export default function CollectPage() {
     ownerPrimaryHouse,
     previousYearInfo,
     memberName,
-    deleteOwner,
+    setOwnerDisabled,
   } = usePujaData();
   const [selectedBlock, setSelectedBlock] = useState<Block>(knownBlocks[0] ?? "A");
   const [search, setSearch] = useState("");
@@ -90,7 +90,7 @@ export default function CollectPage() {
         tenantPreviousYear={previousYearInfo[house.id]}
         onEditOwner={() => setEditing({ house, role: "owner" })}
         onEditTenant={() => setEditing({ house, role: "tenant" })}
-        onRemoveOwner={owner ? () => deleteOwner(owner.id) : undefined}
+        onToggleOwnerDisabled={owner ? () => setOwnerDisabled(owner.id, !owner.disabled) : undefined}
       />
     );
   }

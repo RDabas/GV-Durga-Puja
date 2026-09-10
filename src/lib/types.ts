@@ -37,6 +37,8 @@ export interface Owner {
   phone?: string;
   /** Which of their flats their contribution/block attribution is shown against — see store.tsx's ownerPrimaryHouse. */
   primaryHouseId?: string;
+  /** Excluded from this year's money totals and follow-up lists, but kept on record — see FlatCard's disable/enable owner action. */
+  disabled: boolean;
 }
 
 /** A flat in the society directory. */
