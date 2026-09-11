@@ -29,7 +29,7 @@ export function SponsorCard({
   const history = [...sponsor.payments].sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+    <div className="rounded-2xl border border-border bg-surface p-3.5 shadow-[var(--shadow-card)]">
       <div className="flex items-start justify-between gap-2">
         <span className="text-[0.9rem] font-bold text-ink">{sponsor.name}</span>
         <Pill tone={sponsor.type}>

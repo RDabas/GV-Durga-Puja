@@ -81,7 +81,7 @@ export default function ActivityPage() {
       )}
 
       {entries.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card)]">
           {groupedEntries.map(({ entry, day, showHeader }, i) => {
             return (
               <div key={entry.id}>

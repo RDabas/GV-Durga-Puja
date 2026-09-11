@@ -21,6 +21,9 @@
   --warning-tint: #fbecd4;
   --critical: #c8373f;
   --critical-tint: #fbe6e6;
+  /* Layered elevation (a tight contact shadow plus a soft ambient one) so
+     cards read as raised off the page instead of just outlined. */
+  --shadow-card: 0 2px 4px rgba(31, 26, 38, 0.07), 0 20px 40px -14px rgba(31, 26, 38, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +48,12 @@
     --warning-tint: #3a2c14;
     --critical: #ef7b81;
     --critical-tint: #3a1c1e;
+    /* Shadows barely read against a dark ground, so lean on opacity/spread
+       instead of the light theme's softer, more diffuse ambient shadow —
+       plus a faint top inset highlight standing in for a light catching
+       the card's raised edge, since the shadow alone reads flat here. */
+    --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 44px -12px rgba(0, 0, 0, 0.75), inset
+        0 1px 0 rgba(255, 255, 255, 0.06);
   }
 }
 
@@ -69,6 +78,8 @@
   --warning-tint: #3a2c14;
   --critical: #ef7b81;
   --critical-tint: #3a1c1e;
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 44px -12px rgba(0, 0, 0, 0.75), inset
+      0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 @theme inline {

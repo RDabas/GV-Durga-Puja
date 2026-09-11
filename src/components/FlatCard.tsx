@@ -311,7 +311,7 @@ export function FlatCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl border border-r-[3px] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${accent.border}`}
+      className={`overflow-hidden rounded-2xl border border-r-[3px] bg-surface shadow-[var(--shadow-card)] ${accent.border}`}
     >
       <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-2">
         <span

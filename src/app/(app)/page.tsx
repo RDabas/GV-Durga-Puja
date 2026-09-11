@@ -253,7 +253,7 @@ export default function DashboardPage() {
   return (
     <>
       <div className="grid grid-cols-2 gap-2.5">
-        <div className="col-span-2 rounded-2xl border border-r-[3px] border-brand/30 border-r-brand bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        <div className="col-span-2 rounded-2xl border border-r-[3px] border-brand/30 border-r-brand bg-surface p-3.5 shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-1.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-brand-tint text-brand">
               <CoinsIcon className="h-[13px] w-[13px]" />
@@ -323,7 +323,7 @@ export default function DashboardPage() {
           </div>
           <ProgressBar percent={flatsVisitedPercent} />
         </div>
-        <div className="rounded-2xl border border-r-[3px] border-gold/30 border-r-gold bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        <div className="rounded-2xl border border-r-[3px] border-gold/30 border-r-gold bg-surface p-3.5 shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-1.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-gold-tint text-gold">
               <SponsorsIcon className="h-[13px] w-[13px]" />
@@ -336,7 +336,7 @@ export default function DashboardPage() {
           <div className="mt-0.5 text-[0.72rem] text-ink-soft">{sponsors.length} confirmed</div>
         </div>
         <div
-          className={`rounded-2xl border border-r-[3px] bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${
+          className={`rounded-2xl border border-r-[3px] bg-surface p-3.5 shadow-[var(--shadow-card)] ${
             vendorPending > 0 ? "border-warning/30 border-r-warning" : "border-success/30 border-r-success"
           }`}
         >
@@ -431,7 +431,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card)]">
           {followUps.length === 0 && (
             <p className="p-3 text-[0.8rem] text-ink-faint">Nothing matches this filter.</p>
           )}

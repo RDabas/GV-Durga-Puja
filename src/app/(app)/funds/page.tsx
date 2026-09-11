@@ -61,7 +61,7 @@ export default function FundsPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card)]">
         {balances.map(
           (
             {
@@ -135,7 +135,7 @@ export default function FundsPage() {
           type="button"
           onClick={() => runExport(() => exportPujaDataToExcel(store))}
           disabled={exporting}
-          className="flex w-full items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition active:scale-[0.98] disabled:opacity-60"
+          className="flex w-full items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[var(--shadow-card)] transition active:scale-[0.98] disabled:opacity-60"
         >
           <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
             <DownloadIcon className="h-[15px] w-[15px]" />
