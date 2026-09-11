@@ -1,23 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ContributionSheet } from "@/components/ContributionSheet";
 import { Pill } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
-import {
-  CoinsIcon,
-  DownloadIcon,
-  PlusIcon,
-  ReceiptIcon,
-  SponsorsIcon,
-  VendorsIcon,
-} from "@/components/icons";
-import { exportPujaDataToExcel } from "@/lib/export";
+import { CoinsIcon, SponsorsIcon, VendorsIcon } from "@/components/icons";
 import { knownBlocks } from "@/lib/directory";
 import { formatINR } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
-import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { Block, Contribution, ContributionStatus, House } from "@/lib/types";
 
 const followUpStatusOptions: { value: ContributionStatus; label: string }[] = [
@@ -95,7 +85,6 @@ function followUpDescription(
 }
 
 export default function DashboardPage() {
-  const store = usePujaData();
   const {
     years,
     activeYear,
@@ -108,8 +97,7 @@ export default function DashboardPage() {
     memberName,
     ownerPrimaryHouse,
     previousYearInfo,
-  } = store;
-  const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
+  } = usePujaData();
   const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
   const [statusFilters, setStatusFilters] = useState<ContributionStatus[]>(defaultFollowUpStatuses);
   const [moneyBlockFilter, setMoneyBlockFilter] = useState<Block | "all">("all");
@@ -477,46 +465,6 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
-      </div>
-
-      <div>
-        <p className="mb-2 px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-          Quick actions
-        </p>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Link
-            href="/collect"
-            className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition active:scale-[0.98]"
-          >
-            <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
-              <PlusIcon className="h-[15px] w-[15px]" />
-            </span>
-            Add collection
-          </Link>
-          <Link
-            href="/vendors"
-            className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition active:scale-[0.98]"
-          >
-            <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
-              <ReceiptIcon className="h-[15px] w-[15px]" />
-            </span>
-            Add vendor bill
-          </Link>
-          <button
-            type="button"
-            onClick={() => runExport(() => exportPujaDataToExcel(store))}
-            disabled={exporting}
-            className="col-span-2 flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition active:scale-[0.98] disabled:opacity-60"
-          >
-            <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
-              <DownloadIcon className="h-[15px] w-[15px]" />
-            </span>
-            {exporting ? "Preparing export…" : "Export to Excel"}
-          </button>
-        </div>
-        {exportError && (
-          <p className="mt-1.5 px-0.5 text-[0.75rem] text-critical">{exportError}</p>
-        )}
       </div>
 
       {editing && (

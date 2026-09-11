@@ -5,17 +5,21 @@ import { CarriedFundSheet } from "@/components/CarriedFundSheet";
 import { FundTransferSheet } from "@/components/FundTransferSheet";
 import { MembersSheet } from "@/components/MembersSheet";
 import { PaymentBreakdown } from "@/components/PaymentBreakdown";
+import { DownloadIcon } from "@/components/icons";
 import { formatINR } from "@/lib/format";
 import { committeeBalances } from "@/lib/balances";
 import { carriedFundKindLabels } from "@/lib/carriedFund";
+import { exportPujaDataToExcel } from "@/lib/export";
 import { usePujaData } from "@/lib/store";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 
 export default function FundsPage() {
-  const { members, contributions, fundTransfers, sponsors, vendorExpenses, carriedFunds } =
-    usePujaData();
+  const store = usePujaData();
+  const { members, contributions, fundTransfers, sponsors, vendorExpenses, carriedFunds } = store;
   const [managingMembers, setManagingMembers] = useState(false);
   const [managingCarriedFunds, setManagingCarriedFunds] = useState(false);
   const [managingTransfers, setManagingTransfers] = useState(false);
+  const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
 
   const balances = committeeBalances(
     members,
@@ -123,6 +127,23 @@ export default function FundsPage() {
               </div>
             );
           },
+        )}
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => runExport(() => exportPujaDataToExcel(store))}
+          disabled={exporting}
+          className="flex w-full items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition active:scale-[0.98] disabled:opacity-60"
+        >
+          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
+            <DownloadIcon className="h-[15px] w-[15px]" />
+          </span>
+          {exporting ? "Preparing export…" : "Export to Excel"}
+        </button>
+        {exportError && (
+          <p className="mt-1.5 px-0.5 text-[0.75rem] text-critical">{exportError}</p>
         )}
       </div>
 
