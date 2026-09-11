@@ -21,6 +21,40 @@ const referenceDotTone: Record<ContributionStatus, string> = {
   not_visited: "bg-ink-faint/40",
 };
 
+/**
+ * Card-level accent — the badge and border reflect the single "best" status
+ * on the card (owner or tenant, whichever is further along), following the
+ * same solid-badge-plus-accent-border pattern for every status instead of
+ * treating "paid" as the only one worth highlighting.
+ */
+const cardAccent: Record<ContributionStatus, { badge: string; border: string }> = {
+  paid: { badge: "bg-success text-surface", border: "border-success/40 border-l-success" },
+  partial: { badge: "bg-warning text-surface", border: "border-warning/40 border-l-warning" },
+  promised: { badge: "bg-gold text-surface", border: "border-gold/40 border-l-gold" },
+  pending: { badge: "bg-brand text-surface", border: "border-brand/40 border-l-brand" },
+  not_home: { badge: "bg-critical text-surface", border: "border-critical/40 border-l-critical" },
+  not_visited: { badge: "bg-ground-alt text-ink", border: "border-border" },
+};
+
+// Best-to-worst — the card shows whichever status is furthest along between
+// its owner and tenant, so a "paid" owner isn't outranked by a "not visited"
+// tenant slot that simply hasn't been looked at yet.
+const statusRank: ContributionStatus[] = [
+  "paid",
+  "partial",
+  "promised",
+  "pending",
+  "not_home",
+  "not_visited",
+];
+
+function bestStatus(...statuses: (ContributionStatus | undefined)[]): ContributionStatus {
+  for (const s of statusRank) {
+    if (statuses.includes(s)) return s;
+  }
+  return "not_visited";
+}
+
 /** Small "Disable"/"Enable" link shown right next to the owner's role label — a real sibling button, not nested inside the row's own tap-to-edit button. */
 function DisableToggleButton({
   ownerName,
@@ -255,8 +289,13 @@ export function FlatCard({
   onEditTenant: () => void;
   onToggleOwnerDisabled?: () => Promise<void>;
 }) {
-  const anyPaid =
-    ownerContribution?.status === "paid" || tenantContribution?.status === "paid";
+  // A disabled owner's status is excluded — same as everywhere else they're
+  // "not considered" — so their card doesn't get accented by a stale status.
+  const cardStatus = bestStatus(
+    owner && !owner.disabled ? ownerContribution?.status : undefined,
+    tenantContribution?.status,
+  );
+  const accent = cardAccent[cardStatus];
   const hasTenant = house.tenantNames.length > 0 || tenantContribution !== undefined;
   // Disabling only makes sense when a tenant is also on the flat (an
   // owner-occupied flat has no one else to fall back on) — but re-enabling
@@ -272,15 +311,11 @@ export function FlatCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${
-        anyPaid ? "border-success/40 border-l-[3px] border-l-success" : "border-border"
-      }`}
+      className={`overflow-hidden rounded-2xl border border-l-[3px] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${accent.border}`}
     >
       <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-2">
         <span
-          className={`flex h-8 min-w-[2.5rem] shrink-0 items-center justify-center rounded-lg px-1.5 font-display text-[0.8rem] font-bold ${
-            anyPaid ? "bg-success text-surface" : "bg-ground-alt text-ink"
-          }`}
+          className={`flex h-8 min-w-[2.5rem] shrink-0 items-center justify-center rounded-lg px-1.5 font-display text-[0.8rem] font-bold ${accent.badge}`}
         >
           {house.flatNo}
         </span>

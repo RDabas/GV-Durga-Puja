@@ -290,17 +290,17 @@ export default function DashboardPage() {
               <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
                 {formatINR(totalExpected)}
               </b>
+              {trendPercent !== null && (
+                <span
+                  className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.66rem] font-bold tabular-nums ${
+                    trendPercent >= 0 ? "bg-success-tint text-success" : "bg-critical-tint text-critical"
+                  }`}
+                >
+                  {trendPercent >= 0 ? "▲" : "▼"} {Math.abs(trendPercent)}% vs {previousYear!.year}
+                </span>
+              )}
             </span>
           </div>
-          {trendPercent !== null && (
-            <div
-              className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-bold tabular-nums ${
-                trendPercent >= 0 ? "bg-success-tint text-success" : "bg-critical-tint text-critical"
-              }`}
-            >
-              {trendPercent >= 0 ? "▲" : "▼"} {Math.abs(trendPercent)}% vs {previousYear!.year}
-            </div>
-          )}
           <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
             {flatsVisited} of {housesInMoneyBlock.length} flats visited
           </div>
