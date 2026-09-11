@@ -265,7 +265,7 @@ export default function DashboardPage() {
   return (
     <>
       <div className="grid grid-cols-2 gap-2.5">
-        <div className="col-span-2 rounded-2xl border border-l-[3px] border-brand/30 border-l-brand bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        <div className="col-span-2 rounded-2xl border border-r-[3px] border-brand/30 border-r-brand bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
           <div className="flex items-center gap-1.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-brand-tint text-brand">
               <CoinsIcon className="h-[13px] w-[13px]" />
@@ -335,7 +335,7 @@ export default function DashboardPage() {
           </div>
           <ProgressBar percent={flatsVisitedPercent} />
         </div>
-        <div className="rounded-2xl border border-l-[3px] border-gold/30 border-l-gold bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        <div className="rounded-2xl border border-r-[3px] border-gold/30 border-r-gold bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
           <div className="flex items-center gap-1.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-gold-tint text-gold">
               <SponsorsIcon className="h-[13px] w-[13px]" />
@@ -348,8 +348,8 @@ export default function DashboardPage() {
           <div className="mt-0.5 text-[0.72rem] text-ink-soft">{sponsors.length} confirmed</div>
         </div>
         <div
-          className={`rounded-2xl border border-l-[3px] bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${
-            vendorPending > 0 ? "border-warning/30 border-l-warning" : "border-success/30 border-l-success"
+          className={`rounded-2xl border border-r-[3px] bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${
+            vendorPending > 0 ? "border-warning/30 border-r-warning" : "border-success/30 border-r-success"
           }`}
         >
           <div className="flex items-center gap-1.5">
