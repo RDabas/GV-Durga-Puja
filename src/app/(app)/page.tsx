@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ContributionSheet } from "@/components/ContributionSheet";
 import { Pill } from "@/components/Pill";
-import { CoinsIcon, DownloadIcon, PlusIcon, ReceiptIcon } from "@/components/icons";
+import { ProgressBar } from "@/components/ProgressBar";
+import {
+  CoinsIcon,
+  DownloadIcon,
+  PlusIcon,
+  ReceiptIcon,
+  SponsorsIcon,
+  VendorsIcon,
+} from "@/components/icons";
 import { exportPujaDataToExcel } from "@/lib/export";
 import { knownBlocks } from "@/lib/directory";
 import { formatINR } from "@/lib/format";
@@ -24,6 +32,18 @@ const followUpStatusOptions: { value: ContributionStatus; label: string }[] = [
 // — Promised/Partial are already committed and Not visited is usually the
 // biggest bucket by far, so both stay opt-in rather than the default view.
 const defaultFollowUpStatuses: ContributionStatus[] = ["pending", "not_home"];
+
+// Same solid-badge color language as FlatCard's per-status accent, so a
+// row's avatar tells you its status at a glance instead of blending into a
+// uniform gray list.
+const followUpAvatarTone: Record<ContributionStatus, string> = {
+  paid: "bg-success text-surface",
+  partial: "bg-warning text-surface",
+  promised: "bg-gold text-surface",
+  pending: "bg-brand text-surface",
+  not_home: "bg-critical text-surface",
+  not_visited: "bg-ground-alt text-ink-soft",
+};
 
 interface FollowUpEntry {
   key: string;
@@ -237,13 +257,20 @@ export default function DashboardPage() {
     return statusFilters.includes(e.status);
   });
 
+  const vendorTotal = vendorPaid + vendorPending;
+  const vendorPaidPercent = vendorTotal > 0 ? (vendorPaid / vendorTotal) * 100 : 0;
+  const flatsVisitedPercent =
+    housesInMoneyBlock.length > 0 ? (flatsVisited / housesInMoneyBlock.length) * 100 : 0;
+
   return (
     <>
       <div className="grid grid-cols-2 gap-2.5">
-        <div className="col-span-2 rounded-2xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-          <div className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-ink-faint">
-            <CoinsIcon className="h-[13px] w-[13px]" />
-            From houses
+        <div className="col-span-2 rounded-2xl border border-l-[3px] border-brand/30 border-l-brand bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-brand-tint text-brand">
+              <CoinsIcon className="h-[13px] w-[13px]" />
+            </span>
+            <span className="text-[0.72rem] font-semibold text-ink-faint">From houses</span>
           </div>
 
           <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
@@ -306,22 +333,42 @@ export default function DashboardPage() {
           <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
             {flatsVisited} of {housesInMoneyBlock.length} flats visited
           </div>
+          <ProgressBar percent={flatsVisitedPercent} />
         </div>
-        <div className="rounded-2xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-          <div className="text-[0.72rem] font-semibold text-ink-faint">Sponsors</div>
-          <div className="mt-0.5 font-display text-[1.2rem] font-bold tabular-nums text-ink">
+        <div className="rounded-2xl border border-l-[3px] border-gold/30 border-l-gold bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-gold-tint text-gold">
+              <SponsorsIcon className="h-[13px] w-[13px]" />
+            </span>
+            <span className="text-[0.72rem] font-semibold text-ink-faint">Sponsors</span>
+          </div>
+          <div className="mt-1.5 font-display text-[1.2rem] font-bold tabular-nums text-ink">
             {formatINR(sponsorReceived)}
           </div>
           <div className="mt-0.5 text-[0.72rem] text-ink-soft">{sponsors.length} confirmed</div>
         </div>
-        <div className="rounded-2xl border border-border bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-          <div className="text-[0.72rem] font-semibold text-ink-faint">Vendor spend</div>
-          <div className="mt-0.5 font-display text-[1.2rem] font-bold tabular-nums text-ink">
+        <div
+          className={`rounded-2xl border border-l-[3px] bg-surface p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${
+            vendorPending > 0 ? "border-warning/30 border-l-warning" : "border-success/30 border-l-success"
+          }`}
+        >
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] ${
+                vendorPending > 0 ? "bg-warning-tint text-warning" : "bg-success-tint text-success"
+              }`}
+            >
+              <VendorsIcon className="h-[13px] w-[13px]" />
+            </span>
+            <span className="text-[0.72rem] font-semibold text-ink-faint">Vendor spend</span>
+          </div>
+          <div className="mt-1.5 font-display text-[1.2rem] font-bold tabular-nums text-ink">
             {formatINR(vendorPaid)}
           </div>
           <div className="mt-0.5 text-[0.72rem] tabular-nums text-ink-soft">
-            {formatINR(vendorPending)} pending
+            {vendorPending > 0 ? `${formatINR(vendorPending)} pending` : "Fully settled"}
           </div>
+          {vendorTotal > 0 && <ProgressBar percent={vendorPaidPercent} />}
         </div>
       </div>
 
@@ -407,7 +454,9 @@ export default function DashboardPage() {
               onClick={() => setEditing({ house, role })}
               className={`flex w-full items-start gap-3 p-3 text-left transition active:scale-[0.99] ${i > 0 ? "border-t border-border" : ""}`}
             >
-              <span className="flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-ground-alt px-1 font-display text-[0.78rem] font-bold text-ink-soft">
+              <span
+                className={`flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] px-1 font-display text-[0.78rem] font-bold ${followUpAvatarTone[status]}`}
+              >
                 {badge}
               </span>
               <div className="min-w-0 flex-1">
@@ -437,7 +486,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 gap-2.5">
           <Link
             href="/collect"
-            className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+            className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition active:scale-[0.98]"
           >
             <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
               <PlusIcon className="h-[15px] w-[15px]" />
@@ -446,7 +495,7 @@ export default function DashboardPage() {
           </Link>
           <Link
             href="/vendors"
-            className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+            className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition active:scale-[0.98]"
           >
             <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
               <ReceiptIcon className="h-[15px] w-[15px]" />
@@ -457,7 +506,7 @@ export default function DashboardPage() {
             type="button"
             onClick={() => runExport(() => exportPujaDataToExcel(store))}
             disabled={exporting}
-            className="col-span-2 flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] disabled:opacity-60"
+            className="col-span-2 flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition active:scale-[0.98] disabled:opacity-60"
           >
             <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
               <DownloadIcon className="h-[15px] w-[15px]" />
