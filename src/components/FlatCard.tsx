@@ -23,9 +23,11 @@ const referenceDotTone: Record<ContributionStatus, string> = {
 
 /** Small "Disable"/"Enable" link shown right next to the owner's role label — a real sibling button, not nested inside the row's own tap-to-edit button. */
 function DisableToggleButton({
+  ownerName,
   disabled,
   onToggle,
 }: {
+  ownerName: string;
   disabled?: boolean;
   onToggle: () => Promise<void>;
 }) {
@@ -35,7 +37,10 @@ function DisableToggleButton({
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        run(onToggle);
+        const question = disabled
+          ? `Enable ${ownerName || "this owner"} again? They'll count toward this year's totals and follow-up list.`
+          : `Disable ${ownerName || "this owner"}? They'll be excluded from this year's totals and follow-up list until re-enabled.`;
+        if (window.confirm(question)) run(onToggle);
       }}
       disabled={submitting}
       title={error ?? undefined}
@@ -253,7 +258,11 @@ export function FlatCard({
   // must always stay available so a disabled owner is never stuck that way.
   const showDisableToggle = owner && onToggleOwnerDisabled && (owner.disabled || hasTenant);
   const disableToggle = showDisableToggle ? (
-    <DisableToggleButton disabled={owner!.disabled} onToggle={onToggleOwnerDisabled!} />
+    <DisableToggleButton
+      ownerName={owner!.names.join(", ")}
+      disabled={owner!.disabled}
+      onToggle={onToggleOwnerDisabled!}
+    />
   ) : undefined;
 
   return (
