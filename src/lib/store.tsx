@@ -124,10 +124,44 @@ export interface FundTransferInput {
   note?: string;
 }
 
+/**
+ * One prior-year payment against a flat/owner. Usually there's exactly one,
+ * but a flat can have several across the year (e.g. an outgoing and an
+ * incoming tenant both paid) — see previousYearInfo, keyed by house/owner id
+ * to an array of these rather than a single value, so they show as separate
+ * lines instead of being summed into one misleading total.
+ */
 export interface PreviousYearInfo {
   amount: number;
   /** Who actually paid, when recorded — e.g. from an imported prior year's sheet, since the current owner/tenant on file may have changed since then. */
   payerName?: string;
+}
+
+/**
+ * Schema enforces exactly one contribution row per house/owner per year (see
+ * contributions_tenant_per_year / contributions_owner_per_year), so a flat
+ * with several payers in one year (e.g. an outgoing and incoming tenant)
+ * can't be split across multiple rows. Their breakdown is instead encoded as
+ * JSON in that single row's note — `[{"amount":10000,"name":"..."}, ...]` —
+ * and expanded back into separate lines here. A plain free-text note (the
+ * normal case) just falls through to a single entry using the row's total.
+ */
+function isBreakdownEntry(p: unknown): p is { amount: number; name?: string } {
+  return typeof p === "object" && p !== null && typeof (p as { amount: unknown }).amount === "number";
+}
+
+function previousYearEntries(c: Contribution): PreviousYearInfo[] {
+  if (c.note) {
+    try {
+      const parsed: unknown = JSON.parse(c.note);
+      if (Array.isArray(parsed) && parsed.every(isBreakdownEntry)) {
+        return parsed.map((p) => ({ amount: p.amount, payerName: p.name }));
+      }
+    } catch {
+      // Not a structured breakdown — an ordinary note, fall through below.
+    }
+  }
+  return [{ amount: c.moneyAmount, payerName: c.note }];
 }
 
 function matchesPayer(c: Contribution, payer: PayerRef): boolean {
@@ -152,7 +186,7 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   /** The signed-in user's own committee_members row, once resolved — undefined until then. */
   me: CommitteeMember | undefined;
   /** Keyed by house id or owner id — the two id spaces never collide. */
-  previousYearInfo: Record<string, PreviousYearInfo>;
+  previousYearInfo: Record<string, PreviousYearInfo[]>;
   contributionFor: (payer: PayerRef) => Contribution | undefined;
   ownerOf: (house: House) => Owner | undefined;
   ownerFlatCount: (ownerId: string) => number;
@@ -238,12 +272,12 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       .filter((y) => y.year < activeYear.year)
       .sort((a, b) => b.year - a.year)[0];
 
-    const previousYearInfo: Record<string, PreviousYearInfo> = {};
+    const previousYearInfo: Record<string, PreviousYearInfo[]> = {};
     if (previousYear) {
       for (const c of data.contributions) {
         const key = c.houseId ?? c.ownerId;
         if (key && c.yearId === previousYear.id && c.moneyAmount > 0) {
-          previousYearInfo[key] = { amount: c.moneyAmount, payerName: c.note };
+          (previousYearInfo[key] ??= []).push(...previousYearEntries(c));
         }
       }
     }

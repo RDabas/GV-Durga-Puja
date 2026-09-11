@@ -39,7 +39,7 @@ function OwnerReferenceRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition active:scale-[0.99]"
+      className={`flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition active:scale-[0.99] ${disabled ? "opacity-50" : ""}`}
     >
       <span className="min-w-0 flex-1">
         <span className="block text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
@@ -74,7 +74,7 @@ function PayerRow({
   contribution?: Contribution;
   collectorName?: string;
   assignedToName?: string;
-  previousYear?: PreviousYearInfo;
+  previousYear?: PreviousYearInfo[];
   /** Owner is excluded from this year's totals/follow-up — show that instead of their current-year status. */
   disabled?: boolean;
   onClick: () => void;
@@ -85,7 +85,7 @@ function PayerRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-start gap-3 p-3 text-left transition active:scale-[0.99]"
+      className={`flex w-full items-start gap-3 p-3 text-left transition active:scale-[0.99] ${disabled ? "opacity-50" : ""}`}
     >
       <span className="min-w-0 flex-1">
         <span className="block text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
@@ -148,12 +148,15 @@ function PayerRow({
             )}
           </>
         )}
-        {previousYear && (
-          <span className="mt-0.5 block whitespace-nowrap text-[0.66rem] tabular-nums text-ink-faint">
-            last yr {formatINR(previousYear.amount)}
-            {previousYear.payerName && ` · ${previousYear.payerName}`}
+        {previousYear?.map((py, i) => (
+          <span
+            key={i}
+            className="mt-0.5 block whitespace-nowrap text-[0.66rem] tabular-nums text-ink-faint"
+          >
+            last yr {formatINR(py.amount)}
+            {py.payerName && ` · ${py.payerName}`}
           </span>
-        )}
+        ))}
       </span>
     </button>
   );
@@ -190,8 +193,8 @@ export function FlatCard({
   tenantCollector?: string;
   ownerAssignedTo?: string;
   tenantAssignedTo?: string;
-  ownerPreviousYear?: PreviousYearInfo;
-  tenantPreviousYear?: PreviousYearInfo;
+  ownerPreviousYear?: PreviousYearInfo[];
+  tenantPreviousYear?: PreviousYearInfo[];
   onEditOwner: () => void;
   onEditTenant: () => void;
   onToggleOwnerDisabled?: () => Promise<void>;
