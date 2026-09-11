@@ -28,11 +28,11 @@ const referenceDotTone: Record<ContributionStatus, string> = {
  * treating "paid" as the only one worth highlighting.
  */
 const cardAccent: Record<ContributionStatus, { badge: string; border: string }> = {
-  paid: { badge: "bg-success text-surface", border: "border-success/40 border-l-success" },
-  partial: { badge: "bg-warning text-surface", border: "border-warning/40 border-l-warning" },
-  promised: { badge: "bg-gold text-surface", border: "border-gold/40 border-l-gold" },
-  pending: { badge: "bg-brand text-surface", border: "border-brand/40 border-l-brand" },
-  not_home: { badge: "bg-critical text-surface", border: "border-critical/40 border-l-critical" },
+  paid: { badge: "bg-success text-surface", border: "border-success/40 border-r-success" },
+  partial: { badge: "bg-warning text-surface", border: "border-warning/40 border-r-warning" },
+  promised: { badge: "bg-gold text-surface", border: "border-gold/40 border-r-gold" },
+  pending: { badge: "bg-brand text-surface", border: "border-brand/40 border-r-brand" },
+  not_home: { badge: "bg-critical text-surface", border: "border-critical/40 border-r-critical" },
   not_visited: { badge: "bg-ground-alt text-ink", border: "border-border" },
 };
 
@@ -311,7 +311,7 @@ export function FlatCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl border border-l-[3px] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${accent.border}`}
+      className={`overflow-hidden rounded-2xl border border-r-[3px] bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${accent.border}`}
     >
       <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-2">
         <span
