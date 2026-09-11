@@ -225,9 +225,11 @@ export default function DashboardPage() {
     moneyBlockFilter === "all"
       ? previousYearAmountByBlock.all
       : (previousYearAmountByBlock[moneyBlockFilter] ?? 0);
+  // Compared against Total (paid + promised), not just paid — it sits under
+  // the Total figure, so it should track the same number.
   const trendPercent =
     previousYear && lastYearAmount > 0
-      ? Math.round(((paidAmount - lastYearAmount) / lastYearAmount) * 100)
+      ? Math.round(((totalExpected - lastYearAmount) / lastYearAmount) * 100)
       : null;
 
   const followUps = followUpEntries.filter((e) => {
