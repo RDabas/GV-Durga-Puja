@@ -32,6 +32,11 @@ function DisableToggleButton({
   onToggle: () => Promise<void>;
 }) {
   const { submitting, error, run } = useAsyncAction();
+  const tone = error
+    ? "bg-critical-tint text-critical"
+    : disabled
+      ? "bg-success-tint text-success"
+      : "bg-warning-tint text-warning";
   return (
     <button
       type="button"
@@ -44,7 +49,7 @@ function DisableToggleButton({
       }}
       disabled={submitting}
       title={error ?? undefined}
-      className={`shrink-0 text-[0.66rem] font-semibold underline decoration-dotted underline-offset-2 disabled:opacity-60 ${error ? "text-critical" : "text-ink-soft"}`}
+      className={`shrink-0 rounded-full px-2.5 py-1 text-[0.66rem] font-bold whitespace-nowrap transition active:scale-95 disabled:opacity-60 ${tone}`}
     >
       {submitting ? "…" : error ? "Retry" : disabled ? "Enable" : "Disable"}
     </button>
@@ -266,11 +271,15 @@ export function FlatCard({
   ) : undefined;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+    <div
+      className={`overflow-hidden rounded-2xl border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${
+        anyPaid ? "border-success/40 border-l-[3px] border-l-success" : "border-border"
+      }`}
+    >
       <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-2">
         <span
           className={`flex h-8 min-w-[2.5rem] shrink-0 items-center justify-center rounded-lg px-1.5 font-display text-[0.8rem] font-bold ${
-            anyPaid ? "bg-success-tint text-success" : "bg-ground-alt text-ink"
+            anyPaid ? "bg-success text-surface" : "bg-ground-alt text-ink"
           }`}
         >
           {house.flatNo}

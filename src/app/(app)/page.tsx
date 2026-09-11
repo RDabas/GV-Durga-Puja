@@ -77,6 +77,8 @@ function followUpDescription(
 export default function DashboardPage() {
   const store = usePujaData();
   const {
+    years,
+    activeYear,
     contributions,
     sponsors,
     vendorExpenses,
@@ -85,6 +87,7 @@ export default function DashboardPage() {
     contributionFor,
     memberName,
     ownerPrimaryHouse,
+    previousYearInfo,
   } = store;
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
   const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
@@ -193,6 +196,40 @@ export default function DashboardPage() {
     );
   }).length;
 
+  const previousYear = [...years]
+    .filter((y) => y.year < activeYear.year)
+    .sort((a, b) => b.year - a.year)[0];
+
+  // Same primary-flat consolidation as the current-year totals above — a
+  // multi-flat owner's prior-year payment only counts once, against their
+  // primary flat's block, so last year's figure is comparable to this year's.
+  const previousYearAmountByBlock = useMemo(() => {
+    const totals: Partial<Record<Block, number>> & { all: number } = { all: 0 };
+    const add = (block: Block, amount: number) => {
+      totals.all += amount;
+      totals[block] = (totals[block] ?? 0) + amount;
+    };
+    for (const house of houses) {
+      const entries = previousYearInfo[house.id];
+      if (entries) add(house.block, entries.reduce((s, e) => s + e.amount, 0));
+    }
+    for (const owner of owners) {
+      const entries = previousYearInfo[owner.id];
+      const primary = entries ? ownerPrimaryHouse(owner.id) : undefined;
+      if (entries && primary) add(primary.block, entries.reduce((s, e) => s + e.amount, 0));
+    }
+    return totals;
+  }, [houses, owners, previousYearInfo, ownerPrimaryHouse]);
+
+  const lastYearAmount =
+    moneyBlockFilter === "all"
+      ? previousYearAmountByBlock.all
+      : (previousYearAmountByBlock[moneyBlockFilter] ?? 0);
+  const trendPercent =
+    previousYear && lastYearAmount > 0
+      ? Math.round(((paidAmount - lastYearAmount) / lastYearAmount) * 100)
+      : null;
+
   const followUps = followUpEntries.filter((e) => {
     if (blockFilter !== "all" && e.block !== blockFilter) return false;
     return statusFilters.includes(e.status);
@@ -255,6 +292,15 @@ export default function DashboardPage() {
               </b>
             </span>
           </div>
+          {trendPercent !== null && (
+            <div
+              className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-bold tabular-nums ${
+                trendPercent >= 0 ? "bg-success-tint text-success" : "bg-critical-tint text-critical"
+              }`}
+            >
+              {trendPercent >= 0 ? "▲" : "▼"} {Math.abs(trendPercent)}% vs {previousYear!.year}
+            </div>
+          )}
           <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
             {flatsVisited} of {housesInMoneyBlock.length} flats visited
           </div>

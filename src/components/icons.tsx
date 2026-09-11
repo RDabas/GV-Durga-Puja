@@ -73,6 +73,14 @@ export function DotIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function CheckIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)} strokeWidth={3}>
+      <path d="M5 12.5 9.5 17 19 7" />
+    </svg>
+  );
+}
+
 export function TrishulIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)} stroke="white">
