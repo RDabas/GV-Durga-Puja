@@ -313,7 +313,13 @@ export default function DashboardPage() {
         <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
           <button
             type="button"
-            onClick={() => setStatusFilters(followUpStatusOptions.map((o) => o.value))}
+            onClick={() =>
+              setStatusFilters(
+                statusFilters.length === followUpStatusOptions.length
+                  ? []
+                  : followUpStatusOptions.map((o) => o.value),
+              )
+            }
             className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold ${
               statusFilters.length === followUpStatusOptions.length
                 ? "bg-brand text-white"

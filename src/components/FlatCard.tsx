@@ -1,7 +1,7 @@
+import type { ReactNode } from "react";
 import type { Contribution, ContributionStatus, House, Owner } from "@/lib/types";
 import { Pill } from "@/components/Pill";
 import { PaymentTag } from "@/components/PaymentBreakdown";
-import { FormError } from "@/components/FormControls";
 import { formatINR, formatShortDate } from "@/lib/format";
 import type { PreviousYearInfo } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
@@ -21,39 +21,71 @@ const referenceDotTone: Record<ContributionStatus, string> = {
   not_visited: "bg-ink-faint/40",
 };
 
+/** Small "Disable"/"Enable" link shown right next to the owner's role label — a real sibling button, not nested inside the row's own tap-to-edit button. */
+function DisableToggleButton({
+  disabled,
+  onToggle,
+}: {
+  disabled?: boolean;
+  onToggle: () => Promise<void>;
+}) {
+  const { submitting, error, run } = useAsyncAction();
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        run(onToggle);
+      }}
+      disabled={submitting}
+      title={error ?? undefined}
+      className={`shrink-0 text-[0.66rem] font-semibold underline decoration-dotted underline-offset-2 disabled:opacity-60 ${error ? "text-critical" : "text-ink-soft"}`}
+    >
+      {submitting ? "…" : error ? "Retry" : disabled ? "Enable" : "Disable"}
+    </button>
+  );
+}
+
 /** Shown on a multi-flat owner's non-primary flats instead of the full PayerRow — their money and status already live on the primary flat, so this is just a pointer there. */
 function OwnerReferenceRow({
   names,
   primaryFlatLabel,
   status,
   disabled,
+  headerAction,
   onClick,
 }: {
   names: string;
   primaryFlatLabel: string;
   status: ContributionStatus;
   disabled?: boolean;
+  headerAction?: ReactNode;
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition active:scale-[0.99] ${disabled ? "opacity-50" : ""}`}
-    >
-      <span className="min-w-0 flex-1">
-        <span className="block text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
+    <div className={disabled ? "opacity-50" : ""}>
+      <div className="flex items-center justify-between gap-2 px-3.5 pt-2.5">
+        <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
           Owner
         </span>
-        <span className="mt-0.5 block truncate text-[0.82rem] font-semibold text-ink">
-          {names || "—"}
+        {headerAction}
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full items-center gap-3 px-3.5 pb-2.5 pt-1 text-left transition active:scale-[0.99]"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[0.82rem] font-semibold text-ink">
+            {names || "—"}
+          </span>
+          <span className="mt-0.5 block truncate text-[0.68rem] text-ink-faint">
+            {disabled ? "Disabled" : `Paid via ${primaryFlatLabel}`}
+          </span>
         </span>
-        <span className="mt-0.5 block truncate text-[0.68rem] text-ink-faint">
-          {disabled ? "Disabled" : `Paid via ${primaryFlatLabel}`}
-        </span>
-      </span>
-      {!disabled && <span className={`h-2 w-2 shrink-0 rounded-full ${referenceDotTone[status]}`} />}
-    </button>
+        {!disabled && <span className={`h-2 w-2 shrink-0 rounded-full ${referenceDotTone[status]}`} />}
+      </button>
+    </div>
   );
 }
 
@@ -66,6 +98,7 @@ function PayerRow({
   assignedToName,
   previousYear,
   disabled,
+  headerAction,
   onClick,
 }: {
   role: string;
@@ -77,20 +110,32 @@ function PayerRow({
   previousYear?: PreviousYearInfo[];
   /** Owner is excluded from this year's totals/follow-up — show that instead of their current-year status. */
   disabled?: boolean;
+  headerAction?: ReactNode;
   onClick: () => void;
 }) {
   const status = contribution?.status ?? "not_visited";
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-start gap-3 p-3 text-left transition active:scale-[0.99] ${disabled ? "opacity-50" : ""}`}
-    >
-      <span className="min-w-0 flex-1">
-        <span className="block text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
-          {role}
-        </span>
+    <div className={disabled ? "opacity-50" : ""}>
+      {headerAction && (
+        <div className="flex items-center justify-between gap-2 px-3 pt-3">
+          <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
+            {role}
+          </span>
+          {headerAction}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onClick}
+        className={`flex w-full items-start gap-3 px-3 text-left transition active:scale-[0.99] ${headerAction ? "pb-3 pt-1" : "py-3"}`}
+      >
+        <span className="min-w-0 flex-1">
+          {!headerAction && (
+            <span className="block text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
+              {role}
+            </span>
+          )}
         <span className="mt-0.5 block truncate text-[0.85rem] font-semibold text-ink">
           {names || "Add name"}
         </span>
@@ -158,7 +203,8 @@ function PayerRow({
           </span>
         ))}
       </span>
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -199,7 +245,6 @@ export function FlatCard({
   onEditTenant: () => void;
   onToggleOwnerDisabled?: () => Promise<void>;
 }) {
-  const { submitting: toggling, error: toggleError, run: runToggle } = useAsyncAction();
   const anyPaid =
     ownerContribution?.status === "paid" || tenantContribution?.status === "paid";
   const hasTenant = house.tenantNames.length > 0 || tenantContribution !== undefined;
@@ -207,6 +252,9 @@ export function FlatCard({
   // owner-occupied flat has no one else to fall back on) — but re-enabling
   // must always stay available so a disabled owner is never stuck that way.
   const showDisableToggle = owner && onToggleOwnerDisabled && (owner.disabled || hasTenant);
+  const disableToggle = showDisableToggle ? (
+    <DisableToggleButton disabled={owner!.disabled} onToggle={onToggleOwnerDisabled!} />
+  ) : undefined;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
@@ -229,6 +277,7 @@ export function FlatCard({
           primaryFlatLabel={primaryFlatLabel}
           status={ownerContribution?.status ?? "not_visited"}
           disabled={owner.disabled}
+          headerAction={disableToggle}
           onClick={onEditOwner}
         />
       ) : (
@@ -241,22 +290,9 @@ export function FlatCard({
           assignedToName={ownerAssignedTo}
           previousYear={ownerPreviousYear}
           disabled={owner?.disabled}
+          headerAction={disableToggle}
           onClick={onEditOwner}
         />
-      )}
-
-      {showDisableToggle && (
-        <div className="border-t border-border px-3.5 py-2">
-          <button
-            type="button"
-            onClick={() => runToggle(() => onToggleOwnerDisabled!())}
-            disabled={toggling}
-            className="text-[0.72rem] font-semibold text-ink-soft disabled:opacity-60"
-          >
-            {toggling ? "Saving…" : owner!.disabled ? "Enable owner" : "Disable owner"}
-          </button>
-          <FormError message={toggleError} />
-        </div>
       )}
 
       {/* No tenant usually means owner-occupied, not missing data — so this
