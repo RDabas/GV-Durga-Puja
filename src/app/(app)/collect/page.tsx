@@ -17,14 +17,6 @@ function assignedToLabel(
   return memberName(contribution?.assignedToMemberId) ?? contribution?.assignedToName;
 }
 
-/** Accepts "G-1128", "G1128", "g 1128" — whatever someone types without thinking about the dash. */
-function parseFlatLabel(raw: string): { block: string; flatNo: string } | null {
-  const cleaned = raw.trim().toUpperCase().replace(/\s+/g, "");
-  const match = cleaned.match(/^([A-Z]+)-?(.+)$/);
-  if (!match) return null;
-  return { block: match[1], flatNo: match[2] };
-}
-
 export default function CollectPage() {
   const {
     houses,
@@ -35,7 +27,6 @@ export default function CollectPage() {
     previousYearInfo,
     memberName,
     setOwnerDisabled,
-    setPaidViaHouse,
     reload,
   } = usePujaData();
   const [selectedBlock, setSelectedBlock] = useState<Block>(knownBlocks[0] ?? "A");
@@ -87,15 +78,6 @@ export default function CollectPage() {
       );
   }, [search, houses, ownerOf]);
 
-  async function handleLinkPaidVia(house: House, rawLabel: string) {
-    const parsed = parseFlatLabel(rawLabel);
-    if (!parsed) throw new Error("Enter a flat like G-1128");
-    const target = houses.find((h) => h.block === parsed.block && h.flatNo === parsed.flatNo);
-    if (!target) throw new Error(`No flat "${rawLabel}" found`);
-    if (target.id === house.id) throw new Error("Can't link a flat to itself");
-    await setPaidViaHouse(house.id, target.id);
-  }
-
   function renderFlatCard(house: House) {
     const owner = ownerOf(house);
     const ownerContribution = owner ? contributionFor({ ownerId: owner.id }) : undefined;
@@ -113,7 +95,6 @@ export default function CollectPage() {
     const displayedOwnerContribution = linkedHouse
       ? (linkedOwner ? contributionFor({ ownerId: linkedOwner.id }) : undefined)
       : ownerContribution;
-    const hasTenant = house.tenantNames.length > 0 || tenantContribution !== undefined;
     return (
       <FlatCard
         key={house.id}
@@ -133,10 +114,6 @@ export default function CollectPage() {
         onEditOwner={() => setEditing({ house, role: "owner" })}
         onEditTenant={() => setEditing({ house, role: "tenant" })}
         onToggleOwnerDisabled={owner ? () => setOwnerDisabled(owner.id, !owner.disabled) : undefined}
-        onLinkPaidVia={
-          owner && !hasTenant && !linkedHouse ? (label) => handleLinkPaidVia(house, label) : undefined
-        }
-        onUnlinkPaidVia={linkedHouse ? () => setPaidViaHouse(house.id, null) : undefined}
       />
     );
   }
