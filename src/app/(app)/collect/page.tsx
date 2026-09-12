@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ContributionSheet } from "@/components/ContributionSheet";
 import { FlatCard } from "@/components/FlatCard";
+import { RefreshIcon } from "@/components/icons";
 import { knownBlocks } from "@/lib/directory";
 import { usePujaData } from "@/lib/store";
 import type { Block, Contribution, House } from "@/lib/types";
@@ -26,12 +27,23 @@ export default function CollectPage() {
     previousYearInfo,
     memberName,
     setOwnerDisabled,
+    reload,
   } = usePujaData();
   const [selectedBlock, setSelectedBlock] = useState<Block>(knownBlocks[0] ?? "A");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<{ house: House; role: "owner" | "tenant" } | null>(
     null,
   );
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const floors = useMemo(() => {
     const inBlock = houses.filter((h) => h.block === selectedBlock);
@@ -97,13 +109,24 @@ export default function CollectPage() {
 
   return (
     <>
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search by name or flat number"
-        className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2.5 text-[0.9rem] text-ink outline-none focus:border-brand"
-      />
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or flat number"
+          className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2.5 text-[0.9rem] text-ink outline-none focus:border-brand"
+        />
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          title="Refresh — pick up updates from other collectors"
+          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-border bg-surface-sunken text-ink-soft transition active:scale-95 disabled:opacity-60"
+        >
+          <RefreshIcon className={`h-[18px] w-[18px] ${refreshing ? "animate-spin" : ""}`} />
+        </button>
+      </div>
 
       {searchResults ? (
         <div className="space-y-2.5">

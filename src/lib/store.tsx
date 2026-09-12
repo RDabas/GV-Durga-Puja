@@ -262,6 +262,25 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
     fetchAllWithRetry(supabase).then(applyFresh).catch(applyError);
   }, [supabase, applyFresh, applyError]);
 
+  // Multiple committee members edit the same flats at the same time during
+  // live collection, and there's no realtime subscription — so without this,
+  // one person's update only shows up for everyone else after a manual
+  // refresh. Poll quietly while the tab is visible, and catch up immediately
+  // the moment it's switched back to (covers phone screen lock/app-switch,
+  // where the poll interval alone could leave a long gap).
+  useEffect(() => {
+    const POLL_MS = 15000;
+    const tick = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    const interval = setInterval(tick, POLL_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [load]);
+
   const value = useMemo<PujaStore | null>(() => {
     if (!data) return null;
     const activeYear =

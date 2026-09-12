@@ -132,3 +132,12 @@ export function DownloadIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function RefreshIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 12a8 8 0 0 1 14-5.2M20 12a8 8 0 0 1-14 5.2" />
+      <path d="M18 3v4h-4M6 21v-4h4" />
+    </svg>
+  );
+}
