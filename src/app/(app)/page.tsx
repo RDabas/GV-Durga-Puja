@@ -124,7 +124,11 @@ export default function DashboardPage() {
 
     for (const owner of owners) {
       if (owner.disabled) continue;
-      const ownerHouses = houses.filter((h) => h.ownerId === owner.id);
+      // A house manually linked via paidViaHouseId isn't an independent
+      // thing this owner is followed up on — their accounting was
+      // redirected to whoever they're linked to (a separate Owner record
+      // for the same real person, see FlatCard's "Paid via another flat").
+      const ownerHouses = houses.filter((h) => h.ownerId === owner.id && !h.paidViaHouseId);
       if (ownerHouses.length === 0) continue;
       const primaryHouse = ownerPrimaryHouse(owner.id) ?? ownerHouses[0];
       const contribution = contributionFor({ ownerId: owner.id });
@@ -185,31 +189,26 @@ export default function DashboardPage() {
     .filter((e) => e.status === "promised")
     .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0), 0);
   const totalExpected = paidAmount + promisedAmount;
-  // A multi-flat owner's non-primary flat, when nobody else (no tenant) lives
-  // there, isn't an independent thing to visit — their one contribution is
-  // already tracked via the primary flat. Counting it here would inflate the
-  // denominator with a flat that can never be "visited" on its own, so the
-  // percentage would never be able to reach 100% no matter what.
-  const isPhantomFlat = (h: House) => {
-    if (!h.ownerId) return false;
-    const hasOwnTenant = h.tenantNames.length > 0 || contributionFor({ houseId: h.id }) !== undefined;
-    if (hasOwnTenant) return false;
-    const primary = ownerPrimaryHouse(h.ownerId);
-    return !!primary && primary.id !== h.id;
-  };
-  const housesInMoneyBlock = (
-    moneyBlockFilter === "all" ? houses : houses.filter((h) => h.block === moneyBlockFilter)
-  ).filter((h) => !isPhantomFlat(h));
-  // A flat counts as visited once either its tenant or its owner has an
-  // entry — the owner side only counts on their primary flat, so a
-  // multi-flat owner's one visit doesn't count as visiting every flat.
+  // Always every real flat in the block/society — this is a physical count,
+  // not a count of "independent things to visit", so it never shrinks.
+  const housesInMoneyBlock =
+    moneyBlockFilter === "all" ? houses : houses.filter((h) => h.block === moneyBlockFilter);
+  // A flat counts as visited once its tenant is resolved, or its owner is —
+  // checked via whichever flat the owner's contribution actually lives
+  // against (their primary flat, or another flat manually linked via
+  // paidViaHouseId), so a multi-flat owner's one visit correctly resolves
+  // every flat they hold, not just the one the payment happens to be
+  // recorded on.
   const flatsVisited = housesInMoneyBlock.filter((h) => {
     const tenant = contributions.find((c) => c.houseId === h.id);
-    const isPrimary = h.ownerId ? ownerPrimaryHouse(h.ownerId)?.id === h.id : false;
-    const ownerDisabled = h.ownerId ? owners.find((o) => o.id === h.ownerId)?.disabled : false;
+    const linkedHouse = h.paidViaHouseId ? houses.find((x) => x.id === h.paidViaHouseId) : undefined;
+    const effectiveOwnerId = linkedHouse ? linkedHouse.ownerId : h.ownerId;
+    const ownerDisabled = effectiveOwnerId
+      ? owners.find((o) => o.id === effectiveOwnerId)?.disabled
+      : false;
     const owner =
-      h.ownerId && isPrimary && !ownerDisabled
-        ? contributions.find((c) => c.ownerId === h.ownerId)
+      effectiveOwnerId && !ownerDisabled
+        ? contributions.find((c) => c.ownerId === effectiveOwnerId)
         : undefined;
     return (
       (tenant && tenant.status !== "not_visited") ||

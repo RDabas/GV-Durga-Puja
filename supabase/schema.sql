@@ -60,6 +60,14 @@ alter table owners add column primary_house_id uuid references houses(id) on del
 -- re-enables them.
 alter table owners add column disabled boolean not null default false;
 
+-- Redirects this flat's owner accounting to another flat — for when the same
+-- real person's two flats got entered as two separate owner records (so the
+-- automatic same-owner-id multi-flat detection above can't tell), and a
+-- committee member manually says "this one pays via that one" instead. No
+-- independent money/follow-up entry is generated for a linked flat, and it
+-- counts as visited once the flat it points to does.
+alter table houses add column paid_via_house_id uuid references houses(id) on delete set null;
+
 -- auth_user_id is nullable: an admin adds a member by name so they can be
 -- picked as "collected by" straight away, and the row is linked to a real
 -- login the first time that person signs in.

@@ -17,6 +17,14 @@ function assignedToLabel(
   return memberName(contribution?.assignedToMemberId) ?? contribution?.assignedToName;
 }
 
+/** Accepts "G-1128", "G1128", "g 1128" — whatever someone types without thinking about the dash. */
+function parseFlatLabel(raw: string): { block: string; flatNo: string } | null {
+  const cleaned = raw.trim().toUpperCase().replace(/\s+/g, "");
+  const match = cleaned.match(/^([A-Z]+)-?(.+)$/);
+  if (!match) return null;
+  return { block: match[1], flatNo: match[2] };
+}
+
 export default function CollectPage() {
   const {
     houses,
@@ -27,6 +35,7 @@ export default function CollectPage() {
     previousYearInfo,
     memberName,
     setOwnerDisabled,
+    setPaidViaHouse,
     reload,
   } = usePujaData();
   const [selectedBlock, setSelectedBlock] = useState<Block>(knownBlocks[0] ?? "A");
@@ -78,12 +87,33 @@ export default function CollectPage() {
       );
   }, [search, houses, ownerOf]);
 
+  async function handleLinkPaidVia(house: House, rawLabel: string) {
+    const parsed = parseFlatLabel(rawLabel);
+    if (!parsed) throw new Error("Enter a flat like G-1128");
+    const target = houses.find((h) => h.block === parsed.block && h.flatNo === parsed.flatNo);
+    if (!target) throw new Error(`No flat "${rawLabel}" found`);
+    if (target.id === house.id) throw new Error("Can't link a flat to itself");
+    await setPaidViaHouse(house.id, target.id);
+  }
+
   function renderFlatCard(house: House) {
     const owner = ownerOf(house);
     const ownerContribution = owner ? contributionFor({ ownerId: owner.id }) : undefined;
     const tenantContribution = contributionFor({ houseId: house.id });
+    const linkedHouse = house.paidViaHouseId
+      ? houses.find((h) => h.id === house.paidViaHouseId)
+      : undefined;
+    const linkedOwner = linkedHouse ? ownerOf(linkedHouse) : undefined;
     const primaryHouse = owner ? ownerPrimaryHouse(owner.id) : undefined;
-    const isPrimaryOwnerFlat = !owner || !primaryHouse || primaryHouse.id === house.id;
+    const isPrimaryOwnerFlat = !owner || (!linkedHouse && (!primaryHouse || primaryHouse.id === house.id));
+    const referenceHouse = linkedHouse ?? primaryHouse;
+    // A manually linked flat's status should reflect the flat it's linked
+    // to (a different Owner record entirely), not its own — which has no
+    // contribution of its own by design.
+    const displayedOwnerContribution = linkedHouse
+      ? (linkedOwner ? contributionFor({ ownerId: linkedOwner.id }) : undefined)
+      : ownerContribution;
+    const hasTenant = house.tenantNames.length > 0 || tenantContribution !== undefined;
     return (
       <FlatCard
         key={house.id}
@@ -91,18 +121,22 @@ export default function CollectPage() {
         owner={owner}
         ownerFlatCount={owner ? ownerFlatCount(owner.id) : 0}
         isPrimaryOwnerFlat={isPrimaryOwnerFlat}
-        primaryFlatLabel={primaryHouse ? `${primaryHouse.block}-${primaryHouse.flatNo}` : undefined}
-        ownerContribution={ownerContribution}
+        primaryFlatLabel={referenceHouse ? `${referenceHouse.block}-${referenceHouse.flatNo}` : undefined}
+        ownerContribution={displayedOwnerContribution}
         tenantContribution={tenantContribution}
-        ownerCollector={memberName(ownerContribution?.collectorId)}
+        ownerCollector={memberName(displayedOwnerContribution?.collectorId)}
         tenantCollector={memberName(tenantContribution?.collectorId)}
-        ownerAssignedTo={assignedToLabel(ownerContribution, memberName)}
+        ownerAssignedTo={assignedToLabel(displayedOwnerContribution, memberName)}
         tenantAssignedTo={assignedToLabel(tenantContribution, memberName)}
         ownerPreviousYear={owner ? previousYearInfo[owner.id] : undefined}
         tenantPreviousYear={previousYearInfo[house.id]}
         onEditOwner={() => setEditing({ house, role: "owner" })}
         onEditTenant={() => setEditing({ house, role: "tenant" })}
         onToggleOwnerDisabled={owner ? () => setOwnerDisabled(owner.id, !owner.disabled) : undefined}
+        onLinkPaidVia={
+          owner && !hasTenant && !linkedHouse ? (label) => handleLinkPaidVia(house, label) : undefined
+        }
+        onUnlinkPaidVia={linkedHouse ? () => setPaidViaHouse(house.id, null) : undefined}
       />
     );
   }

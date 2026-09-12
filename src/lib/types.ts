@@ -48,6 +48,14 @@ export interface House {
   floor: number;
   flatNo: string;
   ownerId?: string;
+  /**
+   * Set when this flat's owner is actually the same person as another
+   * flat's owner but was entered as a separate Owner record (so the
+   * automatic multi-flat detection can't tell) — redirects this flat's
+   * owner accounting to the linked house: no independent money/follow-up
+   * entry here, and it counts as visited once the linked flat is.
+   */
+  paidViaHouseId?: string;
   /** Empty when the owner lives there. Tenants always pay per flat. */
   tenantNames: string[];
   tenantPhone?: string;

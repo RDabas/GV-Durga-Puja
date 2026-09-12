@@ -30,6 +30,7 @@ import {
   dbSaveOwner,
   dbSaveTenants,
   dbSetOwnerDisabled,
+  dbSetPaidViaHouse,
   dbStartYear,
   dbUpdateMember,
   dbUpdateSponsor,
@@ -198,6 +199,8 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   startYear: (input: YearInput) => Promise<void>;
   updateYear: (yearId: string, patch: Partial<YearInput>) => Promise<void>;
   saveTenants: (houseId: string, names: string[], phone?: string) => Promise<void>;
+  /** Links (targetHouseId set) or unlinks (null) this flat's owner accounting to another flat — see House.paidViaHouseId. */
+  setPaidViaHouse: (houseId: string, targetHouseId: string | null) => Promise<void>;
   saveOwner: (houseId: string, names: string[], phone?: string) => Promise<string>;
   setOwnerDisabled: (ownerId: string, disabled: boolean) => Promise<void>;
   addMember: (input: MemberInput) => Promise<void>;
@@ -396,6 +399,19 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await logActivity(
           "house.update_tenants",
           `updated tenants for ${house ? `${house.block}-${house.flatNo}` : "a flat"}`,
+        );
+        await load();
+      },
+      setPaidViaHouse: async (houseId, targetHouseId) => {
+        const house = data.houses.find((h) => h.id === houseId);
+        const target = targetHouseId ? data.houses.find((h) => h.id === targetHouseId) : undefined;
+        const houseLabel = house ? `${house.block}-${house.flatNo}` : "a flat";
+        await dbSetPaidViaHouse(supabase, houseId, targetHouseId);
+        await logActivity(
+          targetHouseId ? "house.link_paid_via" : "house.unlink_paid_via",
+          targetHouseId
+            ? `marked ${houseLabel} as paid via ${target ? `${target.block}-${target.flatNo}` : "another flat"}`
+            : `removed the "paid via another flat" link on ${houseLabel}`,
         );
         await load();
       },

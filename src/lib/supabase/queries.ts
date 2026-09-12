@@ -52,6 +52,7 @@ interface HouseRow {
   floor: number;
   flat_no: string;
   owner_id: string | null;
+  paid_via_house_id: string | null;
   tenant_names: string[];
   tenant_phone: string | null;
 }
@@ -186,6 +187,7 @@ const mapHouse = (r: HouseRow): House => ({
   floor: r.floor,
   flatNo: r.flat_no,
   ownerId: r.owner_id ?? undefined,
+  paidViaHouseId: r.paid_via_house_id ?? undefined,
   tenantNames: r.tenant_names,
   tenantPhone: r.tenant_phone ?? undefined,
 });
@@ -420,6 +422,19 @@ export async function dbSaveTenants(
   const { error } = await supabase
     .from("houses")
     .update({ tenant_names: names, tenant_phone: phone ?? null })
+    .eq("id", houseId);
+  if (error) throw new Error(error.message);
+}
+
+/** Links (or unlinks, when targetHouseId is null) this flat's owner accounting to another flat — see House.paidViaHouseId. */
+export async function dbSetPaidViaHouse(
+  supabase: SupabaseClient,
+  houseId: string,
+  targetHouseId: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from("houses")
+    .update({ paid_via_house_id: targetHouseId })
     .eq("id", houseId);
   if (error) throw new Error(error.message);
 }

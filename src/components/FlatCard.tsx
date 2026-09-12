@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Contribution, ContributionStatus, House, Owner } from "@/lib/types";
 import { Pill } from "@/components/Pill";
 import { PaymentTag } from "@/components/PaymentBreakdown";
+import { FormError } from "@/components/FormControls";
 import { formatINR, formatShortDate } from "@/lib/format";
 import type { PreviousYearInfo } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
@@ -87,6 +88,98 @@ function DisableToggleButton({
     >
       {submitting ? "…" : error ? "Retry" : disabled ? "Enable" : "Disable"}
     </button>
+  );
+}
+
+/** Small pill that reverses a manual "paid via another flat" link — sits in the same header slot as the disable toggle. */
+function UnlinkPaidViaButton({ onUnlink }: { onUnlink: () => Promise<void> }) {
+  const { submitting, error, run } = useAsyncAction();
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (window.confirm("Remove this link? The flat will go back to needing its own follow-up.")) {
+          run(onUnlink);
+        }
+      }}
+      disabled={submitting}
+      title={error ?? undefined}
+      className={`shrink-0 rounded-full px-2.5 py-1 text-[0.66rem] font-bold whitespace-nowrap transition active:scale-95 disabled:opacity-60 ${
+        error ? "bg-critical-tint text-critical" : "bg-ground-alt text-ink-soft"
+      }`}
+    >
+      {submitting ? "…" : error ? "Retry" : "Unlink"}
+    </button>
+  );
+}
+
+/** Trigger pill for owner-occupied flats (no tenant) with no tenant to independently track — opens the inline form below to name which other flat this owner actually pays via. */
+function LinkPaidViaTrigger({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="shrink-0 rounded-full bg-brand-tint px-2.5 py-1 text-[0.66rem] font-bold whitespace-nowrap text-brand transition active:scale-95"
+    >
+      Paid via another flat
+    </button>
+  );
+}
+
+/**
+ * Inline form for naming which other flat this owner actually pays through
+ * — e.g. the same person owns two flats but was entered as two separate
+ * owner records, so the app can't tell they're the same person on its own.
+ */
+function PaidViaLinkForm({
+  onLink,
+  onCancel,
+}: {
+  onLink: (label: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+  const { submitting, error, run } = useAsyncAction();
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="space-y-2 border-t border-border px-3.5 py-3"
+    >
+      <p className="text-[0.72rem] text-ink-faint">
+        Which flat does this owner actually pay through? Their status/amount will show from there,
+        and this flat won&rsquo;t need its own follow-up.
+      </p>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="e.g. G-1128"
+        className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2 text-[0.85rem] text-ink outline-none focus:border-brand"
+      />
+      <FormError message={error} />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="flex-1 rounded-xl border border-border py-2 text-[0.78rem] font-semibold text-ink-soft disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => run(() => onLink(value), onCancel)}
+          disabled={submitting || !value.trim()}
+          className="flex-1 rounded-xl bg-brand py-2 text-[0.78rem] font-semibold text-white disabled:opacity-60"
+        >
+          {submitting ? "Linking…" : "Link"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -269,6 +362,8 @@ export function FlatCard({
   onEditOwner,
   onEditTenant,
   onToggleOwnerDisabled,
+  onLinkPaidVia,
+  onUnlinkPaidVia,
 }: {
   house: House;
   owner?: Owner;
@@ -288,7 +383,12 @@ export function FlatCard({
   onEditOwner: () => void;
   onEditTenant: () => void;
   onToggleOwnerDisabled?: () => Promise<void>;
+  /** Offered on an owner-occupied flat (no tenant) with no existing link — opens the inline form to name which other flat this owner actually pays through. */
+  onLinkPaidVia?: (targetFlatLabel: string) => Promise<void>;
+  /** Present exactly when this flat is currently linked — reverses it. */
+  onUnlinkPaidVia?: () => Promise<void>;
 }) {
+  const [showLinkForm, setShowLinkForm] = useState(false);
   // A disabled owner's status is excluded — same as everywhere else they're
   // "not considered" — so their card doesn't get accented by a stale status.
   const cardStatus = bestStatus(
@@ -308,6 +408,11 @@ export function FlatCard({
       onToggle={onToggleOwnerDisabled!}
     />
   ) : undefined;
+  // Only one of these ever applies to a given flat: already linked (undo
+  // it), mid-way through disabling/enabling, or eligible to start a link.
+  const headerAction = onUnlinkPaidVia ? (
+    <UnlinkPaidViaButton onUnlink={onUnlinkPaidVia} />
+  ) : (disableToggle ?? (onLinkPaidVia && <LinkPaidViaTrigger onClick={() => setShowLinkForm(true)} />));
 
   return (
     <div
@@ -330,7 +435,7 @@ export function FlatCard({
           primaryFlatLabel={primaryFlatLabel}
           status={ownerContribution?.status ?? "not_visited"}
           disabled={owner.disabled}
-          headerAction={disableToggle}
+          headerAction={headerAction}
           onClick={onEditOwner}
         />
       ) : (
@@ -343,8 +448,15 @@ export function FlatCard({
           assignedToName={ownerAssignedTo}
           previousYear={ownerPreviousYear}
           disabled={owner?.disabled}
-          headerAction={disableToggle}
+          headerAction={headerAction}
           onClick={onEditOwner}
+        />
+      )}
+
+      {showLinkForm && onLinkPaidVia && (
+        <PaidViaLinkForm
+          onLink={onLinkPaidVia}
+          onCancel={() => setShowLinkForm(false)}
         />
       )}
 
