@@ -114,12 +114,11 @@ function OwnerReferenceRow({
           <span className="block truncate text-[0.82rem] font-semibold text-ink">
             {names || "—"}
           </span>
-          <span className="mt-0.5 block truncate text-[0.68rem] text-ink-faint">
-            {disabled ? "Disabled" : `Paid via ${primaryFlatLabel}`}
-          </span>
-          {!disabled && (
+          {disabled ? (
+            <span className="mt-0.5 block truncate text-[0.68rem] text-ink-faint">Disabled</span>
+          ) : (
             <span className="mt-1 block">
-              <Pill tone={status} />
+              <Pill tone={status}>{`Paid via ${primaryFlatLabel}`}</Pill>
             </span>
           )}
         </span>
