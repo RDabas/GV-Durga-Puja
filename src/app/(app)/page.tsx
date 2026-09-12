@@ -373,8 +373,11 @@ export default function DashboardPage() {
       </div>
 
       <div>
-        <p className="mb-2 px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-          Needs follow-up ({followUps.length})
+        <p className="mb-2 flex items-center gap-2 px-0.5 text-[0.9rem] font-bold text-ink">
+          Needs follow-up
+          <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[0.7rem] font-bold tabular-nums text-brand">
+            {followUps.length}
+          </span>
         </p>
 
         <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">

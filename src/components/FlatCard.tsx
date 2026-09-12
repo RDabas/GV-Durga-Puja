@@ -12,15 +12,6 @@ function summarise(names: string[]): string {
   return `${names[0]}, ${names[1]} +${names.length - 2}`;
 }
 
-const referenceDotTone: Record<ContributionStatus, string> = {
-  paid: "bg-success",
-  partial: "bg-warning",
-  promised: "bg-gold",
-  pending: "bg-brand",
-  not_home: "bg-critical",
-  not_visited: "bg-ink-faint/40",
-};
-
 /**
  * Card-level accent — the badge and border reflect the single "best" status
  * on the card (owner or tenant, whichever is further along), following the
@@ -126,8 +117,12 @@ function OwnerReferenceRow({
           <span className="mt-0.5 block truncate text-[0.68rem] text-ink-faint">
             {disabled ? "Disabled" : `Paid via ${primaryFlatLabel}`}
           </span>
+          {!disabled && (
+            <span className="mt-1 block">
+              <Pill tone={status} />
+            </span>
+          )}
         </span>
-        {!disabled && <span className={`h-2 w-2 shrink-0 rounded-full ${referenceDotTone[status]}`} />}
       </button>
     </div>
   );
