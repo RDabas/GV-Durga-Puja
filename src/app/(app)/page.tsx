@@ -185,8 +185,21 @@ export default function DashboardPage() {
     .filter((e) => e.status === "promised")
     .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0), 0);
   const totalExpected = paidAmount + promisedAmount;
-  const housesInMoneyBlock =
-    moneyBlockFilter === "all" ? houses : houses.filter((h) => h.block === moneyBlockFilter);
+  // A multi-flat owner's non-primary flat, when nobody else (no tenant) lives
+  // there, isn't an independent thing to visit — their one contribution is
+  // already tracked via the primary flat. Counting it here would inflate the
+  // denominator with a flat that can never be "visited" on its own, so the
+  // percentage would never be able to reach 100% no matter what.
+  const isPhantomFlat = (h: House) => {
+    if (!h.ownerId) return false;
+    const hasOwnTenant = h.tenantNames.length > 0 || contributionFor({ houseId: h.id }) !== undefined;
+    if (hasOwnTenant) return false;
+    const primary = ownerPrimaryHouse(h.ownerId);
+    return !!primary && primary.id !== h.id;
+  };
+  const housesInMoneyBlock = (
+    moneyBlockFilter === "all" ? houses : houses.filter((h) => h.block === moneyBlockFilter)
+  ).filter((h) => !isPhantomFlat(h));
   // A flat counts as visited once either its tenant or its owner has an
   // entry — the owner side only counts on their primary flat, so a
   // multi-flat owner's one visit doesn't count as visiting every flat.
@@ -362,7 +375,7 @@ export default function DashboardPage() {
 
       <div>
         <p className="mb-2 px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-          Needs follow-up
+          Needs follow-up ({followUps.length})
         </p>
 
         <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
