@@ -49,6 +49,19 @@ interface FollowUpEntry {
   role: "owner" | "tenant";
 }
 
+/**
+ * Stable key for "who's following this up" — a committee member id when
+ * assigned to one, or the free-text name (someone not in the committee,
+ * e.g. a family member) lowercased so "Gajju bhai" and "gajju bhai" don't
+ * become two separate filter options.
+ */
+function assigneeKey(contribution: Contribution | undefined): string | null {
+  if (contribution?.assignedToMemberId) return `member:${contribution.assignedToMemberId}`;
+  const name = contribution?.assignedToName?.trim();
+  if (name) return `name:${name.toLowerCase()}`;
+  return null;
+}
+
 function followUpDescription(
   status: ContributionStatus,
   contribution: Contribution | undefined,
@@ -100,6 +113,7 @@ export default function DashboardPage() {
   } = usePujaData();
   const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
   const [statusFilters, setStatusFilters] = useState<ContributionStatus[]>(defaultFollowUpStatuses);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [moneyBlockFilter, setMoneyBlockFilter] = useState<Block | "all">("all");
   const [editing, setEditing] = useState<{ house: House; role: "owner" | "tenant" } | null>(
     null,
@@ -173,6 +187,15 @@ export default function DashboardPage() {
     );
     return entries;
   }, [owners, houses, contributionFor, ownerPrimaryHouse]);
+
+  // Grand total, independent of the block filter below — "how much do we
+  // actually have overall", combining resident collections with sponsor
+  // money and netting off what's gone out to vendors.
+  const residentPaidOverall = followUpEntries
+    .filter((e) => e.status === "paid" || e.status === "partial")
+    .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
+  const totalCollected = residentPaidOverall + sponsorReceived;
+  const balance = totalCollected - vendorPaid;
 
   // Money stats reuse the same per-owner/per-flat entries as the follow-up
   // list — an owner spanning several blocks is counted once, against their
@@ -252,8 +275,25 @@ export default function DashboardPage() {
       ? Math.round(((totalExpected - lastYearAmount) / lastYearAmount) * 100)
       : null;
 
+  // Built from every follow-up entry (not the filtered list) so the option
+  // set doesn't shift around as the block/status filters change.
+  const assigneeOptions = useMemo(() => {
+    const byKey = new Map<string, string>();
+    for (const e of followUpEntries) {
+      const key = assigneeKey(e.contribution);
+      if (!key) continue;
+      const label =
+        memberName(e.contribution?.assignedToMemberId) ?? e.contribution?.assignedToName ?? "?";
+      byKey.set(key, label);
+    }
+    return [...byKey.entries()]
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [followUpEntries, memberName]);
+
   const followUps = followUpEntries.filter((e) => {
     if (blockFilter !== "all" && e.block !== blockFilter) return false;
+    if (assigneeFilter !== "all" && assigneeKey(e.contribution) !== assigneeFilter) return false;
     return statusFilters.includes(e.status);
   });
 
@@ -265,6 +305,42 @@ export default function DashboardPage() {
   return (
     <>
       <div className="grid grid-cols-2 gap-2.5">
+        <div className="col-span-2 rounded-2xl border border-r-[3px] border-success/30 border-r-success bg-surface p-3.5 shadow-[var(--shadow-card)]">
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-success-tint text-success">
+              <CoinsIcon className="h-[13px] w-[13px]" />
+            </span>
+            <span className="text-[0.72rem] font-semibold text-ink-faint">Overall</span>
+          </div>
+          <div className="mt-2.5 flex justify-between text-[0.72rem] text-ink-faint">
+            <span>
+              Collected
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(totalCollected)}
+              </b>
+            </span>
+            <span>
+              Vendor spent
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(vendorPaid)}
+              </b>
+            </span>
+            <span>
+              Balance
+              <b
+                className={`mt-0.5 block text-[1.05rem] font-bold tabular-nums ${
+                  balance < 0 ? "text-critical" : "text-ink"
+                }`}
+              >
+                {formatINR(balance)}
+              </b>
+            </span>
+          </div>
+          <div className="mt-2.5 text-[0.72rem] text-ink-soft">
+            {formatINR(residentPaidOverall)} from residents + {formatINR(sponsorReceived)} from
+            sponsors
+          </div>
+        </div>
         <div className="col-span-2 rounded-2xl border border-r-[3px] border-brand/30 border-r-brand bg-surface p-3.5 shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-1.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-brand-tint text-brand">
@@ -445,6 +521,36 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
+
+        {assigneeOptions.length > 0 && (
+          <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+            <button
+              type="button"
+              onClick={() => setAssigneeFilter("all")}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold ${
+                assigneeFilter === "all"
+                  ? "bg-brand text-white"
+                  : "border border-border bg-surface text-ink-soft"
+              }`}
+            >
+              Anyone following up
+            </button>
+            {assigneeOptions.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setAssigneeFilter(key)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold ${
+                  assigneeFilter === key
+                    ? "bg-brand text-white"
+                    : "border border-border bg-surface text-ink-soft"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card)]">
           {followUps.length === 0 && (

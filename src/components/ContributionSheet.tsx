@@ -116,7 +116,7 @@ export function ContributionSheet({
   const status: ContributionStatus = statusChoice === "paid_via" ? "not_visited" : statusChoice;
   const [kind, setKind] = useState<ContributionKind>(contribution?.contributionKind ?? "money");
   const [mode, setMode] = useState<PaymentMode>(
-    !contribution || contribution.paymentMode === "pending" ? "cash" : contribution.paymentMode,
+    !contribution || contribution.paymentMode === "pending" ? "gpay" : contribution.paymentMode,
   );
   const [moneyAmount, setMoneyAmount] = useState(contribution?.moneyAmount ?? 0);
   const [originalPledgeAmount, setOriginalPledgeAmount] = useState(
@@ -124,7 +124,10 @@ export function ContributionSheet({
   );
   const [bhogAmount, setBhogAmount] = useState(contribution?.bhogGroceryAmount ?? 0);
   const [collectorId, setCollectorId] = useState(
-    contribution?.collectorId ?? members[0]?.id ?? "",
+    contribution?.collectorId ??
+      members.find((m) => m.name === "Hirdesh")?.id ??
+      members[0]?.id ??
+      "",
   );
   const [paymentDate, setPaymentDate] = useState(contribution?.paymentDate ?? today());
   const [note, setNote] = useState(contribution?.note ?? "");
