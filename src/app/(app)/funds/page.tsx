@@ -32,7 +32,21 @@ export default function FundsPage() {
   const [managingCarriedFunds, setManagingCarriedFunds] = useState(false);
   const [managingTransfers, setManagingTransfers] = useState(false);
   const [expanded, setExpanded] = useState<{ memberId: string; mode: PaymentMode } | null>(null);
+  const [sort, setSort] = useState<{ field: "flat" | "date" | "amount"; dir: "asc" | "desc" }>({
+    field: "amount",
+    dir: "desc",
+  });
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
+
+  function toggleSort(field: "flat" | "date" | "amount") {
+    setSort((prev) =>
+      prev.field === field
+        ? { field, dir: prev.dir === "asc" ? "desc" : "asc" }
+        // A fresh field starts at whichever direction reads naturally —
+        // biggest amount and most recent date first, lowest flat first.
+        : { field, dir: field === "flat" ? "asc" : "desc" },
+    );
+  }
 
   const balances = committeeBalances(
     members,
@@ -45,59 +59,68 @@ export default function FundsPage() {
 
   /** Who a member's total for one payment mode is actually made up of — flat and amount, for tapping a Cash/GPay/… chip. */
   function contributorsFor(memberId: string, mode: PaymentMode) {
-    return contributions
+    const list = contributions
       .filter((c) => c.collectorId === memberId && c.paymentMode === mode)
       .map((c) => {
-        if (c.houseId) {
-          const house = houses.find((h) => h.id === c.houseId);
-          return {
-            key: c.id,
-            name: house?.tenantNames.join(", ") || "Tenant",
-            flatLabel: house ? `${house.block}-${house.flatNo}` : "—",
-            amount: c.moneyAmount,
-            mode: c.paymentMode,
-            paymentDate: c.paymentDate,
-          };
-        }
+        const house = c.houseId
+          ? houses.find((h) => h.id === c.houseId)
+          : (c.ownerId ? ownerPrimaryHouse(c.ownerId) : undefined);
         const owner = c.ownerId ? owners.find((o) => o.id === c.ownerId) : undefined;
-        const primaryHouse = c.ownerId ? ownerPrimaryHouse(c.ownerId) : undefined;
         return {
           key: c.id,
-          name: owner?.names.join(", ") ?? "Owner",
-          flatLabel: primaryHouse ? `${primaryHouse.block}-${primaryHouse.flatNo}` : "—",
+          name: c.houseId ? house?.tenantNames.join(", ") || "Tenant" : (owner?.names.join(", ") ?? "Owner"),
+          flatLabel: house ? `${house.block}-${house.flatNo}` : "—",
+          // Kept separate from flatLabel so flat sorting orders by real
+          // block/floor/flat-number instead of the display string.
+          block: house?.block ?? "",
+          floor: house?.floor ?? 0,
+          flatNo: house?.flatNo ?? "",
           amount: c.moneyAmount,
           mode: c.paymentMode,
           paymentDate: c.paymentDate,
         };
-      })
-      .sort((a, b) => b.amount - a.amount);
+      });
+
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return list.sort((a, b) => {
+      if (sort.field === "flat") {
+        return (
+          dir *
+          (a.block.localeCompare(b.block) || a.floor - b.floor || a.flatNo.localeCompare(b.flatNo))
+        );
+      }
+      if (sort.field === "date") {
+        return dir * (a.paymentDate ?? "").localeCompare(b.paymentDate ?? "");
+      }
+      return dir * (a.amount - b.amount);
+    });
   }
 
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center justify-between">
-        <p className="px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
+      <div>
+        <p className="mb-2 px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
           Who&rsquo;s holding the money
         </p>
-        <div className="flex gap-3">
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
           <button
             type="button"
             onClick={() => setManagingTransfers(true)}
-            className="text-[0.72rem] font-semibold text-brand"
+            className="shrink-0 rounded-full border border-border bg-surface px-3 py-1.5 text-[0.72rem] font-semibold text-brand transition active:scale-95"
           >
             Hand over
           </button>
           <button
             type="button"
             onClick={() => setManagingCarriedFunds(true)}
-            className="text-[0.72rem] font-semibold text-brand"
+            className="shrink-0 rounded-full border border-border bg-surface px-3 py-1.5 text-[0.72rem] font-semibold text-brand transition active:scale-95"
           >
             Prev. year fund
           </button>
           <button
             type="button"
             onClick={() => setManagingMembers(true)}
-            className="text-[0.72rem] font-semibold text-brand"
+            className="shrink-0 rounded-full border border-border bg-surface px-3 py-1.5 text-[0.72rem] font-semibold text-brand transition active:scale-95"
           >
             Manage
           </button>
@@ -187,6 +210,30 @@ export default function FundsPage() {
 
                 {expandedMode && (
                   <div className="border-t border-border bg-surface-sunken">
+                    <div className="flex items-center gap-1.5 border-b border-border px-3 py-2">
+                      <span className="text-[0.66rem] font-semibold text-ink-faint">Sort</span>
+                      {(
+                        [
+                          { field: "flat" as const, label: "Flat" },
+                          { field: "date" as const, label: "Date" },
+                          { field: "amount" as const, label: "Amount" },
+                        ]
+                      ).map(({ field, label }) => (
+                        <button
+                          key={field}
+                          type="button"
+                          onClick={() => toggleSort(field)}
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[0.66rem] font-semibold transition active:scale-95 ${
+                            sort.field === field
+                              ? "bg-brand text-white"
+                              : "border border-border bg-surface text-ink-soft"
+                          }`}
+                        >
+                          {label}
+                          {sort.field === field && (sort.dir === "asc" ? " ↑" : " ↓")}
+                        </button>
+                      ))}
+                    </div>
                     {contributorsFor(member.id, expandedMode).map((c, ci) => (
                       <div
                         key={c.key}
