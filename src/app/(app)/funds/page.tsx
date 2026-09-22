@@ -5,7 +5,7 @@ import { CarriedFundSheet } from "@/components/CarriedFundSheet";
 import { FundTransferSheet } from "@/components/FundTransferSheet";
 import { MembersSheet } from "@/components/MembersSheet";
 import { paymentModeChipStyles, PaymentTag } from "@/components/PaymentBreakdown";
-import { DownloadIcon } from "@/components/icons";
+import { CloseIcon, DownloadIcon } from "@/components/icons";
 import { formatINR, formatShortDate } from "@/lib/format";
 import { committeeBalances } from "@/lib/balances";
 import { carriedFundKindLabels } from "@/lib/carriedFund";
@@ -233,6 +233,14 @@ export default function FundsPage() {
                           {sort.field === field && (sort.dir === "asc" ? " ↑" : " ↓")}
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        onClick={() => setExpanded(null)}
+                        aria-label="Close"
+                        className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ground-alt text-ink-soft transition active:scale-90"
+                      >
+                        <CloseIcon className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                     {contributorsFor(member.id, expandedMode).map((c, ci) => (
                       <div
