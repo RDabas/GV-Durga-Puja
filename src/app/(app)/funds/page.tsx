@@ -4,9 +4,9 @@ import { useState } from "react";
 import { CarriedFundSheet } from "@/components/CarriedFundSheet";
 import { FundTransferSheet } from "@/components/FundTransferSheet";
 import { MembersSheet } from "@/components/MembersSheet";
-import { PaymentBreakdown } from "@/components/PaymentBreakdown";
+import { PaymentBreakdown, PaymentTag } from "@/components/PaymentBreakdown";
 import { DownloadIcon } from "@/components/icons";
-import { formatINR } from "@/lib/format";
+import { formatINR, formatShortDate } from "@/lib/format";
 import { committeeBalances } from "@/lib/balances";
 import { carriedFundKindLabels } from "@/lib/carriedFund";
 import { exportPujaDataToExcel } from "@/lib/export";
@@ -15,10 +15,21 @@ import { useAsyncAction } from "@/lib/useAsyncAction";
 
 export default function FundsPage() {
   const store = usePujaData();
-  const { members, contributions, fundTransfers, sponsors, vendorExpenses, carriedFunds } = store;
+  const {
+    members,
+    contributions,
+    fundTransfers,
+    sponsors,
+    vendorExpenses,
+    carriedFunds,
+    houses,
+    owners,
+    ownerPrimaryHouse,
+  } = store;
   const [managingMembers, setManagingMembers] = useState(false);
   const [managingCarriedFunds, setManagingCarriedFunds] = useState(false);
   const [managingTransfers, setManagingTransfers] = useState(false);
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
 
   const balances = committeeBalances(
@@ -29,6 +40,36 @@ export default function FundsPage() {
     vendorExpenses,
     carriedFunds,
   );
+
+  /** Who a member's door-to-door total is actually made up of — flat and amount, for tapping into the summary. */
+  function contributorsFor(memberId: string) {
+    return contributions
+      .filter((c) => c.collectorId === memberId && c.paymentMode !== "pending")
+      .map((c) => {
+        if (c.houseId) {
+          const house = houses.find((h) => h.id === c.houseId);
+          return {
+            key: c.id,
+            name: house?.tenantNames.join(", ") || "Tenant",
+            flatLabel: house ? `${house.block}-${house.flatNo}` : "—",
+            amount: c.moneyAmount,
+            mode: c.paymentMode,
+            paymentDate: c.paymentDate,
+          };
+        }
+        const owner = c.ownerId ? owners.find((o) => o.id === c.ownerId) : undefined;
+        const primaryHouse = c.ownerId ? ownerPrimaryHouse(c.ownerId) : undefined;
+        return {
+          key: c.id,
+          name: owner?.names.join(", ") ?? "Owner",
+          flatLabel: primaryHouse ? `${primaryHouse.block}-${primaryHouse.flatNo}` : "—",
+          amount: c.moneyAmount,
+          mode: c.paymentMode,
+          paymentDate: c.paymentDate,
+        };
+      })
+      .sort((a, b) => b.amount - a.amount);
+  }
 
   return (
     <div className="space-y-2.5">
@@ -80,50 +121,81 @@ export default function FundsPage() {
             i,
           ) => {
             const carried = carriedCash + carriedFd + carriedBank;
+            const expanded = expandedMemberId === member.id;
+            const canExpand = collected > 0;
             return (
-              <div
-                key={member.id}
-                className={`flex items-start gap-3 p-3 ${i > 0 ? "border-t border-border" : ""}`}
-              >
-                <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-ground-alt font-display text-[0.82rem] font-bold text-ink-soft">
-                  {member.name.slice(0, 1)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[0.88rem] font-semibold text-ink">
-                    {member.name}
-                  </div>
-                  <div className="mt-0.5 text-[0.75rem] text-ink-faint">
-                    Collected {formatINR(collected)}
-                    {sponsorReceived > 0 && ` · sponsors ${formatINR(sponsorReceived)}`}
-                    {carried > 0 && ` · carried over ${formatINR(carried)}`}
-                    {received > 0 && ` · received ${formatINR(received)}`}
-                    {handedOver > 0 && ` · handed over ${formatINR(handedOver)}`}
-                    {vendorPaid > 0 && ` · paid vendor ${formatINR(vendorPaid)}`}
-                  </div>
-                  <PaymentBreakdown totals={collectedByMode} />
-                  {carried > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {carriedCash > 0 && (
-                        <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
-                          {carriedFundKindLabels.cash} {formatINR(carriedCash)}
-                        </span>
-                      )}
-                      {carriedFd > 0 && (
-                        <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
-                          {carriedFundKindLabels.fd} {formatINR(carriedFd)}
-                        </span>
-                      )}
-                      {carriedBank > 0 && (
-                        <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
-                          {carriedFundKindLabels.bank} {formatINR(carriedBank)}
-                        </span>
-                      )}
+              <div key={member.id} className={i > 0 ? "border-t border-border" : ""}>
+                <button
+                  type="button"
+                  onClick={() => canExpand && setExpandedMemberId(expanded ? null : member.id)}
+                  className={`flex w-full items-start gap-3 p-3 text-left ${
+                    canExpand ? "transition active:scale-[0.99]" : ""
+                  }`}
+                >
+                  <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-ground-alt font-display text-[0.82rem] font-bold text-ink-soft">
+                    {member.name.slice(0, 1)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[0.88rem] font-semibold text-ink">
+                      {member.name}
                     </div>
-                  )}
-                </div>
-                <span className="shrink-0 text-right text-[0.88rem] font-bold tabular-nums text-ink">
-                  {formatINR(balanceInHand)}
-                </span>
+                    <div className="mt-0.5 text-[0.75rem] text-ink-faint">
+                      Collected {formatINR(collected)}
+                      {sponsorReceived > 0 && ` · sponsors ${formatINR(sponsorReceived)}`}
+                      {carried > 0 && ` · carried over ${formatINR(carried)}`}
+                      {received > 0 && ` · received ${formatINR(received)}`}
+                      {handedOver > 0 && ` · handed over ${formatINR(handedOver)}`}
+                      {vendorPaid > 0 && ` · paid vendor ${formatINR(vendorPaid)}`}
+                    </div>
+                    <PaymentBreakdown totals={collectedByMode} />
+                    {carried > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {carriedCash > 0 && (
+                          <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
+                            {carriedFundKindLabels.cash} {formatINR(carriedCash)}
+                          </span>
+                        )}
+                        {carriedFd > 0 && (
+                          <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
+                            {carriedFundKindLabels.fd} {formatINR(carriedFd)}
+                          </span>
+                        )}
+                        {carriedBank > 0 && (
+                          <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
+                            {carriedFundKindLabels.bank} {formatINR(carriedBank)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-right text-[0.88rem] font-bold tabular-nums text-ink">
+                    {formatINR(balanceInHand)}
+                  </span>
+                </button>
+
+                {expanded && (
+                  <div className="border-t border-border bg-surface-sunken">
+                    {contributorsFor(member.id).map((c, ci) => (
+                      <div
+                        key={c.key}
+                        className={`flex items-center gap-3 px-3 py-2 ${ci > 0 ? "border-t border-border" : ""}`}
+                      >
+                        <span className="w-14 shrink-0 text-[0.7rem] font-semibold text-ink-soft">
+                          {c.flatLabel}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[0.78rem] text-ink">
+                          {c.name}
+                        </span>
+                        {c.paymentDate && (
+                          <span className="shrink-0 text-[0.66rem] text-ink-faint">
+                            {formatShortDate(c.paymentDate)}
+                          </span>
+                        )}
+                        <PaymentTag mode={c.mode} amount={c.amount} />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           },
