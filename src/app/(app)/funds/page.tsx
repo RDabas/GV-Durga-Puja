@@ -4,14 +4,16 @@ import { useState } from "react";
 import { CarriedFundSheet } from "@/components/CarriedFundSheet";
 import { FundTransferSheet } from "@/components/FundTransferSheet";
 import { MembersSheet } from "@/components/MembersSheet";
-import { PaymentBreakdown, PaymentTag } from "@/components/PaymentBreakdown";
+import { paymentModeChipStyles, PaymentTag } from "@/components/PaymentBreakdown";
 import { DownloadIcon } from "@/components/icons";
 import { formatINR, formatShortDate } from "@/lib/format";
 import { committeeBalances } from "@/lib/balances";
 import { carriedFundKindLabels } from "@/lib/carriedFund";
 import { exportPujaDataToExcel } from "@/lib/export";
+import { paymentModeLabels, sortedBreakdown } from "@/lib/payment";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
+import type { PaymentMode } from "@/lib/types";
 
 export default function FundsPage() {
   const store = usePujaData();
@@ -29,7 +31,7 @@ export default function FundsPage() {
   const [managingMembers, setManagingMembers] = useState(false);
   const [managingCarriedFunds, setManagingCarriedFunds] = useState(false);
   const [managingTransfers, setManagingTransfers] = useState(false);
-  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<{ memberId: string; mode: PaymentMode } | null>(null);
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
 
   const balances = committeeBalances(
@@ -41,10 +43,10 @@ export default function FundsPage() {
     carriedFunds,
   );
 
-  /** Who a member's door-to-door total is actually made up of — flat and amount, for tapping into the summary. */
-  function contributorsFor(memberId: string) {
+  /** Who a member's total for one payment mode is actually made up of — flat and amount, for tapping a Cash/GPay/… chip. */
+  function contributorsFor(memberId: string, mode: PaymentMode) {
     return contributions
-      .filter((c) => c.collectorId === memberId && c.paymentMode !== "pending")
+      .filter((c) => c.collectorId === memberId && c.paymentMode === mode)
       .map((c) => {
         if (c.houseId) {
           const house = houses.find((h) => h.id === c.houseId);
@@ -121,17 +123,10 @@ export default function FundsPage() {
             i,
           ) => {
             const carried = carriedCash + carriedFd + carriedBank;
-            const expanded = expandedMemberId === member.id;
-            const canExpand = collected > 0;
+            const expandedMode = expanded?.memberId === member.id ? expanded.mode : null;
             return (
               <div key={member.id} className={i > 0 ? "border-t border-border" : ""}>
-                <button
-                  type="button"
-                  onClick={() => canExpand && setExpandedMemberId(expanded ? null : member.id)}
-                  className={`flex w-full items-start gap-3 p-3 text-left ${
-                    canExpand ? "transition active:scale-[0.99]" : ""
-                  }`}
-                >
+                <div className="flex items-start gap-3 p-3">
                   <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-ground-alt font-display text-[0.82rem] font-bold text-ink-soft">
                     {member.name.slice(0, 1)}
                   </span>
@@ -147,7 +142,24 @@ export default function FundsPage() {
                       {handedOver > 0 && ` · handed over ${formatINR(handedOver)}`}
                       {vendorPaid > 0 && ` · paid vendor ${formatINR(vendorPaid)}`}
                     </div>
-                    <PaymentBreakdown totals={collectedByMode} />
+                    {sortedBreakdown(collectedByMode).length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {sortedBreakdown(collectedByMode).map(([mode, amount]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() =>
+                              setExpanded(
+                                expandedMode === mode ? null : { memberId: member.id, mode },
+                              )
+                            }
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums whitespace-nowrap transition active:scale-95 ${paymentModeChipStyles[mode]} ${expandedMode === mode ? "ring-2 ring-offset-1 ring-ink/30" : ""}`}
+                          >
+                            {paymentModeLabels[mode]} {formatINR(amount)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {carried > 0 && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {carriedCash > 0 && (
@@ -171,11 +183,11 @@ export default function FundsPage() {
                   <span className="shrink-0 text-right text-[0.88rem] font-bold tabular-nums text-ink">
                     {formatINR(balanceInHand)}
                   </span>
-                </button>
+                </div>
 
-                {expanded && (
+                {expandedMode && (
                   <div className="border-t border-border bg-surface-sunken">
-                    {contributorsFor(member.id).map((c, ci) => (
+                    {contributorsFor(member.id, expandedMode).map((c, ci) => (
                       <div
                         key={c.key}
                         className={`flex items-center gap-3 px-3 py-2 ${ci > 0 ? "border-t border-border" : ""}`}
