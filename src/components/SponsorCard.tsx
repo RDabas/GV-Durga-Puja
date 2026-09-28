@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Sponsor } from "@/lib/types";
+import type { Sponsor, SponsorType } from "@/lib/types";
 import { PaymentBreakdown } from "@/components/PaymentBreakdown";
 import { Pill } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -8,6 +8,18 @@ import { formatINR, formatShortDate } from "@/lib/format";
 import { paymentModeBreakdown, paymentModeLabels } from "@/lib/payment";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import { usePujaData } from "@/lib/store";
+
+// Same solid-badge-border language as FlatCard's cardAccent — each sponsor
+// type gets a visually distinct card instead of a uniform gray one.
+const sponsorTypeAccent: Record<SponsorType, string> = {
+  non_resident: "border-brand/30 border-r-brand",
+  outsider: "border-border",
+  stall_vendor: "border-gold/30 border-r-gold",
+  non_stall_vendor: "border-warning/30 border-r-warning",
+  dandiya_collection: "border-success/30 border-r-success",
+  counter_collection: "border-critical/30 border-r-critical",
+  donation_box: "border-ink/30 border-r-ink",
+};
 
 export function SponsorCard({
   sponsor,
@@ -29,11 +41,13 @@ export function SponsorCard({
   const history = [...sponsor.payments].sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-3.5 shadow-[var(--shadow-card)]">
+    <div
+      className={`rounded-2xl border border-r-[3px] bg-surface p-3.5 shadow-[var(--shadow-card)] ${sponsorTypeAccent[sponsor.type]}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <span className="text-[0.9rem] font-bold text-ink">{sponsor.name}</span>
         <Pill tone={sponsor.type}>
-          {sponsor.type === "stall" && sponsor.stallDetails
+          {sponsor.type === "stall_vendor" && sponsor.stallDetails
             ? `Stall — ${sponsor.stallDetails}`
             : undefined}
         </Pill>

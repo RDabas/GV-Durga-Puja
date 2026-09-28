@@ -7,7 +7,10 @@ create type block_letter as enum ('A', 'B', 'C', 'D', 'E', 'F', 'G');
 create type payment_mode as enum ('cash', 'gpay', 'phonepe', 'other_upi', 'pending');
 create type contribution_status as enum ('paid', 'partial', 'promised', 'pending', 'not_visited', 'not_home');
 create type contribution_kind as enum ('money', 'bhog_grocery', 'both');
-create type sponsor_type as enum ('outside', 'stall', 'no_stall');
+create type sponsor_type as enum (
+  'non_resident', 'outsider', 'stall_vendor', 'non_stall_vendor',
+  'dandiya_collection', 'counter_collection', 'donation_box'
+);
 create type committee_role as enum ('admin', 'collector');
 create type transfer_mode as enum ('cash', 'gpay', 'phonepe', 'other_upi');
 create type carried_fund_kind as enum ('cash', 'fd', 'bank');
@@ -158,7 +161,7 @@ create table sponsors (
   year_id uuid not null references puja_years(id) on delete cascade,
   name text not null,
   contact text,
-  type sponsor_type not null default 'no_stall',
+  type sponsor_type not null default 'outsider',
   stall_details text,
   amount_pledged numeric(10, 2) not null default 0,
   notes text,

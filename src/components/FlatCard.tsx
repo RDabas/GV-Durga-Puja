@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Contribution, ContributionStatus, House, Owner } from "@/lib/types";
 import { Pill } from "@/components/Pill";
 import { PaymentTag } from "@/components/PaymentBreakdown";
-import { formatINR, formatShortDate } from "@/lib/format";
+import { formatINR, formatShortDate, pledgeProgressLabel } from "@/lib/format";
 import type { PreviousYearInfo } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 
@@ -225,8 +225,11 @@ function PayerRow({
             </span>
             {contribution?.originalPledgeAmount != null && (
               <span className="mt-0.5 block whitespace-nowrap text-[0.7rem] font-semibold tabular-nums text-gold">
-                {formatINR(contribution.moneyAmount)} remaining of{" "}
-                {formatINR(contribution.originalPledgeAmount)}
+                {pledgeProgressLabel(
+                  contribution.status,
+                  contribution.moneyAmount,
+                  contribution.originalPledgeAmount,
+                )}
               </span>
             )}
           </>

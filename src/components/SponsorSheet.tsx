@@ -15,9 +15,13 @@ import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { Sponsor, SponsorType } from "@/lib/types";
 
 const typeOptions: { value: SponsorType; label: string }[] = [
-  { value: "outside", label: "Outside" },
-  { value: "stall", label: "Stall" },
-  { value: "no_stall", label: "No stall" },
+  { value: "non_resident", label: "Non Resident" },
+  { value: "outsider", label: "Outsider" },
+  { value: "stall_vendor", label: "Stall Vendor" },
+  { value: "non_stall_vendor", label: "Non Stall Vendor" },
+  { value: "dandiya_collection", label: "Dandiya Night Collection" },
+  { value: "counter_collection", label: "Counter Collection" },
+  { value: "donation_box", label: "Donation Box Collection" },
 ];
 
 export function SponsorSheet({
@@ -32,7 +36,7 @@ export function SponsorSheet({
 }) {
   const { addSponsor, updateSponsor } = usePujaData();
   const [name, setName] = useState(sponsor?.name ?? "");
-  const [type, setType] = useState<SponsorType>(sponsor?.type ?? "outside");
+  const [type, setType] = useState<SponsorType>(sponsor?.type ?? "outsider");
   const [stallDetails, setStallDetails] = useState(sponsor?.stallDetails ?? "");
   const [contact, setContact] = useState(sponsor?.contact ?? "");
   const [amountPledged, setAmountPledged] = useState(sponsor?.amountPledged ?? 0);
@@ -44,7 +48,7 @@ export function SponsorSheet({
     const input = {
       name: name.trim(),
       type,
-      stallDetails: type === "stall" ? stallDetails.trim() || undefined : undefined,
+      stallDetails: type === "stall_vendor" ? stallDetails.trim() || undefined : undefined,
       contact: contact.trim() || undefined,
       amountPledged,
     };
@@ -76,7 +80,7 @@ export function SponsorSheet({
           <OptionGroup value={type} onChange={setType} options={typeOptions} />
         </Field>
 
-        {type === "stall" && (
+        {type === "stall_vendor" && (
           <Field label="Stall location">
             <TextInput
               value={stallDetails}

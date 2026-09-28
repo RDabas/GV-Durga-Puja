@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { ContributionSheet } from "@/components/ContributionSheet";
-import { Pill } from "@/components/Pill";
+import { Pill, pillLabels } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
 import { CoinsIcon, SponsorsIcon, VendorsIcon } from "@/components/icons";
 import { knownBlocks } from "@/lib/directory";
-import { formatINR } from "@/lib/format";
+import { formatINR, pledgeProgressLabel } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
-import type { Block, Contribution, ContributionStatus, House } from "@/lib/types";
+import type { Block, Contribution, ContributionStatus, House, SponsorType } from "@/lib/types";
 
 const followUpStatusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "promised", label: "Promised" },
@@ -123,6 +123,17 @@ export default function DashboardPage() {
     (sum, s) => sum + s.payments.reduce((ps, p) => ps + p.amount, 0),
     0,
   );
+  // Biggest amount first — the types that actually brought in money lead,
+  // rather than sorting by however sponsors happen to be entered.
+  const sponsorReceivedByType = useMemo(() => {
+    const totals = new Map<SponsorType, number>();
+    for (const s of sponsors) {
+      const received = s.payments.reduce((sum, p) => sum + p.amount, 0);
+      if (received <= 0) continue;
+      totals.set(s.type, (totals.get(s.type) ?? 0) + received);
+    }
+    return [...totals.entries()].sort((a, b) => b[1] - a[1]);
+  }, [sponsors]);
   const vendorPaid = vendorExpenses.reduce(
     (sum, e) => sum + e.payments.reduce((s, p) => s + p.amount, 0),
     0,
@@ -422,6 +433,13 @@ export default function DashboardPage() {
             {formatINR(sponsorReceived)}
           </div>
           <div className="mt-0.5 text-[0.72rem] text-ink-soft">{sponsors.length} confirmed</div>
+          {sponsorReceivedByType.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {sponsorReceivedByType.map(([type, amount]) => (
+                <Pill key={type} tone={type}>{`${pillLabels[type]} ${formatINR(amount)}`}</Pill>
+              ))}
+            </div>
+          )}
         </div>
         <div
           className={`rounded-2xl border border-r-[3px] bg-surface p-3.5 shadow-[var(--shadow-card)] ${
@@ -575,8 +593,11 @@ export default function DashboardPage() {
                 </div>
                 {contribution?.originalPledgeAmount != null && (
                   <div className="mt-0.5 text-[0.72rem] font-semibold text-gold">
-                    {formatINR(contribution.moneyAmount)} remaining of{" "}
-                    {formatINR(contribution.originalPledgeAmount)}
+                    {pledgeProgressLabel(
+                      contribution.status,
+                      contribution.moneyAmount,
+                      contribution.originalPledgeAmount,
+                    )}
                   </div>
                 )}
                 {/* Never truncated — a long name shouldn't be able to hide which flat(s) this is. */}

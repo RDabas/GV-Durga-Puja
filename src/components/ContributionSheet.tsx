@@ -140,6 +140,7 @@ export function ContributionSheet({
   const isPaidVia = statusChoice === "paid_via";
   const received = status === "paid" || status === "partial";
   const promised = status === "promised";
+  const partial = status === "partial";
   const needsFollowUp =
     !isPaidVia && (status === "not_home" || status === "not_visited" || status === "pending");
   const takesBhog = kind !== "money";
@@ -190,7 +191,9 @@ export function ContributionSheet({
         // otherwise there's nothing to track, so drop it rather than store a
         // number that no longer means anything.
         originalPledgeAmount:
-          promised && originalPledgeAmount > moneyAmount ? originalPledgeAmount : undefined,
+          (promised || partial) && originalPledgeAmount > moneyAmount
+            ? originalPledgeAmount
+            : undefined,
         bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
         contributionKind: kind,
         paymentMode: received ? mode : "pending",
@@ -261,13 +264,19 @@ export function ContributionSheet({
           </Field>
         )}
 
-        {promised && (
-          <Field label="Originally promised, if higher (optional)">
+        {(promised || partial) && (
+          <Field
+            label={
+              promised
+                ? "Originally promised, if higher (optional)"
+                : "Total amount promised, if more than what's paid (optional)"
+            }
+          >
             <AmountInput value={originalPledgeAmount} onChange={setOriginalPledgeAmount} />
             <p className="mt-1.5 text-[0.72rem] text-ink-faint">
-              Fill this in only if part of the promise was already covered another way
-              (e.g. they paid a vendor bill directly) — then &ldquo;Amount remaining&rdquo;
-              above becomes what&rsquo;s still pending. Leave at 0 for a plain promise.
+              {promised
+                ? "Fill this in only if part of the promise was already covered another way (e.g. they paid a vendor bill directly) — then “Amount remaining” above becomes what’s still pending. Leave at 0 for a plain promise."
+                : "Fill this in if what's been paid is only part of a bigger promise — the card will then show what's still pending. Leave at 0 if there's no larger promise behind this payment."}
             </p>
           </Field>
         )}

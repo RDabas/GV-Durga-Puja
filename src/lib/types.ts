@@ -12,7 +12,14 @@ export type ContributionStatus =
 
 export type ContributionKind = "money" | "bhog_grocery" | "both";
 
-export type SponsorType = "outside" | "stall" | "no_stall";
+export type SponsorType =
+  | "non_resident"
+  | "outsider"
+  | "stall_vendor"
+  | "non_stall_vendor"
+  | "dandiya_collection"
+  | "counter_collection"
+  | "donation_box";
 
 export type VendorPaymentStatus = "paid_full" | "installment" | "not_paid";
 

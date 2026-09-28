@@ -15,9 +15,13 @@ const statusLabels: Record<ContributionStatus, string> = {
 };
 
 const sponsorTypeLabels: Record<SponsorType, string> = {
-  outside: "Outside",
-  stall: "Stall",
-  no_stall: "No stall",
+  non_resident: "Non Resident",
+  outsider: "Outsider",
+  stall_vendor: "Stall Vendor",
+  non_stall_vendor: "Non Stall Vendor",
+  dandiya_collection: "Dandiya Night Collection",
+  counter_collection: "Counter Collection",
+  donation_box: "Donation Box Collection",
 };
 
 function styleHeader(sheet: ExcelJS.Worksheet) {

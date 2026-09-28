@@ -1,3 +1,5 @@
+import type { ContributionStatus } from "@/lib/types";
+
 const inr = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
@@ -6,6 +8,21 @@ const inr = new Intl.NumberFormat("en-IN", {
 
 export function formatINR(amount: number): string {
   return inr.format(amount);
+}
+
+/**
+ * moneyAmount means something different per status — for "promised" it's
+ * what's still pending, for "partial" it's what's already been paid — so the
+ * "vs. the original pledge" line needs different wording for each.
+ */
+export function pledgeProgressLabel(
+  status: ContributionStatus,
+  moneyAmount: number,
+  originalPledgeAmount: number,
+): string {
+  return status === "partial"
+    ? `${formatINR(moneyAmount)} of ${formatINR(originalPledgeAmount)} paid`
+    : `${formatINR(moneyAmount)} remaining of ${formatINR(originalPledgeAmount)}`;
 }
 
 export function formatShortDate(iso: string): string {
