@@ -12,6 +12,7 @@ const statusLabels: Record<ContributionStatus, string> = {
   pending: "Pending",
   not_visited: "Not visited",
   not_home: "Nobody home",
+  wont_pay: "Won't pay",
 };
 
 const sponsorTypeLabels: Record<SponsorType, string> = {

@@ -26,6 +26,7 @@ import {
   dbRemoveCarriedFund,
   dbRemoveFundTransfer,
   dbRemoveMember,
+  dbRemoveTenant,
   dbSaveContribution,
   dbSaveOwner,
   dbSaveTenants,
@@ -199,6 +200,8 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   startYear: (input: YearInput) => Promise<void>;
   updateYear: (yearId: string, patch: Partial<YearInput>) => Promise<void>;
   saveTenants: (houseId: string, names: string[], phone?: string) => Promise<void>;
+  /** Clears a flat's tenant name(s) and deletes this year's recorded contribution for them, if any — back to an empty "+ Add tenant" flat. */
+  removeTenant: (houseId: string) => Promise<void>;
   /** Links (targetHouseId set) or unlinks (null) this flat's owner accounting to another flat — see House.paidViaHouseId. */
   setPaidViaHouse: (houseId: string, targetHouseId: string | null) => Promise<void>;
   saveOwner: (houseId: string, names: string[], phone?: string) => Promise<string>;
@@ -399,6 +402,16 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await logActivity(
           "house.update_tenants",
           `updated tenants for ${house ? `${house.block}-${house.flatNo}` : "a flat"}`,
+        );
+        await load();
+      },
+      removeTenant: async (houseId) => {
+        const house = data.houses.find((h) => h.id === houseId);
+        const existing = yearContributions.find((c) => c.houseId === houseId);
+        await dbRemoveTenant(supabase, houseId, existing?.id);
+        await logActivity(
+          "house.remove_tenant",
+          `removed tenant ${house?.tenantNames.join(", ") || "?"} from ${house ? `${house.block}-${house.flatNo}` : "a flat"}`,
         );
         await load();
       },

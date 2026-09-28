@@ -15,6 +15,7 @@ const followUpStatusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "partial", label: "Partial" },
   { value: "pending", label: "Pending" },
   { value: "not_home", label: "Nobody home" },
+  { value: "wont_pay", label: "Won't pay" },
   { value: "not_visited", label: "Not visited" },
 ];
 
@@ -32,6 +33,7 @@ const followUpAvatarTone: Record<ContributionStatus, string> = {
   promised: "bg-gold text-surface",
   pending: "bg-brand text-surface",
   not_home: "bg-critical text-surface",
+  wont_pay: "bg-ink text-surface",
   not_visited: "bg-ground-alt text-ink-soft",
 };
 
@@ -90,6 +92,8 @@ function followUpDescription(
         .join(" · ");
     case "partial":
       return `Partial — ${formatINR(contribution?.moneyAmount ?? 0)} so far`;
+    case "wont_pay":
+      return contribution?.followUpNote ?? "Won't pay — no need to follow up";
     default:
       return [contribution?.followUpNote ?? "Not visited yet", assignedTag]
         .filter(Boolean)
@@ -159,7 +163,7 @@ export default function DashboardPage() {
       const contribution = contributionFor({ ownerId: owner.id });
       entries.push({
         key: `owner-${owner.id}`,
-        badge: "OWN",
+        badge: primaryHouse.flatNo,
         name: `${owner.names.join(", ")} · owner`,
         flatInfo: ownerHouses.map((h) => `${h.block}-${h.flatNo}`).join(", "),
         block: primaryHouse.block,
@@ -349,7 +353,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2.5 text-[0.72rem] text-ink-soft">
             {formatINR(residentPaidOverall)} from residents + {formatINR(sponsorReceived)} from
-            sponsors
+            outsiders
           </div>
         </div>
         <div className="col-span-2 rounded-2xl border border-r-[3px] border-brand/30 border-r-brand bg-surface p-3.5 shadow-[var(--shadow-card)]">

@@ -26,6 +26,7 @@ const statusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "promised", label: "Promised" },
   { value: "pending", label: "Pending" },
   { value: "not_home", label: "Nobody home" },
+  { value: "wont_pay", label: "Won't pay" },
   { value: "not_visited", label: "Not visited" },
 ];
 
@@ -46,6 +47,8 @@ function followUpNoteLabel(status: ContributionStatus): string {
       return "Follow-up note";
     case "pending":
       return "Note — what did they say?";
+    case "wont_pay":
+      return "Reason (optional)";
     default:
       return "Note for next visit";
   }
@@ -319,7 +322,7 @@ export function ContributionSheet({
           </>
         )}
 
-        {(status === "promised" || needsFollowUp) && (
+        {(status === "promised" || status === "wont_pay" || needsFollowUp) && (
           <Field label={followUpNoteLabel(status)}>
             <TextInput
               value={followUpNote}
@@ -329,7 +332,9 @@ export function ContributionSheet({
                   ? "e.g. said after the 12th"
                   : status === "pending"
                     ? "e.g. checking with spouse, will confirm"
-                    : "e.g. try again evening"
+                    : status === "wont_pay"
+                      ? "e.g. moved out, declined"
+                      : "e.g. try again evening"
               }
             />
           </Field>

@@ -24,6 +24,7 @@ const cardAccent: Record<ContributionStatus, { badge: string; border: string }> 
   promised: { badge: "bg-gold text-surface", border: "border-gold/40 border-r-gold" },
   pending: { badge: "bg-brand text-surface", border: "border-brand/40 border-r-brand" },
   not_home: { badge: "bg-critical text-surface", border: "border-critical/40 border-r-critical" },
+  wont_pay: { badge: "bg-ink text-surface", border: "border-ink/40 border-r-ink" },
   not_visited: { badge: "bg-ground-alt text-ink", border: "border-border" },
 };
 
@@ -36,6 +37,7 @@ const statusRank: ContributionStatus[] = [
   "promised",
   "pending",
   "not_home",
+  "wont_pay",
   "not_visited",
 ];
 
@@ -77,6 +79,32 @@ function DisableToggleButton({
       className={`shrink-0 rounded-full px-2.5 py-1 text-[0.66rem] font-bold whitespace-nowrap transition active:scale-95 disabled:opacity-60 ${tone}`}
     >
       {submitting ? "…" : error ? "Retry" : disabled ? "Enable" : "Disable"}
+    </button>
+  );
+}
+
+/** Small "Remove" link next to the Tenant label — clears their name and this year's recorded payment, back to an empty "+ Add tenant" flat. */
+function RemoveTenantButton({
+  tenantNames,
+  onRemove,
+}: {
+  tenantNames: string;
+  onRemove: () => Promise<void>;
+}) {
+  const { submitting, error, run } = useAsyncAction();
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        const question = `Remove ${tenantNames || "this tenant"}? Their recorded payment for this year (if any) will be cleared and this flat will need a tenant added again.`;
+        if (window.confirm(question)) run(onRemove);
+      }}
+      disabled={submitting}
+      title={error ?? undefined}
+      className="shrink-0 rounded-full bg-critical-tint px-2.5 py-1 text-[0.66rem] font-bold whitespace-nowrap text-critical transition active:scale-95 disabled:opacity-60"
+    >
+      {submitting ? "…" : error ? "Retry" : "Remove"}
     </button>
   );
 }
@@ -266,6 +294,7 @@ export function FlatCard({
   onEditOwner,
   onEditTenant,
   onToggleOwnerDisabled,
+  onRemoveTenant,
 }: {
   house: House;
   owner?: Owner;
@@ -285,6 +314,8 @@ export function FlatCard({
   onEditOwner: () => void;
   onEditTenant: () => void;
   onToggleOwnerDisabled?: () => Promise<void>;
+  /** Clears the tenant's name and this year's recorded payment — offered whenever a tenant is on file. */
+  onRemoveTenant?: () => Promise<void>;
 }) {
   // A disabled owner's status is excluded — same as everywhere else they're
   // "not considered" — so their card doesn't get accented by a stale status.
@@ -356,6 +387,14 @@ export function FlatCard({
             collectorName={tenantCollector}
             assignedToName={tenantAssignedTo}
             previousYear={tenantPreviousYear}
+            headerAction={
+              onRemoveTenant ? (
+                <RemoveTenantButton
+                  tenantNames={summarise(house.tenantNames)}
+                  onRemove={onRemoveTenant}
+                />
+              ) : undefined
+            }
             onClick={onEditTenant}
           />
         </div>

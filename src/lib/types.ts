@@ -8,7 +8,8 @@ export type ContributionStatus =
   | "promised"
   | "pending"
   | "not_visited"
-  | "not_home";
+  | "not_home"
+  | "wont_pay";
 
 export type ContributionKind = "money" | "bhog_grocery" | "both";
 

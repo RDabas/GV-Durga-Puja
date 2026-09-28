@@ -5,7 +5,7 @@ create extension if not exists "pgcrypto";
 
 create type block_letter as enum ('A', 'B', 'C', 'D', 'E', 'F', 'G');
 create type payment_mode as enum ('cash', 'gpay', 'phonepe', 'other_upi', 'pending');
-create type contribution_status as enum ('paid', 'partial', 'promised', 'pending', 'not_visited', 'not_home');
+create type contribution_status as enum ('paid', 'partial', 'promised', 'pending', 'not_visited', 'not_home', 'wont_pay');
 create type contribution_kind as enum ('money', 'bhog_grocery', 'both');
 create type sponsor_type as enum (
   'non_resident', 'outsider', 'stall_vendor', 'non_stall_vendor',
@@ -308,6 +308,8 @@ create policy "collectors update own contributions, admins update all" on contri
     is_committee_admin()
     or collector_id = (select id from committee_members where auth_user_id = auth.uid())
   );
+create policy "admins delete contributions" on contributions
+  for delete using (is_committee_admin());
 
 create policy "committee can read fund_transfers" on fund_transfers
   for select using (is_committee_member());

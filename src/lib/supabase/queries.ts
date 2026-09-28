@@ -426,6 +426,26 @@ export async function dbSaveTenants(
   if (error) throw new Error(error.message);
 }
 
+/** Clears a flat's tenant name(s) and deletes this year's contribution row for them (if any) — admin-only, since it discards a recorded payment. */
+export async function dbRemoveTenant(
+  supabase: SupabaseClient,
+  houseId: string,
+  contributionId?: string,
+): Promise<void> {
+  if (contributionId) {
+    const { error: deleteError } = await supabase
+      .from("contributions")
+      .delete()
+      .eq("id", contributionId);
+    if (deleteError) throw new Error(deleteError.message);
+  }
+  const { error } = await supabase
+    .from("houses")
+    .update({ tenant_names: [], tenant_phone: null })
+    .eq("id", houseId);
+  if (error) throw new Error(error.message);
+}
+
 /** Links (or unlinks, when targetHouseId is null) this flat's owner accounting to another flat — see House.paidViaHouseId. */
 export async function dbSetPaidViaHouse(
   supabase: SupabaseClient,
