@@ -13,22 +13,17 @@ import {
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import { today } from "@/lib/format";
-import type {
-  ContributionKind,
-  ContributionStatus,
-  House,
-  PaymentMode,
-} from "@/lib/types";
-
-const statusOptions: { value: ContributionStatus; label: string }[] = [
-  { value: "paid", label: "Paid" },
-  { value: "partial", label: "Partial" },
-  { value: "promised", label: "Promised" },
-  { value: "pending", label: "Pending" },
-  { value: "not_home", label: "Nobody home" },
-  { value: "wont_pay", label: "Won't pay" },
-  { value: "not_visited", label: "Not visited" },
-];
+import {
+  amountFieldLabel,
+  followUpNoteLabel,
+  followUpNotePlaceholder,
+  kindOptions,
+  modeOptions,
+  originalPledgeFieldLabel,
+  originalPledgeHelpText,
+  statusOptions,
+} from "@/lib/contributionForm";
+import type { ContributionKind, ContributionStatus, House, PaymentMode } from "@/lib/types";
 
 /** A pseudo-status: redirects this flat's owner accounting to another flat instead of recording a contribution here — see House.paidViaHouseId. */
 type StatusChoice = ContributionStatus | "paid_via";
@@ -40,32 +35,6 @@ function parseFlatLabel(raw: string): { block: string; flatNo: string } | null {
   if (!match) return null;
   return { block: match[1], flatNo: match[2] };
 }
-
-function followUpNoteLabel(status: ContributionStatus): string {
-  switch (status) {
-    case "promised":
-      return "Follow-up note";
-    case "pending":
-      return "Note — what did they say?";
-    case "wont_pay":
-      return "Reason (optional)";
-    default:
-      return "Note for next visit";
-  }
-}
-
-const kindOptions: { value: ContributionKind; label: string }[] = [
-  { value: "money", label: "Money" },
-  { value: "bhog_grocery", label: "Bhog / grocery" },
-  { value: "both", label: "Both" },
-];
-
-const modeOptions: { value: PaymentMode; label: string }[] = [
-  { value: "cash", label: "Cash" },
-  { value: "gpay", label: "GPay" },
-  { value: "phonepe", label: "PhonePe" },
-  { value: "other_upi", label: "Other UPI" },
-];
 
 export function ContributionSheet({
   house,
@@ -254,33 +223,15 @@ export function ContributionSheet({
         )}
 
         {(received || promised) && kind !== "bhog_grocery" && (
-          <Field
-            label={
-              promised
-                ? originalPledgeAmount > 0
-                  ? "Amount remaining"
-                  : "Amount promised"
-                : "Amount received"
-            }
-          >
+          <Field label={amountFieldLabel(status, originalPledgeAmount)}>
             <AmountInput value={moneyAmount} onChange={setMoneyAmount} autoFocus={received} />
           </Field>
         )}
 
         {(promised || partial) && (
-          <Field
-            label={
-              promised
-                ? "Originally promised, if higher (optional)"
-                : "Total amount promised, if more than what's paid (optional)"
-            }
-          >
+          <Field label={originalPledgeFieldLabel(status)}>
             <AmountInput value={originalPledgeAmount} onChange={setOriginalPledgeAmount} />
-            <p className="mt-1.5 text-[0.72rem] text-ink-faint">
-              {promised
-                ? "Fill this in only if part of the promise was already covered another way (e.g. they paid a vendor bill directly) — then “Amount remaining” above becomes what’s still pending. Leave at 0 for a plain promise."
-                : "Fill this in if what's been paid is only part of a bigger promise — the card will then show what's still pending. Leave at 0 if there's no larger promise behind this payment."}
-            </p>
+            <p className="mt-1.5 text-[0.72rem] text-ink-faint">{originalPledgeHelpText(status)}</p>
           </Field>
         )}
 
@@ -327,15 +278,7 @@ export function ContributionSheet({
             <TextInput
               value={followUpNote}
               onChange={(e) => setFollowUpNote(e.target.value)}
-              placeholder={
-                status === "promised"
-                  ? "e.g. said after the 12th"
-                  : status === "pending"
-                    ? "e.g. checking with spouse, will confirm"
-                    : status === "wont_pay"
-                      ? "e.g. moved out, declined"
-                      : "e.g. try again evening"
-              }
+              placeholder={followUpNotePlaceholder(status)}
             />
           </Field>
         )}

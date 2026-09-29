@@ -18,7 +18,7 @@ function summarise(names: string[]): string {
  * same solid-badge-plus-accent-border pattern for every status instead of
  * treating "paid" as the only one worth highlighting.
  */
-const cardAccent: Record<ContributionStatus, { badge: string; border: string }> = {
+export const cardAccent: Record<ContributionStatus, { badge: string; border: string }> = {
   paid: { badge: "bg-success text-surface", border: "border-success/40 border-r-success" },
   partial: { badge: "bg-warning text-surface", border: "border-warning/40 border-r-warning" },
   promised: { badge: "bg-gold text-surface", border: "border-gold/40 border-r-gold" },
@@ -48,13 +48,13 @@ function bestStatus(...statuses: (ContributionStatus | undefined)[]): Contributi
   return "not_visited";
 }
 
-/** Small "Disable"/"Enable" link shown right next to the owner's role label — a real sibling button, not nested inside the row's own tap-to-edit button. */
-function DisableToggleButton({
-  ownerName,
+/** Small "Disable"/"Enable" link shown right next to a row's role label — a real sibling button, not nested inside the row's own tap-to-edit button. Shared by owner rows and Ex Resident cards. */
+export function DisableToggleButton({
+  name,
   disabled,
   onToggle,
 }: {
-  ownerName: string;
+  name: string;
   disabled?: boolean;
   onToggle: () => Promise<void>;
 }) {
@@ -70,8 +70,8 @@ function DisableToggleButton({
       onClick={(e) => {
         e.stopPropagation();
         const question = disabled
-          ? `Enable ${ownerName || "this owner"} again? They'll count toward this year's totals and follow-up list.`
-          : `Disable ${ownerName || "this owner"}? They'll be excluded from this year's totals and follow-up list until re-enabled.`;
+          ? `Enable ${name || "this person"} again? They'll count toward this year's totals and follow-up list.`
+          : `Disable ${name || "this person"}? They'll be excluded from this year's totals and follow-up list until re-enabled.`;
         if (window.confirm(question)) run(onToggle);
       }}
       disabled={submitting}
@@ -155,7 +155,7 @@ function OwnerReferenceRow({
   );
 }
 
-function PayerRow({
+export function PayerRow({
   role,
   names,
   hint,
@@ -331,7 +331,7 @@ export function FlatCard({
   const showDisableToggle = owner && onToggleOwnerDisabled && (owner.disabled || hasTenant);
   const disableToggle = showDisableToggle ? (
     <DisableToggleButton
-      ownerName={owner!.names.join(", ")}
+      name={owner!.names.join(", ")}
       disabled={owner!.disabled}
       onToggle={onToggleOwnerDisabled!}
     />

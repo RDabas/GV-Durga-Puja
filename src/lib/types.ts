@@ -49,6 +49,19 @@ export interface Owner {
   disabled: boolean;
 }
 
+/**
+ * A voluntary contributor not tied to any flat or block — e.g. someone who
+ * used to be a resident, moved out, and isn't a current owner or tenant of
+ * any flat, but keeps contributing each year regardless.
+ */
+export interface ExResident {
+  id: string;
+  names: string[];
+  phone?: string;
+  /** Excluded from this year's money totals and follow-up lists, but kept on record — see the Disable/Enable toggle, shared with Owner. */
+  disabled: boolean;
+}
+
 /** A flat in the society directory. */
 export interface House {
   id: string;
@@ -70,15 +83,17 @@ export interface House {
 }
 
 /**
- * Exactly one of houseId / ownerId is set. A tenant pays for their own flat;
- * an owner pays once for every flat they hold, so that entry hangs off the
- * owner instead of being duplicated across their flats.
+ * Exactly one of houseId / ownerId / exResidentId is set. A tenant pays for
+ * their own flat; an owner pays once for every flat they hold, so that entry
+ * hangs off the owner instead of being duplicated across their flats; an
+ * ex-resident isn't tied to any flat at all.
  */
 export interface Contribution {
   id: string;
   yearId: string;
   houseId?: string;
   ownerId?: string;
+  exResidentId?: string;
   collectorId?: string;
   /**
    * Who should go back for a "nobody home"/"not visited" flat — separate

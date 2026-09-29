@@ -7,6 +7,7 @@ import type {
   Contribution,
   ContributionKind,
   ContributionStatus,
+  ExResident,
   FundTransfer,
   House,
   Owner,
@@ -46,6 +47,13 @@ interface OwnerRow {
   disabled: boolean;
 }
 
+interface ExResidentRow {
+  id: string;
+  names: string[];
+  phone: string | null;
+  disabled: boolean;
+}
+
 interface HouseRow {
   id: string;
   block: House["block"];
@@ -69,6 +77,7 @@ interface ContributionRow {
   id: string;
   house_id: string | null;
   owner_id: string | null;
+  ex_resident_id: string | null;
   year_id: string;
   collector_id: string | null;
   assigned_to_member_id: string | null;
@@ -181,6 +190,13 @@ const mapOwner = (r: OwnerRow): Owner => ({
   disabled: r.disabled,
 });
 
+const mapExResident = (r: ExResidentRow): ExResident => ({
+  id: r.id,
+  names: r.names,
+  phone: r.phone ?? undefined,
+  disabled: r.disabled,
+});
+
 const mapHouse = (r: HouseRow): House => ({
   id: r.id,
   block: r.block,
@@ -205,6 +221,7 @@ const mapContribution = (r: ContributionRow): Contribution => ({
   yearId: r.year_id,
   houseId: r.house_id ?? undefined,
   ownerId: r.owner_id ?? undefined,
+  exResidentId: r.ex_resident_id ?? undefined,
   collectorId: r.collector_id ?? undefined,
   assignedToMemberId: r.assigned_to_member_id ?? undefined,
   assignedToName: r.assigned_to_name ?? undefined,
@@ -303,6 +320,7 @@ const mapActivity = (r: ActivityLogRow): ActivityEntry => ({
 export interface LiveData {
   years: PujaYear[];
   owners: Owner[];
+  exResidents: ExResident[];
   houses: House[];
   members: CommitteeMember[];
   contributions: Contribution[];
@@ -328,6 +346,7 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
   const [
     years,
     owners,
+    exResidents,
     houses,
     members,
     contributions,
@@ -339,6 +358,7 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
   ] = await Promise.all([
       supabase.from("puja_years").select("*").order("year", { ascending: true }),
       supabase.from("owners").select("*"),
+      supabase.from("ex_residents").select("*"),
       // Explicit order, not just insertion order: Postgres doesn't guarantee
       // row order without one, so without this, saving any contribution and
       // reloading could reshuffle flats within a floor on the Collect tab.
@@ -357,6 +377,7 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
   return {
     years: unwrap<YearRow[]>(years, "years").map(mapYear),
     owners: unwrap<OwnerRow[]>(owners, "owners").map(mapOwner),
+    exResidents: unwrap<ExResidentRow[]>(exResidents, "exResidents").map(mapExResident),
     houses: unwrap<HouseRow[]>(houses, "houses").map(mapHouse),
     members: unwrap<MemberRow[]>(members, "members").map(mapMember),
     contributions: unwrap<ContributionRow[]>(contributions, "contributions").map(mapContribution),
@@ -498,6 +519,40 @@ export async function dbSetOwnerDisabled(
   if (error) throw new Error(error.message);
 }
 
+/** Renames an ex-resident in place, or creates one — not tied to any flat/house. Returns the ex-resident id. */
+export async function dbSaveExResident(
+  supabase: SupabaseClient,
+  existingId: string | undefined,
+  names: string[],
+  phone?: string,
+): Promise<string> {
+  if (existingId) {
+    const { error } = await supabase
+      .from("ex_residents")
+      .update({ names, phone: phone ?? null })
+      .eq("id", existingId);
+    if (error) throw new Error(error.message);
+    return existingId;
+  }
+
+  const inserted = await supabase
+    .from("ex_residents")
+    .insert({ names, phone: phone ?? null })
+    .select()
+    .single();
+  return unwrap<ExResidentRow>(inserted, "insert ex_resident").id;
+}
+
+/** Toggles whether an ex-resident counts toward this year's money totals and follow-up lists — their record and history stay intact either way. */
+export async function dbSetExResidentDisabled(
+  supabase: SupabaseClient,
+  exResidentId: string,
+  disabled: boolean,
+): Promise<void> {
+  const { error } = await supabase.from("ex_residents").update({ disabled }).eq("id", exResidentId);
+  if (error) throw new Error(error.message);
+}
+
 export async function dbAddMember(
   supabase: SupabaseClient,
   input: { name: string; phone?: string; role: CommitteeMember["role"] },
@@ -597,7 +652,7 @@ interface ContributionWrite {
 export async function dbSaveContribution(
   supabase: SupabaseClient,
   yearId: string,
-  payer: { houseId: string } | { ownerId: string },
+  payer: { houseId: string } | { ownerId: string } | { exResidentId: string },
   existingId: string | undefined,
   input: ContributionWrite,
 ): Promise<void> {
@@ -605,6 +660,7 @@ export async function dbSaveContribution(
     year_id: yearId,
     house_id: "houseId" in payer ? payer.houseId : null,
     owner_id: "ownerId" in payer ? payer.ownerId : null,
+    ex_resident_id: "exResidentId" in payer ? payer.exResidentId : null,
     collector_id: input.collectorId ?? null,
     assigned_to_member_id: input.assignedToMemberId ?? null,
     assigned_to_name: input.assignedToName ?? null,

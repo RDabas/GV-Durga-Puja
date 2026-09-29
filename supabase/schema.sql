@@ -71,6 +71,18 @@ alter table owners add column disabled boolean not null default false;
 -- counts as visited once the flat it points to does.
 alter table houses add column paid_via_house_id uuid references houses(id) on delete set null;
 
+-- A voluntary contributor not tied to any flat or block — e.g. someone who
+-- used to be a resident, moved out, and isn't a current owner or tenant of
+-- any flat, but keeps contributing each year regardless. Shaped like owners
+-- minus the house link; disable/enable works the same way.
+create table ex_residents (
+  id uuid primary key default gen_random_uuid(),
+  names text[] not null,
+  phone text,
+  disabled boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 -- auth_user_id is nullable: an admin adds a member by name so they can be
 -- picked as "collected by" straight away, and the row is linked to a real
 -- login the first time that person signs in.
@@ -85,12 +97,14 @@ create table committee_members (
 
 -- A flat yields at most two entries per year: one from its tenants (tied to
 -- the flat) and one from its owner (tied to the owner, since an owner of
--- several flats hands over a single amount covering all of them). Exactly one
--- of house_id / owner_id is set.
+-- several flats hands over a single amount covering all of them). An
+-- ex-resident isn't tied to any flat at all. Exactly one of house_id /
+-- owner_id / ex_resident_id is set.
 create table contributions (
   id uuid primary key default gen_random_uuid(),
   house_id uuid references houses(id) on delete cascade,
   owner_id uuid references owners(id) on delete cascade,
+  ex_resident_id uuid references ex_residents(id) on delete cascade,
   year_id uuid not null references puja_years(id) on delete cascade,
   collector_id uuid references committee_members(id),
   -- Who should go back for a "nobody home"/"not visited" flat — separate
@@ -112,13 +126,15 @@ create table contributions (
   follow_up_note text,
   updated_at timestamptz not null default now(),
   constraint contributions_one_payer check (
-    (house_id is not null) <> (owner_id is not null)
+    num_nonnulls(house_id, owner_id, ex_resident_id) = 1
   )
 );
 create unique index contributions_tenant_per_year on contributions(house_id, year_id)
   where house_id is not null;
 create unique index contributions_owner_per_year on contributions(owner_id, year_id)
   where owner_id is not null;
+create unique index contributions_ex_resident_per_year on contributions(ex_resident_id, year_id)
+  where ex_resident_id is not null;
 
 -- Residents always pay a specific committee member (that member's own cash box
 -- or personal UPI) — collector_id on contributions already captures who first
@@ -246,6 +262,7 @@ create index activity_log_created_at_idx on activity_log (created_at desc);
 alter table puja_years enable row level security;
 alter table houses enable row level security;
 alter table owners enable row level security;
+alter table ex_residents enable row level security;
 alter table committee_members enable row level security;
 alter table contributions enable row level security;
 alter table fund_transfers enable row level security;
@@ -292,6 +309,15 @@ create policy "committee can add owners" on owners
 create policy "committee can update owners" on owners
   for update using (is_committee_member());
 create policy "admins delete owners" on owners
+  for delete using (is_committee_admin());
+
+create policy "committee can read ex_residents" on ex_residents
+  for select using (is_committee_member());
+create policy "committee can add ex_residents" on ex_residents
+  for insert with check (is_committee_member());
+create policy "committee can update ex_residents" on ex_residents
+  for update using (is_committee_member());
+create policy "admins delete ex_residents" on ex_residents
   for delete using (is_committee_admin());
 
 create policy "committee can read committee_members" on committee_members

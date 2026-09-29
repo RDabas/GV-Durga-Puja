@@ -2,13 +2,21 @@
 
 import { useMemo, useState } from "react";
 import { ContributionSheet } from "@/components/ContributionSheet";
+import { ExResidentCard } from "@/components/ExResidentCard";
+import { ExResidentSheet } from "@/components/ExResidentSheet";
 import { FlatCard } from "@/components/FlatCard";
-import { RefreshIcon } from "@/components/icons";
+import { PlusIcon, RefreshIcon } from "@/components/icons";
 import { knownBlocks } from "@/lib/directory";
 import { usePujaData } from "@/lib/store";
-import type { Block, Contribution, House } from "@/lib/types";
+import type { Block, Contribution, ExResident, House } from "@/lib/types";
 
 const allBlocks: Block[] = ["A", "B", "C", "D", "E", "F", "G"];
+
+type CollectTab = Block | "ex_resident";
+
+type EditingTarget =
+  | { kind: "flat"; house: House; role: "owner" | "tenant" }
+  | { kind: "ex_resident"; exResident?: ExResident };
 
 function assignedToLabel(
   contribution: Contribution | undefined,
@@ -20,6 +28,7 @@ function assignedToLabel(
 export default function CollectPage() {
   const {
     houses,
+    exResidents,
     contributionFor,
     ownerOf,
     ownerFlatCount,
@@ -28,13 +37,12 @@ export default function CollectPage() {
     memberName,
     setOwnerDisabled,
     removeTenant,
+    setExResidentDisabled,
     reload,
   } = usePujaData();
-  const [selectedBlock, setSelectedBlock] = useState<Block>(knownBlocks[0] ?? "A");
+  const [selectedTab, setSelectedTab] = useState<CollectTab>(knownBlocks[0] ?? "A");
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<{ house: House; role: "owner" | "tenant" } | null>(
-    null,
-  );
+  const [editing, setEditing] = useState<EditingTarget | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   async function handleRefresh() {
@@ -47,7 +55,8 @@ export default function CollectPage() {
   }
 
   const floors = useMemo(() => {
-    const inBlock = houses.filter((h) => h.block === selectedBlock);
+    if (selectedTab === "ex_resident") return [];
+    const inBlock = houses.filter((h) => h.block === selectedTab);
     const byFloor = new Map<number, House[]>();
     for (const house of inBlock) {
       const list = byFloor.get(house.floor) ?? [];
@@ -55,7 +64,7 @@ export default function CollectPage() {
       byFloor.set(house.floor, list);
     }
     return [...byFloor.entries()].sort((a, b) => b[0] - a[0]);
-  }, [houses, selectedBlock]);
+  }, [houses, selectedTab]);
 
   // Non-null only while the search box has text — searches every block, not
   // just the selected one, since the resident might be in a block you're not
@@ -78,6 +87,30 @@ export default function CollectPage() {
           a.block.localeCompare(b.block) || a.floor - b.floor || a.flatNo.localeCompare(b.flatNo),
       );
   }, [search, houses, ownerOf]);
+
+  const exResidentSearchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return null;
+    return exResidents
+      .filter((r) => r.names.some((n) => n.toLowerCase().includes(q)))
+      .sort((a, b) => a.names.join(", ").localeCompare(b.names.join(", ")));
+  }, [search, exResidents]);
+
+  function renderExResidentCard(exResident: ExResident) {
+    const contribution = contributionFor({ exResidentId: exResident.id });
+    return (
+      <ExResidentCard
+        key={exResident.id}
+        exResident={exResident}
+        contribution={contribution}
+        collectorName={memberName(contribution?.collectorId)}
+        assignedToName={assignedToLabel(contribution, memberName)}
+        previousYear={previousYearInfo[exResident.id]}
+        onEdit={() => setEditing({ kind: "ex_resident", exResident })}
+        onToggleDisabled={() => setExResidentDisabled(exResident.id, !exResident.disabled)}
+      />
+    );
+  }
 
   function renderFlatCard(house: House) {
     const owner = ownerOf(house);
@@ -112,8 +145,8 @@ export default function CollectPage() {
         tenantAssignedTo={assignedToLabel(tenantContribution, memberName)}
         ownerPreviousYear={owner ? previousYearInfo[owner.id] : undefined}
         tenantPreviousYear={previousYearInfo[house.id]}
-        onEditOwner={() => setEditing({ house, role: "owner" })}
-        onEditTenant={() => setEditing({ house, role: "tenant" })}
+        onEditOwner={() => setEditing({ kind: "flat", house, role: "owner" })}
+        onEditTenant={() => setEditing({ kind: "flat", house, role: "tenant" })}
         onToggleOwnerDisabled={owner ? () => setOwnerDisabled(owner.id, !owner.disabled) : undefined}
         onRemoveTenant={
           house.tenantNames.length > 0 || tenantContribution ? () => removeTenant(house.id) : undefined
@@ -145,12 +178,20 @@ export default function CollectPage() {
 
       {searchResults ? (
         <div className="space-y-2.5">
-          {searchResults.length === 0 && (
+          {searchResults.length === 0 && (exResidentSearchResults?.length ?? 0) === 0 && (
             <p className="rounded-2xl border border-border bg-surface p-3.5 text-[0.8rem] text-ink-faint">
               No matches for &ldquo;{search}&rdquo;.
             </p>
           )}
           {searchResults.map(renderFlatCard)}
+          {exResidentSearchResults && exResidentSearchResults.length > 0 && (
+            <>
+              <p className="mb-2 px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
+                Ex Residents
+              </p>
+              <div className="space-y-2.5">{exResidentSearchResults.map(renderExResidentCard)}</div>
+            </>
+          )}
         </div>
       ) : (
         <>
@@ -162,10 +203,10 @@ export default function CollectPage() {
                   key={block}
                   type="button"
                   disabled={!known}
-                  onClick={() => setSelectedBlock(block)}
+                  onClick={() => setSelectedTab(block)}
                   title={known ? undefined : `${block} block directory not added yet`}
                   className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl font-display text-[0.85rem] font-bold ${
-                    block === selectedBlock
+                    block === selectedTab
                       ? "bg-brand text-white"
                       : "border border-border bg-surface text-ink-soft"
                   } ${known ? "" : "opacity-35"}`}
@@ -174,25 +215,63 @@ export default function CollectPage() {
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={() => setSelectedTab("ex_resident")}
+              className={`flex h-[38px] shrink-0 items-center justify-center whitespace-nowrap rounded-xl px-3 font-display text-[0.78rem] font-bold ${
+                selectedTab === "ex_resident"
+                  ? "bg-brand text-white"
+                  : "border border-border bg-surface text-ink-soft"
+              }`}
+            >
+              Ex Resident
+            </button>
           </div>
 
-          {floors.map(([floor, floorHouses]) => (
-            <div key={floor}>
-              <p className="mb-2 px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-                Block {selectedBlock} · Floor {floor}
-              </p>
-              <div className="space-y-2.5">{floorHouses.map(renderFlatCard)}</div>
+          {selectedTab === "ex_resident" ? (
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => setEditing({ kind: "ex_resident" })}
+                className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
+              >
+                <PlusIcon className="h-[13px] w-[13px]" />
+                Add ex-resident
+              </button>
+              {exResidents.length === 0 && (
+                <p className="rounded-2xl border border-border bg-surface p-3.5 text-[0.8rem] text-ink-faint">
+                  No ex-residents added yet.
+                </p>
+              )}
+              {exResidents.map(renderExResidentCard)}
             </div>
-          ))}
+          ) : (
+            floors.map(([floor, floorHouses]) => (
+              <div key={floor}>
+                <p className="mb-2 px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
+                  Block {selectedTab} · Floor {floor}
+                </p>
+                <div className="space-y-2.5">{floorHouses.map(renderFlatCard)}</div>
+              </div>
+            ))
+          )}
         </>
       )}
 
-      {editing && (
+      {editing?.kind === "flat" && (
         <ContributionSheet
           key={`${editing.house.id}-${editing.role}`}
           open
           house={editing.house}
           role={editing.role}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {editing?.kind === "ex_resident" && (
+        <ExResidentSheet
+          key={editing.exResident?.id ?? "new"}
+          open
+          exResident={editing.exResident}
           onClose={() => setEditing(null)}
         />
       )}

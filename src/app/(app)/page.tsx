@@ -2,13 +2,23 @@
 
 import { useMemo, useState } from "react";
 import { ContributionSheet } from "@/components/ContributionSheet";
+import { ExResidentSheet } from "@/components/ExResidentSheet";
 import { Pill, pillLabels } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
 import { CoinsIcon, SponsorsIcon, VendorsIcon } from "@/components/icons";
 import { knownBlocks } from "@/lib/directory";
 import { formatINR, pledgeProgressLabel } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
-import type { Block, Contribution, ContributionStatus, House, SponsorType } from "@/lib/types";
+import type {
+  Block,
+  Contribution,
+  ContributionStatus,
+  ExResident,
+  House,
+  SponsorType,
+} from "@/lib/types";
+
+type MoneyGroup = Block | "ex_resident";
 
 const followUpStatusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "promised", label: "Promised" },
@@ -37,19 +47,26 @@ const followUpAvatarTone: Record<ContributionStatus, string> = {
   not_visited: "bg-ground-alt text-ink-soft",
 };
 
-interface FollowUpEntry {
+interface FollowUpEntryBase {
   key: string;
   badge: string;
   name: string;
   /** Kept separate from name — a long name shouldn't be able to truncate this away. */
   flatInfo: string;
-  block: Block;
+  block: MoneyGroup;
   status: ContributionStatus;
   contribution?: Contribution;
-  /** Anchor for editing — for an owner entry, any one of their flats works. */
-  house: House;
-  role: "owner" | "tenant";
 }
+
+type FollowUpEntry =
+  | (FollowUpEntryBase & {
+      kind: "flat";
+      block: Block;
+      /** Anchor for editing — for an owner entry, any one of their flats works. */
+      house: House;
+      role: "owner" | "tenant";
+    })
+  | (FollowUpEntryBase & { kind: "ex_resident"; block: "ex_resident"; exResident: ExResident });
 
 /**
  * Stable key for "who's following this up" — a committee member id when
@@ -110,18 +127,21 @@ export default function DashboardPage() {
     vendorExpenses,
     houses,
     owners,
+    exResidents,
     contributionFor,
     memberName,
     ownerPrimaryHouse,
     previousYearInfo,
   } = usePujaData();
-  const [blockFilter, setBlockFilter] = useState<Block | "all">("all");
+  const [blockFilter, setBlockFilter] = useState<MoneyGroup | "all">("all");
   const [statusFilters, setStatusFilters] = useState<ContributionStatus[]>(defaultFollowUpStatuses);
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
-  const [moneyBlockFilter, setMoneyBlockFilter] = useState<Block | "all">("all");
-  const [editing, setEditing] = useState<{ house: House; role: "owner" | "tenant" } | null>(
-    null,
-  );
+  const [moneyBlockFilter, setMoneyBlockFilter] = useState<MoneyGroup | "all">("all");
+  const [editing, setEditing] = useState<
+    | { kind: "flat"; house: House; role: "owner" | "tenant" }
+    | { kind: "ex_resident"; exResident: ExResident }
+    | null
+  >(null);
 
   const sponsorReceived = sponsors.reduce(
     (sum, s) => sum + s.payments.reduce((ps, p) => ps + p.amount, 0),
@@ -162,6 +182,7 @@ export default function DashboardPage() {
       const primaryHouse = ownerPrimaryHouse(owner.id) ?? ownerHouses[0];
       const contribution = contributionFor({ ownerId: owner.id });
       entries.push({
+        kind: "flat",
         key: `owner-${owner.id}`,
         badge: primaryHouse.flatNo,
         name: `${owner.names.join(", ")} · owner`,
@@ -179,6 +200,7 @@ export default function DashboardPage() {
       const hasTenant = house.tenantNames.length > 0 || contribution !== undefined;
       if (!hasTenant) continue;
       entries.push({
+        kind: "flat",
         key: `tenant-${house.id}`,
         badge: house.flatNo,
         name: house.tenantNames.join(", ") || "Tenant",
@@ -191,17 +213,41 @@ export default function DashboardPage() {
       });
     }
 
+    for (const exResident of exResidents) {
+      if (exResident.disabled) continue;
+      const contribution = contributionFor({ exResidentId: exResident.id });
+      entries.push({
+        kind: "ex_resident",
+        key: `ex-${exResident.id}`,
+        badge: "EX",
+        name: `${exResident.names.join(", ")} · ex-resident`,
+        flatInfo: "Ex Resident",
+        block: "ex_resident",
+        status: contribution?.status ?? "not_visited",
+        contribution,
+        exResident,
+      });
+    }
+
     // Owners and tenants were pushed as two separate groups above — sort by
     // each entry's anchor flat so the list reads in a sensible flat order
-    // instead of "every owner, then every tenant" in DB order.
-    entries.sort(
+    // instead of "every owner, then every tenant" in DB order. Ex-residents
+    // have no flat to sort by, so they go alphabetically at the end.
+    const flatEntries = entries.filter(
+      (e): e is Extract<FollowUpEntry, { kind: "flat" }> => e.kind === "flat",
+    );
+    const exResidentEntries = entries.filter(
+      (e): e is Extract<FollowUpEntry, { kind: "ex_resident" }> => e.kind === "ex_resident",
+    );
+    flatEntries.sort(
       (a, b) =>
         b.house.block.localeCompare(a.house.block) ||
         b.house.floor - a.house.floor ||
         b.house.flatNo.localeCompare(a.house.flatNo),
     );
-    return entries;
-  }, [owners, houses, contributionFor, ownerPrimaryHouse]);
+    exResidentEntries.sort((a, b) => a.name.localeCompare(b.name));
+    return [...flatEntries, ...exResidentEntries];
+  }, [owners, houses, exResidents, contributionFor, ownerPrimaryHouse]);
 
   // Grand total, independent of the block filter below — "how much do we
   // actually have overall", combining resident collections with sponsor
@@ -254,6 +300,16 @@ export default function DashboardPage() {
     );
   }).length;
 
+  // Parallel to flatsVisited, but for ex-residents — swapped in for the
+  // "From houses" card's stat line when moneyBlockFilter is "ex_resident",
+  // since the physical-flat framing doesn't apply to them.
+  const exResidentsVisited = exResidents.filter((r) => {
+    const c = contributions.find((x) => x.exResidentId === r.id);
+    return c && c.status !== "not_visited";
+  }).length;
+  const exResidentsVisitedPercent =
+    exResidents.length > 0 ? (exResidentsVisited / exResidents.length) * 100 : 0;
+
   const previousYear = [...years]
     .filter((y) => y.year < activeYear.year)
     .sort((a, b) => b.year - a.year)[0];
@@ -262,7 +318,10 @@ export default function DashboardPage() {
   // multi-flat owner's prior-year payment only counts once, against their
   // primary flat's block, so last year's figure is comparable to this year's.
   const previousYearAmountByBlock = useMemo(() => {
-    const totals: Partial<Record<Block, number>> & { all: number } = { all: 0 };
+    const totals: Partial<Record<Block, number>> & { all: number; ex_resident: number } = {
+      all: 0,
+      ex_resident: 0,
+    };
     const add = (block: Block, amount: number) => {
       totals.all += amount;
       totals[block] = (totals[block] ?? 0) + amount;
@@ -276,13 +335,25 @@ export default function DashboardPage() {
       const primary = entries ? ownerPrimaryHouse(owner.id) : undefined;
       if (entries && primary) add(primary.block, entries.reduce((s, e) => s + e.amount, 0));
     }
+    // Not gated on `disabled` — same as owners above — a last-year figure
+    // reflects what actually happened, independent of current status.
+    for (const exResident of exResidents) {
+      const entries = previousYearInfo[exResident.id];
+      if (entries) {
+        const amount = entries.reduce((s, e) => s + e.amount, 0);
+        totals.all += amount;
+        totals.ex_resident += amount;
+      }
+    }
     return totals;
-  }, [houses, owners, previousYearInfo, ownerPrimaryHouse]);
+  }, [houses, owners, exResidents, previousYearInfo, ownerPrimaryHouse]);
 
   const lastYearAmount =
     moneyBlockFilter === "all"
       ? previousYearAmountByBlock.all
-      : (previousYearAmountByBlock[moneyBlockFilter] ?? 0);
+      : moneyBlockFilter === "ex_resident"
+        ? previousYearAmountByBlock.ex_resident
+        : (previousYearAmountByBlock[moneyBlockFilter] ?? 0);
   // Compared against Total (paid + promised), not just paid — it sits under
   // the Total figure, so it should track the same number.
   const trendPercent =
@@ -390,6 +461,17 @@ export default function DashboardPage() {
                 {block}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setMoneyBlockFilter("ex_resident")}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold whitespace-nowrap ${
+                moneyBlockFilter === "ex_resident"
+                  ? "bg-brand text-white"
+                  : "border border-border bg-surface text-ink-soft"
+              }`}
+            >
+              Ex Resident
+            </button>
           </div>
 
           <div className="mt-2.5 flex justify-between text-[0.72rem] text-ink-faint">
@@ -421,10 +503,21 @@ export default function DashboardPage() {
               )}
             </span>
           </div>
-          <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
-            {flatsVisited} of {housesInMoneyBlock.length} flats visited
-          </div>
-          <ProgressBar percent={flatsVisitedPercent} />
+          {moneyBlockFilter === "ex_resident" ? (
+            <>
+              <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
+                {exResidentsVisited} of {exResidents.length} ex-residents visited
+              </div>
+              <ProgressBar percent={exResidentsVisitedPercent} />
+            </>
+          ) : (
+            <>
+              <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
+                {flatsVisited} of {housesInMoneyBlock.length} flats visited
+              </div>
+              <ProgressBar percent={flatsVisitedPercent} />
+            </>
+          )}
         </div>
         <div className="rounded-2xl border border-r-[3px] border-gold/30 border-r-gold bg-surface p-3.5 shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-1.5">
@@ -504,6 +597,17 @@ export default function DashboardPage() {
               {block}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setBlockFilter("ex_resident")}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold whitespace-nowrap ${
+              blockFilter === "ex_resident"
+                ? "bg-brand text-white"
+                : "border border-border bg-surface text-ink-soft"
+            }`}
+          >
+            Ex Resident
+          </button>
         </div>
 
         <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
@@ -578,47 +682,59 @@ export default function DashboardPage() {
           {followUps.length === 0 && (
             <p className="p-3 text-[0.8rem] text-ink-faint">Nothing matches this filter.</p>
           )}
-          {followUps.map(({ key, badge, name, flatInfo, status, contribution, house, role }, i) => (
+          {followUps.map((entry, i) => (
             <button
               type="button"
-              key={key}
-              onClick={() => setEditing({ house, role })}
+              key={entry.key}
+              onClick={() =>
+                entry.kind === "flat"
+                  ? setEditing({ kind: "flat", house: entry.house, role: entry.role })
+                  : setEditing({ kind: "ex_resident", exResident: entry.exResident })
+              }
               className={`flex w-full items-start gap-3 p-3 text-left transition active:scale-[0.99] ${i > 0 ? "border-t border-border" : ""}`}
             >
               <span
-                className={`flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] px-1 font-display text-[0.78rem] font-bold ${followUpAvatarTone[status]}`}
+                className={`flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] px-1 font-display text-[0.78rem] font-bold ${followUpAvatarTone[entry.status]}`}
               >
-                {badge}
+                {entry.badge}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[0.88rem] font-semibold text-ink">{name}</div>
+                <div className="truncate text-[0.88rem] font-semibold text-ink">{entry.name}</div>
                 <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
-                  {followUpDescription(status, contribution, memberName)}
+                  {followUpDescription(entry.status, entry.contribution, memberName)}
                 </div>
-                {contribution?.originalPledgeAmount != null && (
+                {entry.contribution?.originalPledgeAmount != null && (
                   <div className="mt-0.5 text-[0.72rem] font-semibold text-gold">
                     {pledgeProgressLabel(
-                      contribution.status,
-                      contribution.moneyAmount,
-                      contribution.originalPledgeAmount,
+                      entry.contribution.status,
+                      entry.contribution.moneyAmount,
+                      entry.contribution.originalPledgeAmount,
                     )}
                   </div>
                 )}
                 {/* Never truncated — a long name shouldn't be able to hide which flat(s) this is. */}
-                <div className="mt-1 text-[0.68rem] font-semibold text-ink-soft">{flatInfo}</div>
+                <div className="mt-1 text-[0.68rem] font-semibold text-ink-soft">{entry.flatInfo}</div>
               </div>
-              <Pill tone={status} />
+              <Pill tone={entry.status} />
             </button>
           ))}
         </div>
       </div>
 
-      {editing && (
+      {editing?.kind === "flat" && (
         <ContributionSheet
           key={`${editing.house.id}-${editing.role}`}
           open
           house={editing.house}
           role={editing.role}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {editing?.kind === "ex_resident" && (
+        <ExResidentSheet
+          key={editing.exResident.id}
+          open
+          exResident={editing.exResident}
           onClose={() => setEditing(null)}
         />
       )}

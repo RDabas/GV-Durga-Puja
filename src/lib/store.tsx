@@ -28,8 +28,10 @@ import {
   dbRemoveMember,
   dbRemoveTenant,
   dbSaveContribution,
+  dbSaveExResident,
   dbSaveOwner,
   dbSaveTenants,
+  dbSetExResidentDisabled,
   dbSetOwnerDisabled,
   dbSetPaidViaHouse,
   dbStartYear,
@@ -63,8 +65,8 @@ import type {
  * on read, so switching which year you're viewing needs no round trip.
  */
 
-/** A tenant entry belongs to a flat; an owner entry belongs to the owner. */
-export type PayerRef = { houseId: string } | { ownerId: string };
+/** A tenant entry belongs to a flat; an owner entry belongs to the owner; an ex-resident entry isn't tied to a flat at all. */
+export type PayerRef = { houseId: string } | { ownerId: string } | { exResidentId: string };
 
 export type ContributionInput = Omit<
   Contribution,
@@ -167,7 +169,9 @@ function previousYearEntries(c: Contribution): PreviousYearInfo[] {
 }
 
 function matchesPayer(c: Contribution, payer: PayerRef): boolean {
-  return "houseId" in payer ? c.houseId === payer.houseId : c.ownerId === payer.ownerId;
+  if ("houseId" in payer) return c.houseId === payer.houseId;
+  if ("ownerId" in payer) return c.ownerId === payer.ownerId;
+  return c.exResidentId === payer.exResidentId;
 }
 
 function memberIsReferenced(data: LiveData, memberId: string): boolean {
@@ -206,6 +210,9 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   setPaidViaHouse: (houseId: string, targetHouseId: string | null) => Promise<void>;
   saveOwner: (houseId: string, names: string[], phone?: string) => Promise<string>;
   setOwnerDisabled: (ownerId: string, disabled: boolean) => Promise<void>;
+  /** Creates (existingId omitted) or renames (existingId set) an ex-resident — not tied to any flat. Returns the ex-resident id. */
+  saveExResident: (existingId: string | undefined, names: string[], phone?: string) => Promise<string>;
+  setExResidentDisabled: (exResidentId: string, disabled: boolean) => Promise<void>;
   addMember: (input: MemberInput) => Promise<void>;
   updateMember: (memberId: string, patch: MemberInput) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
@@ -300,7 +307,7 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
     const previousYearInfo: Record<string, PreviousYearInfo[]> = {};
     if (previousYear) {
       for (const c of data.contributions) {
-        const key = c.houseId ?? c.ownerId;
+        const key = c.houseId ?? c.ownerId ?? c.exResidentId;
         if (key && c.yearId === previousYear.id && c.moneyAmount > 0) {
           (previousYearInfo[key] ??= []).push(...previousYearEntries(c));
         }
@@ -340,6 +347,7 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       me,
       latestActivityAt: data.latestActivityAt,
       owners: data.owners,
+      exResidents: data.exResidents,
       houses: data.houses,
       members: data.members,
       contributions: yearContributions,
@@ -450,6 +458,26 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         );
         await load();
       },
+      saveExResident: async (existingId, names, phone) => {
+        const id = await dbSaveExResident(supabase, existingId, names, phone);
+        await logActivity(
+          "ex_resident.save",
+          existingId
+            ? `updated ex-resident details (${names.join(", ")})`
+            : `added ex-resident ${names.join(", ")}`,
+        );
+        await load();
+        return id;
+      },
+      setExResidentDisabled: async (exResidentId, disabled) => {
+        const exResident = data.exResidents.find((r) => r.id === exResidentId);
+        await dbSetExResidentDisabled(supabase, exResidentId, disabled);
+        await logActivity(
+          disabled ? "ex_resident.disable" : "ex_resident.enable",
+          `${disabled ? "disabled" : "re-enabled"} ex-resident ${exResident?.names.join(", ") ?? "?"}`,
+        );
+        await load();
+      },
       addMember: async (input) => {
         await dbAddMember(supabase, input);
         await logActivity("member.add", `added ${input.name} as a ${input.role}`);
@@ -520,7 +548,10 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
                 const h = data.houses.find((x) => x.id === payer.houseId);
                 return h ? `${h.block}-${h.flatNo}` : "a flat";
               })()
-            : (data.owners.find((o) => o.id === payer.ownerId)?.names.join(", ") ?? "an owner");
+            : "ownerId" in payer
+              ? (data.owners.find((o) => o.id === payer.ownerId)?.names.join(", ") ?? "an owner")
+              : (data.exResidents.find((r) => r.id === payer.exResidentId)?.names.join(", ") ??
+                "an ex-resident");
         let summary: string;
         if (!existing) {
           summary =
