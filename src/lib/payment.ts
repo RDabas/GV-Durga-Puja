@@ -2,14 +2,12 @@ import type { PaymentMode } from "@/lib/types";
 
 export const paymentModeLabels: Record<PaymentMode, string> = {
   cash: "Cash",
-  gpay: "GPay",
-  phonepe: "PhonePe",
-  other_upi: "Other UPI",
+  upi: "UPI",
   pending: "",
 };
 
 /** Order breakdown chips render in, so a member's tags don't reshuffle row to row. */
-const modeOrder: PaymentMode[] = ["cash", "gpay", "phonepe", "other_upi"];
+const modeOrder: PaymentMode[] = ["cash", "upi"];
 
 export type PaymentBreakdownTotals = Partial<Record<PaymentMode, number>>;
 

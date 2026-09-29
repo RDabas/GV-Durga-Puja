@@ -17,13 +17,12 @@ import {
   amountFieldLabel,
   followUpNoteLabel,
   followUpNotePlaceholder,
-  kindOptions,
   modeOptions,
   originalPledgeFieldLabel,
   originalPledgeHelpText,
   statusOptions,
 } from "@/lib/contributionForm";
-import type { ContributionKind, ContributionStatus, ExResident, PaymentMode } from "@/lib/types";
+import type { ContributionStatus, ExResident, PaymentMode } from "@/lib/types";
 
 /**
  * Add or edit an Ex Resident — someone not tied to any flat or block who
@@ -47,15 +46,13 @@ export function ExResidentSheet({
 
   const [names, setNames] = useState((exResident?.names ?? []).join(", "));
   const [status, setStatus] = useState<ContributionStatus>(contribution?.status ?? "paid");
-  const [kind, setKind] = useState<ContributionKind>(contribution?.contributionKind ?? "money");
   const [mode, setMode] = useState<PaymentMode>(
-    !contribution || contribution.paymentMode === "pending" ? "gpay" : contribution.paymentMode,
+    !contribution || contribution.paymentMode === "pending" ? "upi" : contribution.paymentMode,
   );
   const [moneyAmount, setMoneyAmount] = useState(contribution?.moneyAmount ?? 0);
   const [originalPledgeAmount, setOriginalPledgeAmount] = useState(
     contribution?.originalPledgeAmount ?? 0,
   );
-  const [bhogAmount, setBhogAmount] = useState(contribution?.bhogGroceryAmount ?? 0);
   const [collectorId, setCollectorId] = useState(
     contribution?.collectorId ?? members.find((m) => m.name === "Hirdesh")?.id ?? members[0]?.id ?? "",
   );
@@ -71,7 +68,6 @@ export function ExResidentSheet({
   const promised = status === "promised";
   const partial = status === "partial";
   const needsFollowUp = status === "not_home" || status === "not_visited" || status === "pending";
-  const takesBhog = kind !== "money";
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
@@ -99,8 +95,8 @@ export function ExResidentSheet({
             (promised || partial) && originalPledgeAmount > moneyAmount
               ? originalPledgeAmount
               : undefined,
-          bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
-          contributionKind: kind,
+          bhogGroceryAmount: 0,
+          contributionKind: "money",
           paymentMode: received ? mode : "pending",
           status,
           paymentDate: received ? paymentDate : undefined,
@@ -132,11 +128,7 @@ export function ExResidentSheet({
           <OptionGroup value={status} onChange={setStatus} options={statusOptions} />
         </Field>
 
-        <Field label="Contribution">
-          <OptionGroup value={kind} onChange={setKind} options={kindOptions} />
-        </Field>
-
-        {(received || promised) && kind !== "bhog_grocery" && (
+        {(received || promised) && (
           <Field label={amountFieldLabel(status, originalPledgeAmount)}>
             <AmountInput value={moneyAmount} onChange={setMoneyAmount} autoFocus={received} />
           </Field>
@@ -151,12 +143,6 @@ export function ExResidentSheet({
 
         {received && (
           <>
-            {takesBhog && (
-              <Field label="Bhog / grocery value">
-                <AmountInput value={bhogAmount} onChange={setBhogAmount} />
-              </Field>
-            )}
-
             <Field label="Paid by">
               <OptionGroup value={mode} onChange={setMode} options={modeOptions} />
             </Field>

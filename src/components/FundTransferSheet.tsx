@@ -18,9 +18,7 @@ import type { TransferMode } from "@/lib/types";
 
 const modeOptions: { value: TransferMode; label: string }[] = [
   { value: "cash", label: "Cash" },
-  { value: "gpay", label: "GPay" },
-  { value: "phonepe", label: "PhonePe" },
-  { value: "other_upi", label: "Other UPI" },
+  { value: "upi", label: "UPI" },
 ];
 
 export function FundTransferSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -29,7 +27,7 @@ export function FundTransferSheet({ open, onClose }: { open: boolean; onClose: (
   const [fromMemberId, setFromMemberId] = useState(members[0]?.id ?? "");
   const [toMemberId, setToMemberId] = useState(members[1]?.id ?? members[0]?.id ?? "");
   const [amount, setAmount] = useState(0);
-  const [mode, setMode] = useState<TransferMode>("cash");
+  const [mode, setMode] = useState<TransferMode>("upi");
   const [transferDate, setTransferDate] = useState(today());
   const [note, setNote] = useState("");
   const { submitting, error, run } = useAsyncAction();

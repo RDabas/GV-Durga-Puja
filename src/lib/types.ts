@@ -1,6 +1,6 @@
 export type Block = "A" | "B" | "C" | "D" | "E" | "F" | "G";
 
-export type PaymentMode = "cash" | "gpay" | "phonepe" | "other_upi" | "pending";
+export type PaymentMode = "cash" | "upi" | "pending";
 
 export type ContributionStatus =
   | "paid"
@@ -24,7 +24,7 @@ export type SponsorType =
 
 export type VendorPaymentStatus = "paid_full" | "installment" | "not_paid";
 
-export type TransferMode = "cash" | "gpay" | "phonepe" | "other_upi";
+export type TransferMode = "cash" | "upi";
 
 export interface PujaYear {
   id: string;

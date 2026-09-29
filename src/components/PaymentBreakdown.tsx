@@ -8,9 +8,7 @@ import type { PaymentMode } from "@/lib/types";
 
 export const paymentModeChipStyles: Record<PaymentMode, string> = {
   cash: "bg-ground-alt text-ink-soft",
-  gpay: "bg-success-tint text-success",
-  phonepe: "bg-brand-tint text-brand",
-  other_upi: "bg-gold-tint text-gold",
+  upi: "bg-success-tint text-success",
   pending: "bg-ground-alt text-ink-faint",
 };
 

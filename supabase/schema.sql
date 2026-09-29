@@ -4,7 +4,7 @@
 create extension if not exists "pgcrypto";
 
 create type block_letter as enum ('A', 'B', 'C', 'D', 'E', 'F', 'G');
-create type payment_mode as enum ('cash', 'gpay', 'phonepe', 'other_upi', 'pending');
+create type payment_mode as enum ('cash', 'upi', 'pending');
 create type contribution_status as enum ('paid', 'partial', 'promised', 'pending', 'not_visited', 'not_home', 'wont_pay');
 create type contribution_kind as enum ('money', 'bhog_grocery', 'both');
 create type sponsor_type as enum (
@@ -12,7 +12,7 @@ create type sponsor_type as enum (
   'dandiya_collection', 'counter_collection', 'donation_box'
 );
 create type committee_role as enum ('admin', 'collector');
-create type transfer_mode as enum ('cash', 'gpay', 'phonepe', 'other_upi');
+create type transfer_mode as enum ('cash', 'upi');
 create type carried_fund_kind as enum ('cash', 'fd', 'bank');
 
 -- One row per Navratri event. Everything financial is scoped by year_id so
@@ -150,7 +150,7 @@ create table fund_transfers (
   from_member_id uuid references committee_members(id),
   to_member_id uuid references committee_members(id),
   amount numeric(10, 2) not null check (amount > 0),
-  mode transfer_mode not null default 'cash',
+  mode transfer_mode not null default 'upi',
   transfer_date date not null default current_date,
   note text,
   created_at timestamptz not null default now(),
@@ -194,7 +194,7 @@ create table sponsor_payments (
   member_id uuid not null references committee_members(id),
   amount numeric(10, 2) not null,
   payment_date date not null default current_date,
-  mode payment_mode not null default 'cash',
+  mode payment_mode not null default 'upi',
   note text,
   created_at timestamptz not null default now()
 );
@@ -228,7 +228,7 @@ create table vendor_payments (
   member_id uuid not null references committee_members(id),
   amount numeric(10, 2) not null,
   payment_date date not null default current_date,
-  mode payment_mode not null default 'cash',
+  mode payment_mode not null default 'upi',
   note text,
   -- Paid from member_id's own pocket (e.g. offsetting their own resident
   -- pledge) rather than committee cash, so it shouldn't reduce their balance

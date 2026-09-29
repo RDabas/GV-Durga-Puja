@@ -17,13 +17,12 @@ import {
   amountFieldLabel,
   followUpNoteLabel,
   followUpNotePlaceholder,
-  kindOptions,
   modeOptions,
   originalPledgeFieldLabel,
   originalPledgeHelpText,
   statusOptions,
 } from "@/lib/contributionForm";
-import type { ContributionKind, ContributionStatus, House, PaymentMode } from "@/lib/types";
+import type { ContributionStatus, House, PaymentMode } from "@/lib/types";
 
 /** A pseudo-status: redirects this flat's owner accounting to another flat instead of recording a contribution here — see House.paidViaHouseId. */
 type StatusChoice = ContributionStatus | "paid_via";
@@ -86,15 +85,13 @@ export function ContributionSheet({
   );
   const [paidViaLabel, setPaidViaLabel] = useState(linkedHouseLabel);
   const status: ContributionStatus = statusChoice === "paid_via" ? "not_visited" : statusChoice;
-  const [kind, setKind] = useState<ContributionKind>(contribution?.contributionKind ?? "money");
   const [mode, setMode] = useState<PaymentMode>(
-    !contribution || contribution.paymentMode === "pending" ? "gpay" : contribution.paymentMode,
+    !contribution || contribution.paymentMode === "pending" ? "upi" : contribution.paymentMode,
   );
   const [moneyAmount, setMoneyAmount] = useState(contribution?.moneyAmount ?? 0);
   const [originalPledgeAmount, setOriginalPledgeAmount] = useState(
     contribution?.originalPledgeAmount ?? 0,
   );
-  const [bhogAmount, setBhogAmount] = useState(contribution?.bhogGroceryAmount ?? 0);
   const [collectorId, setCollectorId] = useState(
     contribution?.collectorId ??
       members.find((m) => m.name === "Hirdesh")?.id ??
@@ -115,7 +112,6 @@ export function ContributionSheet({
   const partial = status === "partial";
   const needsFollowUp =
     !isPaidVia && (status === "not_home" || status === "not_visited" || status === "pending");
-  const takesBhog = kind !== "money";
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
@@ -166,8 +162,8 @@ export function ContributionSheet({
           (promised || partial) && originalPledgeAmount > moneyAmount
             ? originalPledgeAmount
             : undefined,
-        bhogGroceryAmount: received && takesBhog ? bhogAmount : 0,
-        contributionKind: kind,
+        bhogGroceryAmount: 0,
+        contributionKind: "money",
         paymentMode: received ? mode : "pending",
         status,
         paymentDate: received ? paymentDate : undefined,
@@ -216,13 +212,7 @@ export function ContributionSheet({
           </Field>
         )}
 
-        {!isPaidVia && (
-          <Field label="Contribution">
-            <OptionGroup value={kind} onChange={setKind} options={kindOptions} />
-          </Field>
-        )}
-
-        {(received || promised) && kind !== "bhog_grocery" && (
+        {(received || promised) && (
           <Field label={amountFieldLabel(status, originalPledgeAmount)}>
             <AmountInput value={moneyAmount} onChange={setMoneyAmount} autoFocus={received} />
           </Field>
@@ -237,12 +227,6 @@ export function ContributionSheet({
 
         {received && (
           <>
-            {takesBhog && (
-              <Field label="Bhog / grocery value">
-                <AmountInput value={bhogAmount} onChange={setBhogAmount} />
-              </Field>
-            )}
-
             <Field label="Paid by">
               <OptionGroup value={mode} onChange={setMode} options={modeOptions} />
             </Field>

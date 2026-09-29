@@ -1,7 +1,7 @@
-import type { ContributionKind, ContributionStatus, PaymentMode } from "@/lib/types";
+import type { ContributionStatus, PaymentMode } from "@/lib/types";
 
 /**
- * Shared field options/labels for a contribution's status/kind/mode and its
+ * Shared field options/labels for a contribution's status/mode and its
  * status-dependent wording — used by both ContributionSheet (owner/tenant,
  * which also has its own house-specific "paid via another flat" pseudo-status
  * layered on top) and ExResidentSheet (not tied to any flat).
@@ -17,17 +17,9 @@ export const statusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "not_visited", label: "Not visited" },
 ];
 
-export const kindOptions: { value: ContributionKind; label: string }[] = [
-  { value: "money", label: "Money" },
-  { value: "bhog_grocery", label: "Bhog / grocery" },
-  { value: "both", label: "Both" },
-];
-
 export const modeOptions: { value: PaymentMode; label: string }[] = [
   { value: "cash", label: "Cash" },
-  { value: "gpay", label: "GPay" },
-  { value: "phonepe", label: "PhonePe" },
-  { value: "other_upi", label: "Other UPI" },
+  { value: "upi", label: "UPI" },
 ];
 
 export function followUpNoteLabel(status: ContributionStatus): string {

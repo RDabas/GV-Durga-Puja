@@ -13,15 +13,9 @@ import {
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import { today } from "@/lib/format";
+import { modeOptions } from "@/lib/contributionForm";
 import type { PaymentInput } from "@/lib/store";
 import type { PaymentMode } from "@/lib/types";
-
-const modeOptions: { value: PaymentMode; label: string }[] = [
-  { value: "cash", label: "Cash" },
-  { value: "gpay", label: "GPay" },
-  { value: "phonepe", label: "PhonePe" },
-  { value: "other_upi", label: "Other UPI" },
-];
 
 /**
  * Sponsor money in and vendor money out record the same fields — including
@@ -49,7 +43,7 @@ export function PaymentSheet({
 }) {
   const { members } = usePujaData();
   const [amount, setAmount] = useState(0);
-  const [mode, setMode] = useState<PaymentMode>("cash");
+  const [mode, setMode] = useState<PaymentMode>("upi");
   const [memberId, setMemberId] = useState(members[0]?.id ?? "");
   const [paymentDate, setPaymentDate] = useState(today());
   const [note, setNote] = useState("");
