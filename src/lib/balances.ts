@@ -4,14 +4,13 @@ import type {
   CommitteeMember,
   Contribution,
   FundTransfer,
-  Sponsor,
   VendorExpense,
 } from "@/lib/types";
 
 export interface CommitteeBalance {
   member: CommitteeMember;
   collected: number;
-  sponsorReceived: number;
+  outsideCollectionReceived: number;
   handedOver: number;
   received: number;
   vendorPaid: number;
@@ -24,31 +23,34 @@ export interface CommitteeBalance {
 
 /**
  * How much cash/UPI each committee member is currently holding for the year:
- * what they collected door-to-door and from sponsors, plus what other members
- * transferred to them and whatever they were still holding from a previous
- * year, minus what they've since handed over or paid out to a vendor
- * themselves. collectedByMode splits the door-to-door figure by how residents
- * actually paid, so a member can be asked for the cash in their box
- * separately from what sits in their UPI apps.
+ * what they collected door-to-door and from outside collection, plus what
+ * other members transferred to them and whatever they were still holding
+ * from a previous year, minus what they've since handed over or paid out to
+ * a vendor themselves. collectedByMode splits the door-to-door figure by how
+ * residents actually paid — outside-collection money is kept out of it, same
+ * as it's kept as its own separate total, so a member can be asked for the
+ * cash in their box separately from what sits in their UPI apps.
  */
 export function committeeBalances(
   members: CommitteeMember[],
   contributions: Contribution[],
   transfers: FundTransfer[],
-  sponsors: Sponsor[],
   vendorExpenses: VendorExpense[],
   carriedFunds: CarriedFund[] = [],
 ): CommitteeBalance[] {
   return members.map((member) => {
     const collectedFrom = contributions.filter(
-      (c) => c.collectorId === member.id && c.paymentMode !== "pending",
+      (c) =>
+        c.collectorId === member.id && c.paymentMode !== "pending" && c.outsideCollectionId == null,
     );
     const collected = collectedFrom.reduce((sum, c) => sum + c.moneyAmount, 0);
 
-    const sponsorReceived = sponsors
-      .flatMap((s) => s.payments)
-      .filter((p) => p.memberId === member.id)
-      .reduce((sum, p) => sum + p.amount, 0);
+    const outsideCollectionReceived = contributions
+      .filter(
+        (c) =>
+          c.collectorId === member.id && c.paymentMode !== "pending" && c.outsideCollectionId != null,
+      )
+      .reduce((sum, c) => sum + c.moneyAmount, 0);
 
     // A self-funded payment came out of the member's own pocket (typically
     // offsetting their own resident pledge), never out of committee cash
@@ -79,7 +81,7 @@ export function committeeBalances(
     return {
       member,
       collected,
-      sponsorReceived,
+      outsideCollectionReceived,
       handedOver,
       received,
       vendorPaid,
@@ -88,7 +90,7 @@ export function committeeBalances(
       carriedBank,
       balanceInHand:
         collected +
-        sponsorReceived +
+        outsideCollectionReceived +
         received +
         carriedCash +
         carriedFd +

@@ -10,12 +10,11 @@ import type {
   ExResident,
   FundTransfer,
   House,
+  OutsideCollection,
+  OutsideCollectionType,
   Owner,
   PaymentMode,
   PujaYear,
-  Sponsor,
-  SponsorPayment,
-  SponsorType,
   TransferMode,
   Vendor,
   VendorExpense,
@@ -54,6 +53,14 @@ interface ExResidentRow {
   disabled: boolean;
 }
 
+interface OutsideCollectionRow {
+  id: string;
+  name: string;
+  type: OutsideCollectionType;
+  stall_details: string | null;
+  disabled: boolean;
+}
+
 interface HouseRow {
   id: string;
   block: House["block"];
@@ -78,6 +85,7 @@ interface ContributionRow {
   house_id: string | null;
   owner_id: string | null;
   ex_resident_id: string | null;
+  outside_collection_id: string | null;
   year_id: string;
   collector_id: string | null;
   assigned_to_member_id: string | null;
@@ -111,28 +119,6 @@ interface CarriedFundRow {
   kind: CarriedFundKind;
   amount: number;
   note: string | null;
-}
-
-interface SponsorPaymentRow {
-  id: string;
-  sponsor_id: string;
-  member_id: string;
-  amount: number;
-  payment_date: string;
-  mode: PaymentMode;
-  note: string | null;
-}
-
-interface SponsorRow {
-  id: string;
-  year_id: string;
-  name: string;
-  contact: string | null;
-  type: SponsorType;
-  stall_details: string | null;
-  amount_pledged: number;
-  notes: string | null;
-  sponsor_payments: SponsorPaymentRow[];
 }
 
 interface VendorRow {
@@ -197,6 +183,14 @@ const mapExResident = (r: ExResidentRow): ExResident => ({
   disabled: r.disabled,
 });
 
+const mapOutsideCollection = (r: OutsideCollectionRow): OutsideCollection => ({
+  id: r.id,
+  name: r.name,
+  type: r.type,
+  stallDetails: r.stall_details ?? undefined,
+  disabled: r.disabled,
+});
+
 const mapHouse = (r: HouseRow): House => ({
   id: r.id,
   block: r.block,
@@ -222,6 +216,7 @@ const mapContribution = (r: ContributionRow): Contribution => ({
   houseId: r.house_id ?? undefined,
   ownerId: r.owner_id ?? undefined,
   exResidentId: r.ex_resident_id ?? undefined,
+  outsideCollectionId: r.outside_collection_id ?? undefined,
   collectorId: r.collector_id ?? undefined,
   assignedToMemberId: r.assigned_to_member_id ?? undefined,
   assignedToName: r.assigned_to_name ?? undefined,
@@ -254,28 +249,6 @@ const mapCarriedFund = (r: CarriedFundRow): CarriedFund => ({
   kind: r.kind,
   amount: r.amount,
   note: r.note ?? undefined,
-});
-
-const mapSponsorPayment = (r: SponsorPaymentRow): SponsorPayment => ({
-  id: r.id,
-  sponsorId: r.sponsor_id,
-  memberId: r.member_id,
-  amount: r.amount,
-  paymentDate: r.payment_date,
-  mode: r.mode,
-  note: r.note ?? undefined,
-});
-
-const mapSponsor = (r: SponsorRow): Sponsor => ({
-  id: r.id,
-  yearId: r.year_id,
-  name: r.name,
-  contact: r.contact ?? undefined,
-  type: r.type,
-  stallDetails: r.stall_details ?? undefined,
-  amountPledged: r.amount_pledged,
-  notes: r.notes ?? undefined,
-  payments: (r.sponsor_payments ?? []).map(mapSponsorPayment),
 });
 
 const mapVendor = (r: VendorRow): Vendor => ({
@@ -321,12 +294,12 @@ export interface LiveData {
   years: PujaYear[];
   owners: Owner[];
   exResidents: ExResident[];
+  outsideCollections: OutsideCollection[];
   houses: House[];
   members: CommitteeMember[];
   contributions: Contribution[];
   fundTransfers: FundTransfer[];
   carriedFunds: CarriedFund[];
-  sponsors: Sponsor[];
   vendorExpenses: VendorExpense[];
   /** Latest activity_log timestamp, for the nav badge — the log itself is paged separately, not held in memory. */
   latestActivityAt: string | null;
@@ -347,18 +320,19 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
     years,
     owners,
     exResidents,
+    outsideCollections,
     houses,
     members,
     contributions,
     fundTransfers,
     carriedFunds,
-    sponsors,
     vendorExpenses,
     latestActivity,
   ] = await Promise.all([
       supabase.from("puja_years").select("*").order("year", { ascending: true }),
       supabase.from("owners").select("*"),
       supabase.from("ex_residents").select("*"),
+      supabase.from("outside_collections").select("*"),
       // Explicit order, not just insertion order: Postgres doesn't guarantee
       // row order without one, so without this, saving any contribution and
       // reloading could reshuffle flats within a floor on the Collect tab.
@@ -367,7 +341,6 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
       supabase.from("contributions").select("*"),
       supabase.from("fund_transfers").select("*"),
       supabase.from("carried_funds").select("*"),
-      supabase.from("sponsors").select("*, sponsor_payments(*)"),
       supabase.from("vendor_expenses").select("*, vendors(*), vendor_payments(*)"),
       // Just the latest timestamp, cheap — the full log is paged separately
       // by the Activity page, never held in the app-wide LiveData snapshot.
@@ -378,12 +351,14 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
     years: unwrap<YearRow[]>(years, "years").map(mapYear),
     owners: unwrap<OwnerRow[]>(owners, "owners").map(mapOwner),
     exResidents: unwrap<ExResidentRow[]>(exResidents, "exResidents").map(mapExResident),
+    outsideCollections: unwrap<OutsideCollectionRow[]>(outsideCollections, "outsideCollections").map(
+      mapOutsideCollection,
+    ),
     houses: unwrap<HouseRow[]>(houses, "houses").map(mapHouse),
     members: unwrap<MemberRow[]>(members, "members").map(mapMember),
     contributions: unwrap<ContributionRow[]>(contributions, "contributions").map(mapContribution),
     fundTransfers: unwrap<FundTransferRow[]>(fundTransfers, "fundTransfers").map(mapFundTransfer),
     carriedFunds: unwrap<CarriedFundRow[]>(carriedFunds, "carriedFunds").map(mapCarriedFund),
-    sponsors: unwrap<SponsorRow[]>(sponsors, "sponsors").map(mapSponsor),
     vendorExpenses: unwrap<VendorExpenseRow[]>(vendorExpenses, "vendorExpenses").map(mapVendorExpense),
     latestActivityAt:
       unwrap<{ created_at: string }[]>(latestActivity, "latestActivity")[0]?.created_at ?? null,
@@ -553,6 +528,44 @@ export async function dbSetExResidentDisabled(
   if (error) throw new Error(error.message);
 }
 
+/** Renames an outside-collection entry in place, or creates one — not tied to any flat/house. Returns its id. */
+export async function dbSaveOutsideCollection(
+  supabase: SupabaseClient,
+  existingId: string | undefined,
+  name: string,
+  type: OutsideCollectionType,
+  stallDetails?: string,
+): Promise<string> {
+  if (existingId) {
+    const { error } = await supabase
+      .from("outside_collections")
+      .update({ name, type, stall_details: stallDetails ?? null })
+      .eq("id", existingId);
+    if (error) throw new Error(error.message);
+    return existingId;
+  }
+
+  const inserted = await supabase
+    .from("outside_collections")
+    .insert({ name, type, stall_details: stallDetails ?? null })
+    .select()
+    .single();
+  return unwrap<OutsideCollectionRow>(inserted, "insert outside_collection").id;
+}
+
+/** Toggles whether an outside-collection entry counts toward this year's money totals — its record and history stay intact either way. */
+export async function dbSetOutsideCollectionDisabled(
+  supabase: SupabaseClient,
+  outsideCollectionId: string,
+  disabled: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from("outside_collections")
+    .update({ disabled })
+    .eq("id", outsideCollectionId);
+  if (error) throw new Error(error.message);
+}
+
 export async function dbAddMember(
   supabase: SupabaseClient,
   input: { name: string; phone?: string; role: CommitteeMember["role"] },
@@ -652,7 +665,11 @@ interface ContributionWrite {
 export async function dbSaveContribution(
   supabase: SupabaseClient,
   yearId: string,
-  payer: { houseId: string } | { ownerId: string } | { exResidentId: string },
+  payer:
+    | { houseId: string }
+    | { ownerId: string }
+    | { exResidentId: string }
+    | { outsideCollectionId: string },
   existingId: string | undefined,
   input: ContributionWrite,
 ): Promise<void> {
@@ -661,6 +678,7 @@ export async function dbSaveContribution(
     house_id: "houseId" in payer ? payer.houseId : null,
     owner_id: "ownerId" in payer ? payer.ownerId : null,
     ex_resident_id: "exResidentId" in payer ? payer.exResidentId : null,
+    outside_collection_id: "outsideCollectionId" in payer ? payer.outsideCollectionId : null,
     collector_id: input.collectorId ?? null,
     assigned_to_member_id: input.assignedToMemberId ?? null,
     assigned_to_name: input.assignedToName ?? null,
@@ -681,63 +699,6 @@ export async function dbSaveContribution(
   if (error) throw new Error(error.message);
 }
 
-export async function dbAddSponsor(
-  supabase: SupabaseClient,
-  yearId: string,
-  input: {
-    name: string;
-    type: SponsorType;
-    stallDetails?: string;
-    contact?: string;
-    amountPledged: number;
-    notes?: string;
-  },
-): Promise<void> {
-  const { error } = await supabase.from("sponsors").insert({
-    year_id: yearId,
-    name: input.name,
-    type: input.type,
-    stall_details: input.stallDetails ?? null,
-    contact: input.contact ?? null,
-    amount_pledged: input.amountPledged,
-    notes: input.notes ?? null,
-  });
-  if (error) throw new Error(error.message);
-}
-
-/** Corrects a sponsor entered wrong — name, type, pledge amount, etc. */
-export async function dbUpdateSponsor(
-  supabase: SupabaseClient,
-  sponsorId: string,
-  input: {
-    name: string;
-    type: SponsorType;
-    stallDetails?: string;
-    contact?: string;
-    amountPledged: number;
-    notes?: string;
-  },
-): Promise<void> {
-  const { error } = await supabase
-    .from("sponsors")
-    .update({
-      name: input.name,
-      type: input.type,
-      stall_details: input.stallDetails ?? null,
-      contact: input.contact ?? null,
-      amount_pledged: input.amountPledged,
-      notes: input.notes ?? null,
-    })
-    .eq("id", sponsorId);
-  if (error) throw new Error(error.message);
-}
-
-/** Cascades to its sponsor_payments — use when a sponsor was entered wrong. */
-export async function dbDeleteSponsor(supabase: SupabaseClient, sponsorId: string): Promise<void> {
-  const { error } = await supabase.from("sponsors").delete().eq("id", sponsorId);
-  if (error) throw new Error(error.message);
-}
-
 interface PaymentWrite {
   memberId: string;
   amount: number;
@@ -745,22 +706,6 @@ interface PaymentWrite {
   mode: PaymentMode;
   note?: string;
   selfFunded?: boolean;
-}
-
-export async function dbAddSponsorPayment(
-  supabase: SupabaseClient,
-  sponsorId: string,
-  input: PaymentWrite,
-): Promise<void> {
-  const { error } = await supabase.from("sponsor_payments").insert({
-    sponsor_id: sponsorId,
-    member_id: input.memberId,
-    amount: input.amount,
-    payment_date: input.paymentDate,
-    mode: input.mode,
-    note: input.note ?? null,
-  });
-  if (error) throw new Error(error.message);
 }
 
 export async function dbAddVendorExpense(

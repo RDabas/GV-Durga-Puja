@@ -15,7 +15,7 @@ import type {
   ContributionStatus,
   ExResident,
   House,
-  SponsorType,
+  OutsideCollectionType,
 } from "@/lib/types";
 
 type MoneyGroup = Block | "ex_resident";
@@ -123,7 +123,7 @@ export default function DashboardPage() {
     years,
     activeYear,
     contributions,
-    sponsors,
+    outsideCollections,
     vendorExpenses,
     houses,
     owners,
@@ -143,21 +143,30 @@ export default function DashboardPage() {
     | null
   >(null);
 
-  const sponsorReceived = sponsors.reduce(
-    (sum, s) => sum + s.payments.reduce((ps, p) => ps + p.amount, 0),
-    0,
+  // "Received" here means status paid/partial's moneyAmount — same accounting
+  // as a resident's contribution, just sourced from outsideCollectionId rows
+  // instead of a payments sub-table. Disabled entries are excluded, same as
+  // a disabled owner or ex-resident is left out of this year's totals.
+  const activeOutsideCollections = useMemo(
+    () => outsideCollections.filter((entry) => !entry.disabled),
+    [outsideCollections],
   );
+  const outsideCollectionReceived = activeOutsideCollections.reduce((sum, entry) => {
+    const c = contributionFor({ outsideCollectionId: entry.id });
+    return sum + (c && (c.status === "paid" || c.status === "partial") ? c.moneyAmount : 0);
+  }, 0);
   // Biggest amount first — the types that actually brought in money lead,
-  // rather than sorting by however sponsors happen to be entered.
-  const sponsorReceivedByType = useMemo(() => {
-    const totals = new Map<SponsorType, number>();
-    for (const s of sponsors) {
-      const received = s.payments.reduce((sum, p) => sum + p.amount, 0);
+  // rather than sorting by however entries happen to be added.
+  const outsideCollectionReceivedByType = useMemo(() => {
+    const totals = new Map<OutsideCollectionType, number>();
+    for (const entry of activeOutsideCollections) {
+      const c = contributionFor({ outsideCollectionId: entry.id });
+      const received = c && (c.status === "paid" || c.status === "partial") ? c.moneyAmount : 0;
       if (received <= 0) continue;
-      totals.set(s.type, (totals.get(s.type) ?? 0) + received);
+      totals.set(entry.type, (totals.get(entry.type) ?? 0) + received);
     }
     return [...totals.entries()].sort((a, b) => b[1] - a[1]);
-  }, [sponsors]);
+  }, [activeOutsideCollections, contributionFor]);
   const vendorPaid = vendorExpenses.reduce(
     (sum, e) => sum + e.payments.reduce((s, p) => s + p.amount, 0),
     0,
@@ -255,7 +264,7 @@ export default function DashboardPage() {
   const residentPaidOverall = followUpEntries
     .filter((e) => e.status === "paid" || e.status === "partial")
     .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
-  const totalCollected = residentPaidOverall + sponsorReceived;
+  const totalCollected = residentPaidOverall + outsideCollectionReceived;
   const balance = totalCollected - vendorPaid;
 
   // Money stats reuse the same per-owner/per-flat entries as the follow-up
@@ -423,8 +432,8 @@ export default function DashboardPage() {
             </span>
           </div>
           <div className="mt-2.5 text-[0.72rem] text-ink-soft">
-            {formatINR(residentPaidOverall)} from residents + {formatINR(sponsorReceived)} from
-            outsiders
+            {formatINR(residentPaidOverall)} from residents + {formatINR(outsideCollectionReceived)}{" "}
+            from outside collection
           </div>
         </div>
         <div className="col-span-2 rounded-2xl border border-r-[3px] border-brand/30 border-r-brand bg-surface p-3.5 shadow-[var(--shadow-card)]">
@@ -524,15 +533,17 @@ export default function DashboardPage() {
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-gold-tint text-gold">
               <SponsorsIcon className="h-[13px] w-[13px]" />
             </span>
-            <span className="text-[0.72rem] font-semibold text-ink-faint">Sponsors</span>
+            <span className="text-[0.72rem] font-semibold text-ink-faint">Outside Collection</span>
           </div>
           <div className="mt-1.5 font-display text-[1.2rem] font-bold tabular-nums text-ink">
-            {formatINR(sponsorReceived)}
+            {formatINR(outsideCollectionReceived)}
           </div>
-          <div className="mt-0.5 text-[0.72rem] text-ink-soft">{sponsors.length} confirmed</div>
-          {sponsorReceivedByType.length > 0 && (
+          <div className="mt-0.5 text-[0.72rem] text-ink-soft">
+            {activeOutsideCollections.length} confirmed
+          </div>
+          {outsideCollectionReceivedByType.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
-              {sponsorReceivedByType.map(([type, amount]) => (
+              {outsideCollectionReceivedByType.map(([type, amount]) => (
                 <Pill key={type} tone={type}>{`${pillLabels[type]} ${formatINR(amount)}`}</Pill>
               ))}
             </div>

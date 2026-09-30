@@ -16,11 +16,8 @@ import {
   dbAddCarriedFund,
   dbAddFundTransfer,
   dbAddMember,
-  dbAddSponsor,
-  dbAddSponsorPayment,
   dbAddVendorExpense,
   dbAddVendorPayment,
-  dbDeleteSponsor,
   dbDeleteVendorExpense,
   dbLogActivity,
   dbRemoveCarriedFund,
@@ -29,14 +26,15 @@ import {
   dbRemoveTenant,
   dbSaveContribution,
   dbSaveExResident,
+  dbSaveOutsideCollection,
   dbSaveOwner,
   dbSaveTenants,
   dbSetExResidentDisabled,
+  dbSetOutsideCollectionDisabled,
   dbSetOwnerDisabled,
   dbSetPaidViaHouse,
   dbStartYear,
   dbUpdateMember,
-  dbUpdateSponsor,
   dbUpdateVendorExpense,
   dbUpdateYear,
   fetchAllWithRetry,
@@ -47,10 +45,10 @@ import type {
   CommitteeMember,
   Contribution,
   House,
+  OutsideCollectionType,
   Owner,
   PaymentMode,
   PujaYear,
-  SponsorType,
   TransferMode,
 } from "@/lib/types";
 
@@ -65,8 +63,12 @@ import type {
  * on read, so switching which year you're viewing needs no round trip.
  */
 
-/** A tenant entry belongs to a flat; an owner entry belongs to the owner; an ex-resident entry isn't tied to a flat at all. */
-export type PayerRef = { houseId: string } | { ownerId: string } | { exResidentId: string };
+/** A tenant entry belongs to a flat; an owner entry belongs to the owner; an ex-resident or outside-collection entry isn't tied to a flat at all. */
+export type PayerRef =
+  | { houseId: string }
+  | { ownerId: string }
+  | { exResidentId: string }
+  | { outsideCollectionId: string };
 
 export type ContributionInput = Omit<
   Contribution,
@@ -81,15 +83,6 @@ export interface PaymentInput {
   note?: string;
   /** Vendor payments only — paid from the member's own pocket, so it shouldn't reduce their balance in hand. */
   selfFunded?: boolean;
-}
-
-export interface SponsorInput {
-  name: string;
-  type: SponsorType;
-  stallDetails?: string;
-  contact?: string;
-  amountPledged: number;
-  notes?: string;
 }
 
 export interface VendorExpenseInput {
@@ -171,7 +164,8 @@ function previousYearEntries(c: Contribution): PreviousYearInfo[] {
 function matchesPayer(c: Contribution, payer: PayerRef): boolean {
   if ("houseId" in payer) return c.houseId === payer.houseId;
   if ("ownerId" in payer) return c.ownerId === payer.ownerId;
-  return c.exResidentId === payer.exResidentId;
+  if ("exResidentId" in payer) return c.exResidentId === payer.exResidentId;
+  return c.outsideCollectionId === payer.outsideCollectionId;
 }
 
 function memberIsReferenced(data: LiveData, memberId: string): boolean {
@@ -181,7 +175,6 @@ function memberIsReferenced(data: LiveData, memberId: string): boolean {
       (t) => t.fromMemberId === memberId || t.toMemberId === memberId,
     ) ||
     data.carriedFunds.some((f) => f.memberId === memberId) ||
-    data.sponsors.some((s) => s.payments.some((p) => p.memberId === memberId)) ||
     data.vendorExpenses.some((e) => e.payments.some((p) => p.memberId === memberId))
   );
 }
@@ -213,6 +206,14 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   /** Creates (existingId omitted) or renames (existingId set) an ex-resident — not tied to any flat. Returns the ex-resident id. */
   saveExResident: (existingId: string | undefined, names: string[], phone?: string) => Promise<string>;
   setExResidentDisabled: (exResidentId: string, disabled: boolean) => Promise<void>;
+  /** Creates (existingId omitted) or renames (existingId set) an outside-collection entry — not tied to any flat. Returns its id. */
+  saveOutsideCollection: (
+    existingId: string | undefined,
+    name: string,
+    type: OutsideCollectionType,
+    stallDetails?: string,
+  ) => Promise<string>;
+  setOutsideCollectionDisabled: (outsideCollectionId: string, disabled: boolean) => Promise<void>;
   addMember: (input: MemberInput) => Promise<void>;
   updateMember: (memberId: string, patch: MemberInput) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
@@ -221,10 +222,6 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   addFundTransfer: (input: FundTransferInput) => Promise<void>;
   removeFundTransfer: (transferId: string) => Promise<void>;
   saveContribution: (payer: PayerRef, input: ContributionInput) => Promise<void>;
-  addSponsor: (input: SponsorInput) => Promise<void>;
-  updateSponsor: (sponsorId: string, input: SponsorInput) => Promise<void>;
-  addSponsorPayment: (sponsorId: string, input: PaymentInput) => Promise<void>;
-  deleteSponsor: (sponsorId: string) => Promise<void>;
   addVendorExpense: (input: VendorExpenseInput) => Promise<void>;
   updateVendorExpense: (expenseId: string, input: VendorExpenseInput) => Promise<void>;
   addVendorPayment: (expenseId: string, input: PaymentInput) => Promise<void>;
@@ -348,12 +345,12 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       latestActivityAt: data.latestActivityAt,
       owners: data.owners,
       exResidents: data.exResidents,
+      outsideCollections: data.outsideCollections,
       houses: data.houses,
       members: data.members,
       contributions: yearContributions,
       fundTransfers: inYear(data.fundTransfers),
       carriedFunds: inYear(data.carriedFunds),
-      sponsors: inYear(data.sponsors),
       vendorExpenses: inYear(data.vendorExpenses),
       previousYearInfo,
       contributionFor: (payer) => yearContributions.find((c) => matchesPayer(c, payer)),
@@ -478,6 +475,24 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         );
         await load();
       },
+      saveOutsideCollection: async (existingId, name, type, stallDetails) => {
+        const id = await dbSaveOutsideCollection(supabase, existingId, name, type, stallDetails);
+        await logActivity(
+          "outside_collection.save",
+          existingId ? `updated outside-collection details (${name})` : `added outside collection ${name}`,
+        );
+        await load();
+        return id;
+      },
+      setOutsideCollectionDisabled: async (outsideCollectionId, disabled) => {
+        const entry = data.outsideCollections.find((r) => r.id === outsideCollectionId);
+        await dbSetOutsideCollectionDisabled(supabase, outsideCollectionId, disabled);
+        await logActivity(
+          disabled ? "outside_collection.disable" : "outside_collection.enable",
+          `${disabled ? "disabled" : "re-enabled"} outside collection ${entry?.name ?? "?"}`,
+        );
+        await load();
+      },
       addMember: async (input) => {
         await dbAddMember(supabase, input);
         await logActivity("member.add", `added ${input.name} as a ${input.role}`);
@@ -550,8 +565,11 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
               })()
             : "ownerId" in payer
               ? (data.owners.find((o) => o.id === payer.ownerId)?.names.join(", ") ?? "an owner")
-              : (data.exResidents.find((r) => r.id === payer.exResidentId)?.names.join(", ") ??
-                "an ex-resident");
+              : "exResidentId" in payer
+                ? (data.exResidents.find((r) => r.id === payer.exResidentId)?.names.join(", ") ??
+                  "an ex-resident")
+                : (data.outsideCollections.find((r) => r.id === payer.outsideCollectionId)?.name ??
+                  "an outside collection entry");
         let summary: string;
         if (!existing) {
           summary =
@@ -565,47 +583,6 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
           summary = `updated details for ${label} (still ${pillLabels[input.status]})`;
         }
         await logActivity("contribution.save", summary, activeYear.id);
-        await load();
-      },
-      addSponsor: async (input) => {
-        await dbAddSponsor(supabase, activeYear.id, input);
-        await logActivity(
-          "sponsor.add",
-          `added sponsor ${input.name} (pledged ${formatINR(input.amountPledged)})`,
-          activeYear.id,
-        );
-        await load();
-      },
-      updateSponsor: async (sponsorId, input) => {
-        const before = data.sponsors.find((s) => s.id === sponsorId);
-        await dbUpdateSponsor(supabase, sponsorId, input);
-        await logActivity(
-          "sponsor.update",
-          before && before.amountPledged !== input.amountPledged
-            ? `changed pledge for ${input.name} from ${formatINR(before.amountPledged)} to ${formatINR(input.amountPledged)}`
-            : `updated details for sponsor ${input.name}`,
-          before?.yearId,
-        );
-        await load();
-      },
-      addSponsorPayment: async (sponsorId, input) => {
-        const sponsor = data.sponsors.find((s) => s.id === sponsorId);
-        await dbAddSponsorPayment(supabase, sponsorId, input);
-        await logActivity(
-          "sponsor_payment.add",
-          `recorded ${formatINR(input.amount)} from sponsor ${sponsor?.name ?? "?"} (received by ${memberName(input.memberId)})`,
-          sponsor?.yearId,
-        );
-        await load();
-      },
-      deleteSponsor: async (sponsorId) => {
-        const sponsor = data.sponsors.find((s) => s.id === sponsorId);
-        await dbDeleteSponsor(supabase, sponsorId);
-        await logActivity(
-          "sponsor.delete",
-          `deleted sponsor ${sponsor?.name ?? "?"} and its recorded payments`,
-          sponsor?.yearId,
-        );
         await load();
       },
       addVendorExpense: async (input) => {

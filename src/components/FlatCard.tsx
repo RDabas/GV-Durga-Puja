@@ -165,6 +165,7 @@ export function PayerRow({
   previousYear,
   disabled,
   headerAction,
+  extraBadge,
   onClick,
 }: {
   role: string;
@@ -177,6 +178,8 @@ export function PayerRow({
   /** Owner is excluded from this year's totals/follow-up — show that instead of their current-year status. */
   disabled?: boolean;
   headerAction?: ReactNode;
+  /** An extra badge shown next to the status Pill — e.g. OutsideCollectionCard's type Pill. */
+  extraBadge?: ReactNode;
   onClick: () => void;
 }) {
   const status = contribution?.status ?? "not_visited";
@@ -216,6 +219,7 @@ export function PayerRow({
           <>
             <span className="mt-1 flex flex-wrap items-center gap-1.5">
               <Pill tone={status} />
+              {extraBadge}
               {contribution && <PaymentTag mode={contribution.paymentMode} />}
               {contribution?.contributionKind === "both" && (
                 <span className="text-[0.7rem] text-ink-faint">+ bhog</span>

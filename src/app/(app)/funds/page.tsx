@@ -21,7 +21,6 @@ export default function FundsPage() {
     members,
     contributions,
     fundTransfers,
-    sponsors,
     vendorExpenses,
     carriedFunds,
     houses,
@@ -52,7 +51,6 @@ export default function FundsPage() {
     members,
     contributions,
     fundTransfers,
-    sponsors,
     vendorExpenses,
     carriedFunds,
   );
@@ -133,7 +131,7 @@ export default function FundsPage() {
             {
               member,
               collected,
-              sponsorReceived,
+              outsideCollectionReceived,
               handedOver,
               received,
               vendorPaid,
@@ -159,7 +157,8 @@ export default function FundsPage() {
                     </div>
                     <div className="mt-0.5 text-[0.75rem] text-ink-faint">
                       Collected {formatINR(collected)}
-                      {sponsorReceived > 0 && ` · sponsors ${formatINR(sponsorReceived)}`}
+                      {outsideCollectionReceived > 0 &&
+                        ` · outside collection ${formatINR(outsideCollectionReceived)}`}
                       {carried > 0 && ` · carried over ${formatINR(carried)}`}
                       {received > 0 && ` · received ${formatINR(received)}`}
                       {handedOver > 0 && ` · handed over ${formatINR(handedOver)}`}

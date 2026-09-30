@@ -7,10 +7,7 @@ create type block_letter as enum ('A', 'B', 'C', 'D', 'E', 'F', 'G');
 create type payment_mode as enum ('cash', 'upi', 'pending');
 create type contribution_status as enum ('paid', 'partial', 'promised', 'pending', 'not_visited', 'not_home', 'wont_pay');
 create type contribution_kind as enum ('money', 'bhog_grocery', 'both');
-create type sponsor_type as enum (
-  'non_resident', 'outsider', 'stall_vendor', 'non_stall_vendor',
-  'dandiya_collection', 'counter_collection', 'donation_box'
-);
+create type outside_collection_type as enum ('outsider', 'donation', 'donation_box', 'stall', 'dandiya_collection');
 create type committee_role as enum ('admin', 'collector');
 create type transfer_mode as enum ('cash', 'upi');
 create type carried_fund_kind as enum ('cash', 'fd', 'bank');
@@ -83,6 +80,18 @@ create table ex_residents (
   created_at timestamptz not null default now()
 );
 
+-- A voluntary contributor from outside the society — a stall, a donation, an
+-- outsider gift, etc. — not tied to any flat or block, tracked the same
+-- status-driven way as a resident via contributions.outside_collection_id.
+create table outside_collections (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type outside_collection_type not null default 'outsider',
+  stall_details text,
+  disabled boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 -- auth_user_id is nullable: an admin adds a member by name so they can be
 -- picked as "collected by" straight away, and the row is linked to a real
 -- login the first time that person signs in.
@@ -98,13 +107,15 @@ create table committee_members (
 -- A flat yields at most two entries per year: one from its tenants (tied to
 -- the flat) and one from its owner (tied to the owner, since an owner of
 -- several flats hands over a single amount covering all of them). An
--- ex-resident isn't tied to any flat at all. Exactly one of house_id /
--- owner_id / ex_resident_id is set.
+-- ex-resident or outside-collection entry isn't tied to any flat at all.
+-- Exactly one of house_id / owner_id / ex_resident_id / outside_collection_id
+-- is set.
 create table contributions (
   id uuid primary key default gen_random_uuid(),
   house_id uuid references houses(id) on delete cascade,
   owner_id uuid references owners(id) on delete cascade,
   ex_resident_id uuid references ex_residents(id) on delete cascade,
+  outside_collection_id uuid references outside_collections(id) on delete cascade,
   year_id uuid not null references puja_years(id) on delete cascade,
   collector_id uuid references committee_members(id),
   -- Who should go back for a "nobody home"/"not visited" flat — separate
@@ -126,7 +137,7 @@ create table contributions (
   follow_up_note text,
   updated_at timestamptz not null default now(),
   constraint contributions_one_payer check (
-    num_nonnulls(house_id, owner_id, ex_resident_id) = 1
+    num_nonnulls(house_id, owner_id, ex_resident_id, outside_collection_id) = 1
   )
 );
 create unique index contributions_tenant_per_year on contributions(house_id, year_id)
@@ -135,6 +146,8 @@ create unique index contributions_owner_per_year on contributions(owner_id, year
   where owner_id is not null;
 create unique index contributions_ex_resident_per_year on contributions(ex_resident_id, year_id)
   where ex_resident_id is not null;
+create unique index contributions_outside_collection_per_year on contributions(outside_collection_id, year_id)
+  where outside_collection_id is not null;
 
 -- Residents always pay a specific committee member (that member's own cash box
 -- or personal UPI) — collector_id on contributions already captures who first
@@ -172,33 +185,6 @@ create table carried_funds (
   created_at timestamptz not null default now()
 );
 
-create table sponsors (
-  id uuid primary key default gen_random_uuid(),
-  year_id uuid not null references puja_years(id) on delete cascade,
-  name text not null,
-  contact text,
-  type sponsor_type not null default 'outsider',
-  stall_details text,
-  amount_pledged numeric(10, 2) not null default 0,
-  notes text,
-  created_at timestamptz not null default now()
-);
-
--- Amount received from a sponsor is the sum of these rows, not a column on
--- sponsors — each instalment records which app or cash it arrived through,
--- and member_id records which committee member's hand it passed through, so
--- it adds to that member's balance in hand the same way a contribution does.
-create table sponsor_payments (
-  id uuid primary key default gen_random_uuid(),
-  sponsor_id uuid not null references sponsors(id) on delete cascade,
-  member_id uuid not null references committee_members(id),
-  amount numeric(10, 2) not null,
-  payment_date date not null default current_date,
-  mode payment_mode not null default 'upi',
-  note text,
-  created_at timestamptz not null default now()
-);
-
 -- Static vendor directory across years.
 create table vendors (
   id uuid primary key default gen_random_uuid(),
@@ -221,7 +207,7 @@ create table vendor_expenses (
 
 -- Zero rows = nothing paid yet; one row = paid in full; many rows = installments.
 -- member_id records which committee member handed this over — it comes out
--- of their balance in hand, mirroring sponsor_payments.member_id.
+-- of their balance in hand.
 create table vendor_payments (
   id uuid primary key default gen_random_uuid(),
   vendor_expense_id uuid not null references vendor_expenses(id) on delete cascade,
@@ -256,19 +242,18 @@ create index activity_log_created_at_idx on activity_log (created_at desc);
 
 -- --- Row Level Security -----------------------------------------------------
 -- Every table is restricted to authenticated committee members. Only admins
--- can write sponsor/vendor financials or edit another collector's entries;
+-- can write vendor financials or edit another collector's entries;
 -- collectors can read everything and write their own contribution rows.
 
 alter table puja_years enable row level security;
 alter table houses enable row level security;
 alter table owners enable row level security;
 alter table ex_residents enable row level security;
+alter table outside_collections enable row level security;
 alter table committee_members enable row level security;
 alter table contributions enable row level security;
 alter table fund_transfers enable row level security;
 alter table carried_funds enable row level security;
-alter table sponsors enable row level security;
-alter table sponsor_payments enable row level security;
 alter table vendors enable row level security;
 alter table vendor_expenses enable row level security;
 alter table vendor_payments enable row level security;
@@ -320,6 +305,15 @@ create policy "committee can update ex_residents" on ex_residents
 create policy "admins delete ex_residents" on ex_residents
   for delete using (is_committee_admin());
 
+create policy "committee can read outside_collections" on outside_collections
+  for select using (is_committee_member());
+create policy "committee can add outside_collections" on outside_collections
+  for insert with check (is_committee_member());
+create policy "committee can update outside_collections" on outside_collections
+  for update using (is_committee_member());
+create policy "admins delete outside_collections" on outside_collections
+  for delete using (is_committee_admin());
+
 create policy "committee can read committee_members" on committee_members
   for select using (is_committee_member());
 create policy "admins manage committee_members" on committee_members
@@ -352,16 +346,6 @@ create policy "admins delete fund_transfers" on fund_transfers
 create policy "committee can read carried_funds" on carried_funds
   for select using (is_committee_member());
 create policy "admins manage carried_funds" on carried_funds
-  for all using (is_committee_admin()) with check (is_committee_admin());
-
-create policy "committee can read sponsors" on sponsors
-  for select using (is_committee_member());
-create policy "admins manage sponsors" on sponsors
-  for all using (is_committee_admin()) with check (is_committee_admin());
-
-create policy "committee can read sponsor_payments" on sponsor_payments
-  for select using (is_committee_member());
-create policy "admins manage sponsor_payments" on sponsor_payments
   for all using (is_committee_admin()) with check (is_committee_admin());
 
 create policy "committee can read vendors" on vendors

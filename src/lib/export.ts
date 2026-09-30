@@ -3,7 +3,7 @@ import type { PujaStore } from "@/lib/store";
 import { paymentModeLabels } from "@/lib/payment";
 import { carriedFundKindLabels } from "@/lib/carriedFund";
 import { committeeBalances } from "@/lib/balances";
-import type { ContributionStatus, SponsorType } from "@/lib/types";
+import type { ContributionStatus, OutsideCollectionType } from "@/lib/types";
 
 const statusLabels: Record<ContributionStatus, string> = {
   paid: "Paid",
@@ -15,14 +15,12 @@ const statusLabels: Record<ContributionStatus, string> = {
   wont_pay: "Won't pay",
 };
 
-const sponsorTypeLabels: Record<SponsorType, string> = {
-  non_resident: "Non Resident",
+const outsideCollectionTypeLabels: Record<OutsideCollectionType, string> = {
   outsider: "Outsider",
-  stall_vendor: "Stall Vendor",
-  non_stall_vendor: "Non Stall Vendor",
-  dandiya_collection: "Dandiya Night Collection",
-  counter_collection: "Counter Collection",
+  donation: "Donation",
   donation_box: "Donation Box Collection",
+  stall: "Stall",
+  dandiya_collection: "Dandiya Night Collection",
 };
 
 function styleHeader(sheet: ExcelJS.Worksheet) {
@@ -43,7 +41,7 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
     activeYear,
     houses,
     contributions,
-    sponsors,
+    outsideCollections,
     vendorExpenses,
     members,
     carriedFunds,
@@ -109,54 +107,33 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
   }
   styleHeader(flatsSheet);
 
-  const sponsorsSheet = workbook.addWorksheet("Sponsors");
-  sponsorsSheet.columns = [
+  const outsideCollectionSheet = workbook.addWorksheet("Outside Collection");
+  outsideCollectionSheet.columns = [
     { header: "Name", key: "name", width: 26 },
-    { header: "Type", key: "type", width: 12 },
+    { header: "Type", key: "type", width: 20 },
     { header: "Stall Details", key: "stall", width: 20 },
-    { header: "Contact", key: "contact", width: 16 },
-    { header: "Pledged", key: "pledged", width: 14 },
-    { header: "Received", key: "received", width: 14 },
-    { header: "Balance", key: "balance", width: 14 },
-    { header: "Notes", key: "notes", width: 30 },
-  ];
-  for (const s of sponsors) {
-    const received = s.payments.reduce((sum, p) => sum + p.amount, 0);
-    sponsorsSheet.addRow({
-      name: s.name,
-      type: sponsorTypeLabels[s.type],
-      stall: s.stallDetails ?? "",
-      contact: s.contact ?? "",
-      pledged: s.amountPledged,
-      received,
-      balance: s.amountPledged - received,
-      notes: s.notes ?? "",
-    });
-  }
-  styleHeader(sponsorsSheet);
-
-  const sponsorPaymentsSheet = workbook.addWorksheet("Sponsor Payments");
-  sponsorPaymentsSheet.columns = [
-    { header: "Sponsor", key: "sponsor", width: 26 },
-    { header: "Date", key: "date", width: 14 },
+    { header: "Status", key: "status", width: 14 },
     { header: "Amount", key: "amount", width: 14 },
     { header: "Mode", key: "mode", width: 12 },
-    { header: "Received By", key: "receivedBy", width: 16 },
+    { header: "Collected By", key: "collectedBy", width: 16 },
+    { header: "Date", key: "date", width: 14 },
     { header: "Note", key: "note", width: 30 },
   ];
-  for (const s of sponsors) {
-    for (const p of s.payments) {
-      sponsorPaymentsSheet.addRow({
-        sponsor: s.name,
-        date: p.paymentDate,
-        amount: p.amount,
-        mode: paymentModeLabels[p.mode],
-        receivedBy: memberName(p.memberId) ?? "",
-        note: p.note ?? "",
-      });
-    }
+  for (const entry of outsideCollections) {
+    const c = contributionFor({ outsideCollectionId: entry.id });
+    outsideCollectionSheet.addRow({
+      name: entry.name,
+      type: outsideCollectionTypeLabels[entry.type],
+      stall: entry.stallDetails ?? "",
+      status: c ? statusLabels[c.status] : "",
+      amount: c ? c.moneyAmount : "",
+      mode: c && c.moneyAmount > 0 ? paymentModeLabels[c.paymentMode] : "",
+      collectedBy: memberName(c?.collectorId) ?? "",
+      date: c?.paymentDate ?? "",
+      note: c?.followUpNote ?? c?.note ?? "",
+    });
   }
-  styleHeader(sponsorPaymentsSheet);
+  styleHeader(outsideCollectionSheet);
 
   const vendorsSheet = workbook.addWorksheet("Vendor Bills");
   vendorsSheet.columns = [
@@ -211,7 +188,6 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
     members,
     contributions,
     fundTransfers,
-    sponsors,
     vendorExpenses,
     carriedFunds,
   );
@@ -220,7 +196,7 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
     { header: "Member", key: "member", width: 20 },
     { header: "Role", key: "role", width: 12 },
     { header: "Collected (Houses)", key: "collected", width: 18 },
-    { header: "Sponsor Payments Received", key: "sponsorReceived", width: 24 },
+    { header: "Outside Collection Received", key: "outsideCollectionReceived", width: 26 },
     { header: "Carried In", key: "carried", width: 14 },
     { header: "Received From Others", key: "received", width: 18 },
     { header: "Handed Over", key: "handedOver", width: 14 },
@@ -232,7 +208,7 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
       member: b.member.name,
       role: b.member.role === "admin" ? "Admin" : "Collector",
       collected: b.collected,
-      sponsorReceived: b.sponsorReceived,
+      outsideCollectionReceived: b.outsideCollectionReceived,
       carried: b.carriedCash + b.carriedFd + b.carriedBank,
       received: b.received,
       handedOver: b.handedOver,

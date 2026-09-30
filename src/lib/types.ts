@@ -13,14 +13,12 @@ export type ContributionStatus =
 
 export type ContributionKind = "money" | "bhog_grocery" | "both";
 
-export type SponsorType =
-  | "non_resident"
+export type OutsideCollectionType =
   | "outsider"
-  | "stall_vendor"
-  | "non_stall_vendor"
-  | "dandiya_collection"
-  | "counter_collection"
-  | "donation_box";
+  | "donation"
+  | "donation_box"
+  | "stall"
+  | "dandiya_collection";
 
 export type VendorPaymentStatus = "paid_full" | "installment" | "not_paid";
 
@@ -62,6 +60,21 @@ export interface ExResident {
   disabled: boolean;
 }
 
+/**
+ * A voluntary contributor from outside the society — a stall, a donation, a
+ * one-off outsider gift, etc. — not tied to any flat or block, tracked the
+ * same status-driven way as a resident (one status, one amount per year).
+ */
+export interface OutsideCollection {
+  id: string;
+  name: string;
+  type: OutsideCollectionType;
+  /** Only meaningful for type "stall" — where the stall was set up. */
+  stallDetails?: string;
+  /** Excluded from this year's money totals, but kept on record — see the Disable/Enable toggle, shared with Owner/ExResident. */
+  disabled: boolean;
+}
+
 /** A flat in the society directory. */
 export interface House {
   id: string;
@@ -83,10 +96,11 @@ export interface House {
 }
 
 /**
- * Exactly one of houseId / ownerId / exResidentId is set. A tenant pays for
- * their own flat; an owner pays once for every flat they hold, so that entry
- * hangs off the owner instead of being duplicated across their flats; an
- * ex-resident isn't tied to any flat at all.
+ * Exactly one of houseId / ownerId / exResidentId / outsideCollectionId is
+ * set. A tenant pays for their own flat; an owner pays once for every flat
+ * they hold, so that entry hangs off the owner instead of being duplicated
+ * across their flats; an ex-resident or outside-collection entry isn't tied
+ * to any flat at all.
  */
 export interface Contribution {
   id: string;
@@ -94,6 +108,7 @@ export interface Contribution {
   houseId?: string;
   ownerId?: string;
   exResidentId?: string;
+  outsideCollectionId?: string;
   collectorId?: string;
   /**
    * Who should go back for a "nobody home"/"not visited" flat — separate
@@ -116,29 +131,6 @@ export interface Contribution {
   paymentDate?: string;
   note?: string;
   followUpNote?: string;
-}
-
-export interface Sponsor {
-  id: string;
-  yearId: string;
-  name: string;
-  contact?: string;
-  type: SponsorType;
-  stallDetails?: string;
-  amountPledged: number;
-  notes?: string;
-  payments: SponsorPayment[];
-}
-
-export interface SponsorPayment {
-  id: string;
-  sponsorId: string;
-  /** Which committee member physically took this money — it adds to their balance in hand. */
-  memberId: string;
-  amount: number;
-  paymentDate: string;
-  mode: PaymentMode;
-  note?: string;
 }
 
 export interface Vendor {

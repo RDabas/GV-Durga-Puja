@@ -1,67 +1,64 @@
 "use client";
 
 import { useState } from "react";
-import { PaymentSheet } from "@/components/PaymentSheet";
-import { SponsorCard } from "@/components/SponsorCard";
-import { SponsorSheet } from "@/components/SponsorSheet";
+import { OutsideCollectionCard } from "@/components/OutsideCollectionCard";
+import { OutsideCollectionSheet } from "@/components/OutsideCollectionSheet";
 import { PlusIcon } from "@/components/icons";
 import { usePujaData } from "@/lib/store";
+import type { OutsideCollection } from "@/lib/types";
 
-export default function SponsorsPage() {
-  const { sponsors, addSponsorPayment, deleteSponsor } = usePujaData();
-  const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [payingFor, setPayingFor] = useState<string | null>(null);
+export default function OutsideCollectionPage() {
+  const { outsideCollections, contributionFor, memberName, setOutsideCollectionDisabled } =
+    usePujaData();
+  const [editing, setEditing] = useState<{ outsideCollection?: OutsideCollection } | null>(null);
 
-  const editing = sponsors.find((s) => s.id === editingId);
-  const paying = sponsors.find((s) => s.id === payingFor);
+  const sorted = [...outsideCollections].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         <p className="px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-          Sponsors
+          Outside Collection
         </p>
         <button
           type="button"
-          onClick={() => setAdding(true)}
+          onClick={() => setEditing({})}
           className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
         >
           <PlusIcon className="h-[13px] w-[13px]" />
-          Add sponsor
+          Add
         </button>
       </div>
 
-      {sponsors.map((sponsor) => (
-        <SponsorCard
-          key={sponsor.id}
-          sponsor={sponsor}
-          onRecordPayment={() => setPayingFor(sponsor.id)}
-          onEdit={() => setEditingId(sponsor.id)}
-          onDelete={() => deleteSponsor(sponsor.id)}
-        />
-      ))}
-
-      <SponsorSheet open={adding} onClose={() => setAdding(false)} />
-
-      {editing && (
-        <SponsorSheet
-          key={editing.id}
-          open
-          sponsor={editing}
-          onClose={() => setEditingId(null)}
-        />
+      {sorted.length === 0 && (
+        <p className="rounded-2xl border border-border bg-surface p-3.5 text-[0.8rem] text-ink-faint">
+          Nothing added yet.
+        </p>
       )}
 
-      {paying && (
-        <PaymentSheet
-          key={paying.id}
+      {sorted.map((entry) => {
+        const contribution = contributionFor({ outsideCollectionId: entry.id });
+        return (
+          <OutsideCollectionCard
+            key={entry.id}
+            outsideCollection={entry}
+            contribution={contribution}
+            collectorName={memberName(contribution?.collectorId)}
+            assignedToName={
+              memberName(contribution?.assignedToMemberId) ?? contribution?.assignedToName
+            }
+            onEdit={() => setEditing({ outsideCollection: entry })}
+            onToggleDisabled={() => setOutsideCollectionDisabled(entry.id, !entry.disabled)}
+          />
+        );
+      })}
+
+      {editing && (
+        <OutsideCollectionSheet
+          key={editing.outsideCollection?.id ?? "new"}
           open
-          title="Record sponsor payment"
-          subtitle={paying.name}
-          memberLabel="Received by"
-          onSubmit={(input) => addSponsorPayment(paying.id, input)}
-          onClose={() => setPayingFor(null)}
+          outsideCollection={editing.outsideCollection}
+          onClose={() => setEditing(null)}
         />
       )}
     </div>
