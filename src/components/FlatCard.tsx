@@ -83,32 +83,6 @@ export function DisableToggleButton({
   );
 }
 
-/** Small "Remove" link next to the Tenant label — clears their name and this year's recorded payment, back to an empty "+ Add tenant" flat. */
-function RemoveTenantButton({
-  tenantNames,
-  onRemove,
-}: {
-  tenantNames: string;
-  onRemove: () => Promise<void>;
-}) {
-  const { submitting, error, run } = useAsyncAction();
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        const question = `Remove ${tenantNames || "this tenant"}? Their recorded payment for this year (if any) will be cleared and this flat will need a tenant added again.`;
-        if (window.confirm(question)) run(onRemove);
-      }}
-      disabled={submitting}
-      title={error ?? undefined}
-      className="shrink-0 rounded-full bg-critical-tint px-2.5 py-1 text-[0.66rem] font-bold whitespace-nowrap text-critical transition active:scale-95 disabled:opacity-60"
-    >
-      {submitting ? "…" : error ? "Retry" : "Remove"}
-    </button>
-  );
-}
-
 /** Shown on a multi-flat owner's non-primary flats instead of the full PayerRow — their money and status already live on the primary flat, so this is just a pointer there. */
 function OwnerReferenceRow({
   names,
@@ -298,7 +272,7 @@ export function FlatCard({
   onEditOwner,
   onEditTenant,
   onToggleOwnerDisabled,
-  onRemoveTenant,
+  onToggleTenantDisabled,
 }: {
   house: House;
   owner?: Owner;
@@ -318,14 +292,15 @@ export function FlatCard({
   onEditOwner: () => void;
   onEditTenant: () => void;
   onToggleOwnerDisabled?: () => Promise<void>;
-  /** Clears the tenant's name and this year's recorded payment — offered whenever a tenant is on file. */
-  onRemoveTenant?: () => Promise<void>;
+  /** Offered whenever a tenant is on file — excludes them from this year's totals/follow-up without discarding their record. */
+  onToggleTenantDisabled?: () => Promise<void>;
 }) {
-  // A disabled owner's status is excluded — same as everywhere else they're
-  // "not considered" — so their card doesn't get accented by a stale status.
+  // A disabled owner/tenant's status is excluded — same as everywhere else
+  // they're "not considered" — so their card doesn't get accented by a stale
+  // status.
   const cardStatus = bestStatus(
     owner && !owner.disabled ? ownerContribution?.status : undefined,
-    tenantContribution?.status,
+    !house.tenantDisabled ? tenantContribution?.status : undefined,
   );
   const accent = cardAccent[cardStatus];
   const hasTenant = house.tenantNames.length > 0 || tenantContribution !== undefined;
@@ -340,6 +315,14 @@ export function FlatCard({
       onToggle={onToggleOwnerDisabled!}
     />
   ) : undefined;
+  const tenantDisableToggle =
+    hasTenant && onToggleTenantDisabled ? (
+      <DisableToggleButton
+        name={summarise(house.tenantNames)}
+        disabled={house.tenantDisabled}
+        onToggle={onToggleTenantDisabled}
+      />
+    ) : undefined;
 
   return (
     <div
@@ -391,14 +374,8 @@ export function FlatCard({
             collectorName={tenantCollector}
             assignedToName={tenantAssignedTo}
             previousYear={tenantPreviousYear}
-            headerAction={
-              onRemoveTenant ? (
-                <RemoveTenantButton
-                  tenantNames={summarise(house.tenantNames)}
-                  onRemove={onRemoveTenant}
-                />
-              ) : undefined
-            }
+            disabled={house.tenantDisabled}
+            headerAction={tenantDisableToggle}
             onClick={onEditTenant}
           />
         </div>

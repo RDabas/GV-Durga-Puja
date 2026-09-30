@@ -36,7 +36,7 @@ export default function CollectPage() {
     previousYearInfo,
     memberName,
     setOwnerDisabled,
-    removeTenant,
+    setTenantDisabled,
     setExResidentDisabled,
     reload,
   } = usePujaData();
@@ -148,9 +148,7 @@ export default function CollectPage() {
         onEditOwner={() => setEditing({ kind: "flat", house, role: "owner" })}
         onEditTenant={() => setEditing({ kind: "flat", house, role: "tenant" })}
         onToggleOwnerDisabled={owner ? () => setOwnerDisabled(owner.id, !owner.disabled) : undefined}
-        onRemoveTenant={
-          house.tenantNames.length > 0 || tenantContribution ? () => removeTenant(house.id) : undefined
-        }
+        onToggleTenantDisabled={() => setTenantDisabled(house.id, !house.tenantDisabled)}
       />
     );
   }

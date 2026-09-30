@@ -70,6 +70,7 @@ interface HouseRow {
   paid_via_house_id: string | null;
   tenant_names: string[];
   tenant_phone: string | null;
+  tenant_disabled: boolean;
 }
 
 interface MemberRow {
@@ -200,6 +201,7 @@ const mapHouse = (r: HouseRow): House => ({
   paidViaHouseId: r.paid_via_house_id ?? undefined,
   tenantNames: r.tenant_names,
   tenantPhone: r.tenant_phone ?? undefined,
+  tenantDisabled: r.tenant_disabled,
 });
 
 const mapMember = (r: MemberRow): CommitteeMember => ({
@@ -422,22 +424,15 @@ export async function dbSaveTenants(
   if (error) throw new Error(error.message);
 }
 
-/** Clears a flat's tenant name(s) and deletes this year's contribution row for them (if any) — admin-only, since it discards a recorded payment. */
-export async function dbRemoveTenant(
+/** Toggles whether a flat's tenant counts toward this year's money totals and follow-up lists — their record and history stay intact either way. */
+export async function dbSetTenantDisabled(
   supabase: SupabaseClient,
   houseId: string,
-  contributionId?: string,
+  disabled: boolean,
 ): Promise<void> {
-  if (contributionId) {
-    const { error: deleteError } = await supabase
-      .from("contributions")
-      .delete()
-      .eq("id", contributionId);
-    if (deleteError) throw new Error(deleteError.message);
-  }
   const { error } = await supabase
     .from("houses")
-    .update({ tenant_names: [], tenant_phone: null })
+    .update({ tenant_disabled: disabled })
     .eq("id", houseId);
   if (error) throw new Error(error.message);
 }

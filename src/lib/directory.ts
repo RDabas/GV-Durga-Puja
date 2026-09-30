@@ -451,6 +451,7 @@ function buildHouses(): House[] {
           flatNo,
           ownerId: seed?.owner ? ownerIdFor(seed.owner) : undefined,
           tenantNames: seed?.tenants ?? [],
+          tenantDisabled: false,
         });
       }
     }

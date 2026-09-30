@@ -43,6 +43,9 @@ create table houses (
   owner_id uuid references owners(id) on delete set null,
   tenant_names text[] not null default '{}',
   tenant_phone text,
+  -- Excluded from this year's money totals and follow-up lists, but kept on
+  -- record — mirrors owners.disabled, scoped to just the tenant slot.
+  tenant_disabled boolean not null default false,
   created_at timestamptz not null default now(),
   unique (block, flat_no)
 );

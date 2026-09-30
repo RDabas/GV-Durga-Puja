@@ -23,7 +23,6 @@ import {
   dbRemoveCarriedFund,
   dbRemoveFundTransfer,
   dbRemoveMember,
-  dbRemoveTenant,
   dbSaveContribution,
   dbSaveExResident,
   dbSaveOutsideCollection,
@@ -33,6 +32,7 @@ import {
   dbSetOutsideCollectionDisabled,
   dbSetOwnerDisabled,
   dbSetPaidViaHouse,
+  dbSetTenantDisabled,
   dbStartYear,
   dbUpdateMember,
   dbUpdateVendorExpense,
@@ -197,8 +197,8 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   startYear: (input: YearInput) => Promise<void>;
   updateYear: (yearId: string, patch: Partial<YearInput>) => Promise<void>;
   saveTenants: (houseId: string, names: string[], phone?: string) => Promise<void>;
-  /** Clears a flat's tenant name(s) and deletes this year's recorded contribution for them, if any — back to an empty "+ Add tenant" flat. */
-  removeTenant: (houseId: string) => Promise<void>;
+  /** Toggles whether a flat's tenant counts toward this year's money totals and follow-up lists — their record and history stay intact either way. */
+  setTenantDisabled: (houseId: string, disabled: boolean) => Promise<void>;
   /** Links (targetHouseId set) or unlinks (null) this flat's owner accounting to another flat — see House.paidViaHouseId. */
   setPaidViaHouse: (houseId: string, targetHouseId: string | null) => Promise<void>;
   saveOwner: (houseId: string, names: string[], phone?: string) => Promise<string>;
@@ -410,13 +410,12 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         );
         await load();
       },
-      removeTenant: async (houseId) => {
+      setTenantDisabled: async (houseId, disabled) => {
         const house = data.houses.find((h) => h.id === houseId);
-        const existing = yearContributions.find((c) => c.houseId === houseId);
-        await dbRemoveTenant(supabase, houseId, existing?.id);
+        await dbSetTenantDisabled(supabase, houseId, disabled);
         await logActivity(
-          "house.remove_tenant",
-          `removed tenant ${house?.tenantNames.join(", ") || "?"} from ${house ? `${house.block}-${house.flatNo}` : "a flat"}`,
+          disabled ? "house.disable_tenant" : "house.enable_tenant",
+          `${disabled ? "disabled" : "re-enabled"} tenant ${house?.tenantNames.join(", ") || "?"} for ${house ? `${house.block}-${house.flatNo}` : "a flat"}`,
         );
         await load();
       },

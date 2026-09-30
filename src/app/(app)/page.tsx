@@ -205,6 +205,7 @@ export default function DashboardPage() {
     }
 
     for (const house of houses) {
+      if (house.tenantDisabled) continue;
       const contribution = contributionFor({ houseId: house.id });
       const hasTenant = house.tenantNames.length > 0 || contribution !== undefined;
       if (!hasTenant) continue;
@@ -293,7 +294,7 @@ export default function DashboardPage() {
   // every flat they hold, not just the one the payment happens to be
   // recorded on.
   const flatsVisited = housesInMoneyBlock.filter((h) => {
-    const tenant = contributions.find((c) => c.houseId === h.id);
+    const tenant = !h.tenantDisabled ? contributions.find((c) => c.houseId === h.id) : undefined;
     const linkedHouse = h.paidViaHouseId ? houses.find((x) => x.id === h.paidViaHouseId) : undefined;
     const effectiveOwnerId = linkedHouse ? linkedHouse.ownerId : h.ownerId;
     const ownerDisabled = effectiveOwnerId

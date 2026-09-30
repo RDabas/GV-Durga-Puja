@@ -94,6 +94,8 @@ export interface House {
   /** Empty when the owner lives there. Tenants always pay per flat. */
   tenantNames: string[];
   tenantPhone?: string;
+  /** Excluded from this year's money totals and follow-up lists, but kept on record — see FlatCard's Disable/Enable tenant action. */
+  tenantDisabled: boolean;
 }
 
 /**
