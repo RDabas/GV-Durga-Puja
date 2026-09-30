@@ -18,7 +18,8 @@ export type OutsideCollectionType =
   | "donation"
   | "donation_box"
   | "stall"
-  | "dandiya_collection";
+  | "dandiya_collection"
+  | "promotion";
 
 export type VendorPaymentStatus = "paid_full" | "installment" | "not_paid";
 

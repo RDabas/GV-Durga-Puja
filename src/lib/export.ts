@@ -21,6 +21,7 @@ const outsideCollectionTypeLabels: Record<OutsideCollectionType, string> = {
   donation_box: "Donation Box Collection",
   stall: "Stall",
   dandiya_collection: "Dandiya Night Collection",
+  promotion: "Promotion",
 };
 
 function styleHeader(sheet: ExcelJS.Worksheet) {

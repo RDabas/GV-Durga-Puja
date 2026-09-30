@@ -35,6 +35,7 @@ const typeOptions: { value: OutsideCollectionType; label: string }[] = [
   { value: "donation_box", label: "Donation Box Collection" },
   { value: "stall", label: "Stall" },
   { value: "dandiya_collection", label: "Dandiya Night Collection" },
+  { value: "promotion", label: "Promotion" },
 ];
 
 /**
