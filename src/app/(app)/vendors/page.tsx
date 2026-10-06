@@ -6,15 +6,24 @@ import { VendorCard } from "@/components/VendorCard";
 import { VendorExpenseSheet } from "@/components/VendorExpenseSheet";
 import { PlusIcon } from "@/components/icons";
 import { usePujaData } from "@/lib/store";
+import type { VendorPayment } from "@/lib/types";
 
 export default function VendorsPage() {
-  const { vendorExpenses, addVendorPayment, deleteVendorExpense } = usePujaData();
+  const { vendorExpenses, addVendorPayment, updateVendorPayment, deleteVendorPayment, deleteVendorExpense } =
+    usePujaData();
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [payingFor, setPayingFor] = useState<string | null>(null);
+  const [editingPayment, setEditingPayment] = useState<{
+    expenseId: string;
+    payment: VendorPayment;
+  } | null>(null);
 
   const editing = vendorExpenses.find((e) => e.id === editingId);
   const paying = vendorExpenses.find((e) => e.id === payingFor);
+  const editingPaymentExpense = editingPayment
+    ? vendorExpenses.find((e) => e.id === editingPayment.expenseId)
+    : undefined;
 
   return (
     <div className="space-y-2.5">
@@ -37,6 +46,8 @@ export default function VendorsPage() {
           key={expense.id}
           expense={expense}
           onRecordPayment={() => setPayingFor(expense.id)}
+          onEditPayment={(payment) => setEditingPayment({ expenseId: expense.id, payment })}
+          onRemovePayment={(paymentId) => deleteVendorPayment(expense.id, paymentId)}
           onEdit={() => setEditingId(expense.id)}
           onDelete={() => deleteVendorExpense(expense.id)}
         />
@@ -63,6 +74,22 @@ export default function VendorsPage() {
           allowSelfFunded
           onSubmit={(input) => addVendorPayment(paying.id, input)}
           onClose={() => setPayingFor(null)}
+        />
+      )}
+
+      {editingPayment && (
+        <PaymentSheet
+          key={editingPayment.payment.id}
+          open
+          title="Edit vendor payment"
+          subtitle={editingPaymentExpense?.vendor.name}
+          memberLabel="Paid by"
+          allowSelfFunded
+          payment={editingPayment.payment}
+          onSubmit={(input) =>
+            updateVendorPayment(editingPayment.expenseId, editingPayment.payment.id, input)
+          }
+          onClose={() => setEditingPayment(null)}
         />
       )}
     </div>

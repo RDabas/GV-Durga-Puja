@@ -778,6 +778,34 @@ export async function dbAddVendorPayment(
   if (error) throw new Error(error.message);
 }
 
+/** Corrects a vendor payment entered wrong — amount, mode, date, who paid, etc. */
+export async function dbUpdateVendorPayment(
+  supabase: SupabaseClient,
+  paymentId: string,
+  input: PaymentWrite,
+): Promise<void> {
+  const { error } = await supabase
+    .from("vendor_payments")
+    .update({
+      member_id: input.memberId,
+      amount: input.amount,
+      payment_date: input.paymentDate,
+      mode: input.mode,
+      note: input.note ?? null,
+      self_funded: input.selfFunded ?? false,
+    })
+    .eq("id", paymentId);
+  if (error) throw new Error(error.message);
+}
+
+export async function dbDeleteVendorPayment(
+  supabase: SupabaseClient,
+  paymentId: string,
+): Promise<void> {
+  const { error } = await supabase.from("vendor_payments").delete().eq("id", paymentId);
+  if (error) throw new Error(error.message);
+}
+
 /** Archives whatever year was active and starts a new one. Returns the new year's id. */
 export async function dbStartYear(
   supabase: SupabaseClient,

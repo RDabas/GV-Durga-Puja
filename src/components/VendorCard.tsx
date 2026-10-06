@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { VendorExpense } from "@/lib/types";
+import type { VendorExpense, VendorPayment } from "@/lib/types";
 import { PaymentBreakdown } from "@/components/PaymentBreakdown";
 import { Pill, type PillTone } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -15,14 +15,37 @@ function statusFor(paid: number, total: number): PillTone {
   return "installment";
 }
 
+/** Small "Remove" link next to a payment history row — a sibling of the row's own tap-to-edit button, not nested inside it. */
+function RemovePaymentButton({ onRemove }: { onRemove: () => Promise<void> }) {
+  const { submitting, error, run } = useAsyncAction();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (window.confirm("Remove this payment? This can't be undone.")) run(onRemove);
+      }}
+      disabled={submitting}
+      title={error ?? undefined}
+      className="shrink-0 rounded-full px-2 py-0.5 text-[0.66rem] font-semibold text-critical transition active:scale-95 disabled:opacity-60"
+    >
+      {submitting ? "…" : error ? "Retry" : "Remove"}
+    </button>
+  );
+}
+
 export function VendorCard({
   expense,
   onRecordPayment,
+  onEditPayment,
+  onRemovePayment,
   onEdit,
   onDelete,
 }: {
   expense: VendorExpense;
   onRecordPayment?: () => void;
+  /** Opens the payment sheet pre-filled to correct a payment entered wrong. */
+  onEditPayment?: (payment: VendorPayment) => void;
+  onRemovePayment?: (paymentId: string) => Promise<void>;
   onEdit?: () => void;
   onDelete?: () => Promise<void>;
 }) {
@@ -70,14 +93,29 @@ export function VendorCard({
           {history.map((p) => (
             <div
               key={p.id}
-              className="flex items-center justify-between text-[0.72rem] text-ink-faint"
+              className="flex items-center gap-2 text-[0.72rem] text-ink-faint"
             >
-              <span>
-                {formatShortDate(p.paymentDate)} · {paymentModeLabels[p.mode]} · paid by{" "}
-                <span className="font-semibold text-ink-soft">{memberName(p.memberId)}</span>
-                {p.selfFunded && " · self-funded"}
-              </span>
+              {onEditPayment ? (
+                <button
+                  type="button"
+                  onClick={() => onEditPayment(p)}
+                  className="min-w-0 flex-1 text-left transition active:opacity-70"
+                >
+                  {formatShortDate(p.paymentDate)} · {paymentModeLabels[p.mode]} · paid by{" "}
+                  <span className="font-semibold text-ink-soft">{memberName(p.memberId)}</span>
+                  {p.selfFunded && " · self-funded"}
+                </button>
+              ) : (
+                <span className="min-w-0 flex-1">
+                  {formatShortDate(p.paymentDate)} · {paymentModeLabels[p.mode]} · paid by{" "}
+                  <span className="font-semibold text-ink-soft">{memberName(p.memberId)}</span>
+                  {p.selfFunded && " · self-funded"}
+                </span>
+              )}
               <span className="shrink-0 tabular-nums text-ink-soft">{formatINR(p.amount)}</span>
+              {onRemovePayment && (
+                <RemovePaymentButton onRemove={() => onRemovePayment(p.id)} />
+              )}
             </div>
           ))}
         </div>

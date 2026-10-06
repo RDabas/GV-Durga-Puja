@@ -19,6 +19,7 @@ import {
   dbAddVendorExpense,
   dbAddVendorPayment,
   dbDeleteVendorExpense,
+  dbDeleteVendorPayment,
   dbLogActivity,
   dbRemoveCarriedFund,
   dbRemoveFundTransfer,
@@ -36,6 +37,7 @@ import {
   dbStartYear,
   dbUpdateMember,
   dbUpdateVendorExpense,
+  dbUpdateVendorPayment,
   dbUpdateYear,
   fetchAllWithRetry,
   type LiveData,
@@ -225,6 +227,9 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   addVendorExpense: (input: VendorExpenseInput) => Promise<void>;
   updateVendorExpense: (expenseId: string, input: VendorExpenseInput) => Promise<void>;
   addVendorPayment: (expenseId: string, input: PaymentInput) => Promise<void>;
+  /** Corrects a vendor payment entered wrong — amount, mode, date, who paid, etc. */
+  updateVendorPayment: (expenseId: string, paymentId: string, input: PaymentInput) => Promise<void>;
+  deleteVendorPayment: (expenseId: string, paymentId: string) => Promise<void>;
   deleteVendorExpense: (expenseId: string) => Promise<void>;
   reload: () => Promise<void>;
 }
@@ -612,6 +617,27 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await logActivity(
           "vendor_payment.add",
           `paid ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"}${input.selfFunded ? " (self-funded)" : ""} (by ${memberName(input.memberId)})`,
+          expense?.yearId,
+        );
+        await load();
+      },
+      updateVendorPayment: async (expenseId, paymentId, input) => {
+        const expense = data.vendorExpenses.find((e) => e.id === expenseId);
+        await dbUpdateVendorPayment(supabase, paymentId, input);
+        await logActivity(
+          "vendor_payment.update",
+          `corrected a payment of ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"} (by ${memberName(input.memberId)})`,
+          expense?.yearId,
+        );
+        await load();
+      },
+      deleteVendorPayment: async (expenseId, paymentId) => {
+        const expense = data.vendorExpenses.find((e) => e.id === expenseId);
+        const payment = expense?.payments.find((p) => p.id === paymentId);
+        await dbDeleteVendorPayment(supabase, paymentId);
+        await logActivity(
+          "vendor_payment.delete",
+          `removed a payment of ${formatINR(payment?.amount ?? 0)} to vendor ${expense?.vendor.name ?? "?"}`,
           expense?.yearId,
         );
         await load();

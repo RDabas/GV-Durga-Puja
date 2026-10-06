@@ -18,9 +18,11 @@ import type { PaymentInput } from "@/lib/store";
 import type { PaymentMode } from "@/lib/types";
 
 /**
- * Sponsor money in and vendor money out record the same fields — including
- * which committee member's hand it passed through, so it moves their balance
- * in hand the same way a resident contribution or fund transfer does.
+ * Vendor money out (and, previously, sponsor money in) records the same
+ * fields — including which committee member's hand it passed through, so it
+ * moves their balance in hand the same way a resident contribution or fund
+ * transfer does. Also used to correct a payment entered wrong: pass
+ * `payment` to pre-fill and edit it in place instead of recording a new one.
  */
 export function PaymentSheet({
   open,
@@ -28,6 +30,7 @@ export function PaymentSheet({
   subtitle,
   memberLabel,
   allowSelfFunded,
+  payment,
   onSubmit,
   onClose,
 }: {
@@ -38,16 +41,18 @@ export function PaymentSheet({
   memberLabel: string;
   /** Vendor payments only — a committee member who is also a resident can pay a bill straight out of their own pocket. */
   allowSelfFunded?: boolean;
+  /** Present to edit an existing payment in place; absent to record a new one. */
+  payment?: PaymentInput;
   onSubmit: (input: PaymentInput) => Promise<void>;
   onClose: () => void;
 }) {
   const { members } = usePujaData();
-  const [amount, setAmount] = useState(0);
-  const [mode, setMode] = useState<PaymentMode>("upi");
-  const [memberId, setMemberId] = useState(members[0]?.id ?? "");
-  const [paymentDate, setPaymentDate] = useState(today());
-  const [note, setNote] = useState("");
-  const [selfFunded, setSelfFunded] = useState(false);
+  const [amount, setAmount] = useState(payment?.amount ?? 0);
+  const [mode, setMode] = useState<PaymentMode>(payment?.mode ?? "upi");
+  const [memberId, setMemberId] = useState(payment?.memberId ?? members[0]?.id ?? "");
+  const [paymentDate, setPaymentDate] = useState(payment?.paymentDate ?? today());
+  const [note, setNote] = useState(payment?.note ?? "");
+  const [selfFunded, setSelfFunded] = useState(payment?.selfFunded ?? false);
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
@@ -123,7 +128,9 @@ export function PaymentSheet({
         )}
 
         <FormError message={error} />
-        <SubmitButton disabled={submitting} submitting={submitting}>Record payment</SubmitButton>
+        <SubmitButton disabled={submitting} submitting={submitting}>
+          {payment ? "Save" : "Record payment"}
+        </SubmitButton>
       </form>
     </Sheet>
   );
