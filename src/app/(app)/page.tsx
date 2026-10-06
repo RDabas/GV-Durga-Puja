@@ -7,7 +7,7 @@ import { Pill, pillLabels } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
 import { CoinsIcon, SponsorsIcon, VendorsIcon } from "@/components/icons";
 import { knownBlocks } from "@/lib/directory";
-import { formatINR, pledgeProgressLabel } from "@/lib/format";
+import { formatINR, pledgeProgressLabel, promisedContribution } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
 import type {
   Block,
@@ -157,7 +157,7 @@ export default function DashboardPage() {
   }, 0);
   const outsideCollectionPromised = activeOutsideCollections.reduce((sum, entry) => {
     const c = contributionFor({ outsideCollectionId: entry.id });
-    return sum + (c && c.status === "promised" ? c.moneyAmount : 0);
+    return sum + (c ? promisedContribution(c.status, c.moneyAmount, c.originalPledgeAmount) : 0);
   }, 0);
   const outsideCollectionTotal = outsideCollectionReceived + outsideCollectionPromised;
   const outsideCollectionPaidCount = activeOutsideCollections.filter(
@@ -287,9 +287,14 @@ export default function DashboardPage() {
   const paidAmount = moneyEntries
     .filter((e) => e.status === "paid" || e.status === "partial")
     .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
-  const promisedAmount = moneyEntries
-    .filter((e) => e.status === "promised")
-    .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0), 0);
+  const promisedAmount = moneyEntries.reduce(
+    (sum, e) =>
+      sum +
+      (e.contribution
+        ? promisedContribution(e.status, e.contribution.moneyAmount, e.contribution.originalPledgeAmount)
+        : 0),
+    0,
+  );
   const totalExpected = paidAmount + promisedAmount;
   // Always every real flat in the block/society — this is a physical count,
   // not a count of "independent things to visit", so it never shrinks.

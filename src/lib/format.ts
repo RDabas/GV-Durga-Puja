@@ -25,6 +25,26 @@ export function pledgeProgressLabel(
     : `${formatINR(moneyAmount)} remaining of ${formatINR(originalPledgeAmount)}`;
 }
 
+/**
+ * How much of a contribution should count toward a "Promised" aggregate —
+ * the full moneyAmount for status "promised" (which already represents
+ * what's still pending), or the remaining gap for a "partial" payment that
+ * has a bigger original pledge on record. Anything else (paid, partial with
+ * no recorded pledge, not yet visited, etc.) contributes nothing, since
+ * there's no known further amount expected.
+ */
+export function promisedContribution(
+  status: ContributionStatus,
+  moneyAmount: number,
+  originalPledgeAmount: number | undefined,
+): number {
+  if (status === "promised") return moneyAmount;
+  if (status === "partial" && originalPledgeAmount != null && originalPledgeAmount > moneyAmount) {
+    return originalPledgeAmount - moneyAmount;
+  }
+  return 0;
+}
+
 export function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
