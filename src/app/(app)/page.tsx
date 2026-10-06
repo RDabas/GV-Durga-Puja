@@ -180,6 +180,9 @@ export default function DashboardPage() {
     0,
   );
   const vendorPending = vendorExpenses.reduce((sum, e) => sum + e.totalAmount, 0) - vendorPaid;
+  const vendorFullySettledCount = vendorExpenses.filter(
+    (e) => e.payments.reduce((sum, p) => sum + p.amount, 0) >= e.totalAmount,
+  ).length;
 
   // Every flat and every owner gets an entry even with no contribution row
   // yet — "not visited" is the implicit default, same as FlatCard shows it,
@@ -616,7 +619,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
-            {vendorPending > 0 ? "Not fully settled yet" : "Fully settled"}
+            {vendorFullySettledCount} of {vendorExpenses.length} fully settled
           </div>
           {vendorTotal > 0 && <ProgressBar percent={vendorPaidPercent} />}
         </div>
