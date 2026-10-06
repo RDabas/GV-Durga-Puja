@@ -595,11 +595,28 @@ export default function DashboardPage() {
             </span>
             <span className="text-[0.72rem] font-semibold text-ink-faint">Vendor spend</span>
           </div>
-          <div className="mt-1.5 font-display text-[1.2rem] font-bold tabular-nums text-ink">
-            {formatINR(vendorPaid)}
+          <div className="mt-2.5 flex justify-between text-[0.72rem] text-ink-faint">
+            <span>
+              Paid
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(vendorPaid)}
+              </b>
+            </span>
+            <span>
+              Pending
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(vendorPending)}
+              </b>
+            </span>
+            <span>
+              Total
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(vendorTotal)}
+              </b>
+            </span>
           </div>
-          <div className="mt-0.5 text-[0.72rem] tabular-nums text-ink-soft">
-            {vendorPending > 0 ? `${formatINR(vendorPending)} pending` : "Fully settled"}
+          <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
+            {vendorPending > 0 ? "Not fully settled yet" : "Fully settled"}
           </div>
           {vendorTotal > 0 && <ProgressBar percent={vendorPaidPercent} />}
         </div>
