@@ -13,7 +13,18 @@ import { exportPujaDataToExcel } from "@/lib/export";
 import { paymentModeLabels, sortedBreakdown } from "@/lib/payment";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
-import type { PaymentMode } from "@/lib/types";
+import type { OutsideCollectionType, PaymentMode } from "@/lib/types";
+
+// Short forms of the Pill labels in components/Pill.tsx — those read fine as
+// a badge but are too long for this list's narrow flat-column slot.
+const outsideCollectionTypeShortLabels: Record<OutsideCollectionType, string> = {
+  outsider: "Outsider",
+  donation: "Donation",
+  donation_box: "Donation Box",
+  stall: "Stall",
+  dandiya_collection: "Dandiya",
+  promotion: "Promotion",
+};
 
 export default function FundsPage() {
   const store = usePujaData();
@@ -79,10 +90,17 @@ export default function FundsPage() {
             : c.exResidentId
               ? (exResident?.names.join(", ") ?? "Ex Resident")
               : (outsideCollection?.name ?? "Outside Collection");
+        const flatLabel = house
+          ? `${house.block}-${house.flatNo}`
+          : c.exResidentId
+            ? "Ex Resident"
+            : outsideCollection
+              ? outsideCollectionTypeShortLabels[outsideCollection.type]
+              : "—";
         return {
           key: c.id,
           name,
-          flatLabel: house ? `${house.block}-${house.flatNo}` : "—",
+          flatLabel,
           // Kept separate from flatLabel so flat sorting orders by real
           // block/floor/flat-number instead of the display string.
           block: house?.block ?? "",
@@ -290,7 +308,7 @@ export default function FundsPage() {
                         key={c.key}
                         className={`flex items-center gap-3 px-3 py-2 ${ci > 0 ? "border-t border-border" : ""}`}
                       >
-                        <span className="w-14 shrink-0 text-[0.7rem] font-semibold text-ink-soft">
+                        <span className="w-16 shrink-0 text-[0.7rem] leading-tight font-semibold text-ink-soft">
                           {c.flatLabel}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-[0.78rem] text-ink">
