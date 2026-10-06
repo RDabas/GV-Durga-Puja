@@ -144,6 +144,7 @@ export default function FundsPage() {
             i,
           ) => {
             const carried = carriedCash + carriedFd + carriedBank;
+            const totalReceived = collected + outsideCollectionReceived;
             const expandedMode = expanded?.memberId === member.id ? expanded.mode : null;
             return (
               <div key={member.id} className={i > 0 ? "border-t border-border" : ""}>
@@ -155,15 +156,43 @@ export default function FundsPage() {
                     <div className="truncate text-[0.88rem] font-semibold text-ink">
                       {member.name}
                     </div>
-                    <div className="mt-0.5 text-[0.75rem] text-ink-faint">
-                      Collected {formatINR(collected)}
-                      {outsideCollectionReceived > 0 &&
-                        ` · outside collection ${formatINR(outsideCollectionReceived)}`}
-                      {carried > 0 && ` · carried over ${formatINR(carried)}`}
-                      {received > 0 && ` · received ${formatINR(received)}`}
-                      {handedOver > 0 && ` · handed over ${formatINR(handedOver)}`}
-                      {vendorPaid > 0 && ` · paid vendor ${formatINR(vendorPaid)}`}
+                    <div className="mt-0.5 flex items-center gap-3 text-[0.72rem] text-ink-faint">
+                      <span>
+                        Total
+                        <b className="ml-1 font-semibold tabular-nums text-ink">
+                          {formatINR(totalReceived)}
+                        </b>
+                      </span>
+                      <span>
+                        Spent
+                        <b className="ml-1 font-semibold tabular-nums text-ink">
+                          {formatINR(vendorPaid)}
+                        </b>
+                      </span>
+                      <span>
+                        Balance
+                        <b className="ml-1 font-semibold tabular-nums text-ink">
+                          {formatINR(balanceInHand)}
+                        </b>
+                      </span>
                     </div>
+                    {(collected > 0 || outsideCollectionReceived > 0) && (
+                      <div className="mt-0.5 text-[0.68rem] text-ink-faint">
+                        {collected > 0 && `from houses ${formatINR(collected)}`}
+                        {collected > 0 && outsideCollectionReceived > 0 && " · "}
+                        {outsideCollectionReceived > 0 &&
+                          `from outside ${formatINR(outsideCollectionReceived)}`}
+                      </div>
+                    )}
+                    {(carried > 0 || received > 0 || handedOver > 0) && (
+                      <div className="mt-0.5 text-[0.68rem] text-ink-faint">
+                        {carried > 0 && `carried over ${formatINR(carried)}`}
+                        {carried > 0 && (received > 0 || handedOver > 0) && " · "}
+                        {received > 0 && `received ${formatINR(received)}`}
+                        {received > 0 && handedOver > 0 && " · "}
+                        {handedOver > 0 && `handed over ${formatINR(handedOver)}`}
+                      </div>
+                    )}
                     {sortedBreakdown(collectedByMode).length > 0 && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {sortedBreakdown(collectedByMode).map(([mode, amount]) => (
