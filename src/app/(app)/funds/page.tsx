@@ -26,6 +26,8 @@ export default function FundsPage() {
     houses,
     owners,
     ownerPrimaryHouse,
+    exResidents,
+    outsideCollections,
   } = store;
   const [managingMembers, setManagingMembers] = useState(false);
   const [managingCarriedFunds, setManagingCarriedFunds] = useState(false);
@@ -64,9 +66,22 @@ export default function FundsPage() {
           ? houses.find((h) => h.id === c.houseId)
           : (c.ownerId ? ownerPrimaryHouse(c.ownerId) : undefined);
         const owner = c.ownerId ? owners.find((o) => o.id === c.ownerId) : undefined;
+        const exResident = c.exResidentId
+          ? exResidents.find((r) => r.id === c.exResidentId)
+          : undefined;
+        const outsideCollection = c.outsideCollectionId
+          ? outsideCollections.find((r) => r.id === c.outsideCollectionId)
+          : undefined;
+        const name = c.houseId
+          ? house?.tenantNames.join(", ") || "Tenant"
+          : c.ownerId
+            ? (owner?.names.join(", ") ?? "Owner")
+            : c.exResidentId
+              ? (exResident?.names.join(", ") ?? "Ex Resident")
+              : (outsideCollection?.name ?? "Outside Collection");
         return {
           key: c.id,
-          name: c.houseId ? house?.tenantNames.join(", ") || "Tenant" : (owner?.names.join(", ") ?? "Owner"),
+          name,
           flatLabel: house ? `${house.block}-${house.flatNo}` : "—",
           // Kept separate from flatLabel so flat sorting orders by real
           // block/floor/flat-number instead of the display string.
