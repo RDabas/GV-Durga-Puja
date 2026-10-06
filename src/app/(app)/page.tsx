@@ -155,6 +155,11 @@ export default function DashboardPage() {
     const c = contributionFor({ outsideCollectionId: entry.id });
     return sum + (c && (c.status === "paid" || c.status === "partial") ? c.moneyAmount : 0);
   }, 0);
+  const outsideCollectionPromised = activeOutsideCollections.reduce((sum, entry) => {
+    const c = contributionFor({ outsideCollectionId: entry.id });
+    return sum + (c && c.status === "promised" ? c.moneyAmount : 0);
+  }, 0);
+  const outsideCollectionTotal = outsideCollectionReceived + outsideCollectionPromised;
   // Biggest amount first — the types that actually brought in money lead,
   // rather than sorting by however entries happen to be added.
   const outsideCollectionReceivedByType = useMemo(() => {
@@ -529,17 +534,34 @@ export default function DashboardPage() {
             </>
           )}
         </div>
-        <div className="rounded-2xl border border-r-[3px] border-gold/30 border-r-gold bg-surface p-3.5 shadow-[var(--shadow-card)]">
+        <div className="col-span-2 rounded-2xl border border-r-[3px] border-gold/30 border-r-gold bg-surface p-3.5 shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-1.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-gold-tint text-gold">
               <SponsorsIcon className="h-[13px] w-[13px]" />
             </span>
             <span className="text-[0.72rem] font-semibold text-ink-faint">Outside Collection</span>
           </div>
-          <div className="mt-1.5 font-display text-[1.2rem] font-bold tabular-nums text-ink">
-            {formatINR(outsideCollectionReceived)}
+          <div className="mt-2.5 flex justify-between text-[0.72rem] text-ink-faint">
+            <span>
+              Paid
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(outsideCollectionReceived)}
+              </b>
+            </span>
+            <span>
+              Promised
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(outsideCollectionPromised)}
+              </b>
+            </span>
+            <span>
+              Total
+              <b className="mt-0.5 block text-[1.05rem] font-bold tabular-nums text-ink">
+                {formatINR(outsideCollectionTotal)}
+              </b>
+            </span>
           </div>
-          <div className="mt-0.5 text-[0.72rem] text-ink-soft">
+          <div className="mt-2.5 text-[0.72rem] text-ink-soft">
             {activeOutsideCollections.length} confirmed
           </div>
           {outsideCollectionReceivedByType.length > 0 && (
@@ -551,7 +573,7 @@ export default function DashboardPage() {
           )}
         </div>
         <div
-          className={`rounded-2xl border border-r-[3px] bg-surface p-3.5 shadow-[var(--shadow-card)] ${
+          className={`col-span-2 rounded-2xl border border-r-[3px] bg-surface p-3.5 shadow-[var(--shadow-card)] ${
             vendorPending > 0 ? "border-warning/30 border-r-warning" : "border-success/30 border-r-success"
           }`}
         >
