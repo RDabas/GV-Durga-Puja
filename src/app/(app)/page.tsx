@@ -160,6 +160,9 @@ export default function DashboardPage() {
     return sum + (c && c.status === "promised" ? c.moneyAmount : 0);
   }, 0);
   const outsideCollectionTotal = outsideCollectionReceived + outsideCollectionPromised;
+  const outsideCollectionPaidCount = activeOutsideCollections.filter(
+    (entry) => contributionFor({ outsideCollectionId: entry.id })?.status === "paid",
+  ).length;
   // Biggest amount first — the types that actually brought in money lead,
   // rather than sorting by however entries happen to be added.
   const outsideCollectionReceivedByType = useMemo(() => {
@@ -561,8 +564,8 @@ export default function DashboardPage() {
               </b>
             </span>
           </div>
-          <div className="mt-2.5 text-[0.72rem] text-ink-soft">
-            {activeOutsideCollections.length} confirmed
+          <div className="mt-2.5 text-[0.72rem] tabular-nums text-ink-soft">
+            {outsideCollectionPaidCount} of {activeOutsideCollections.length} paid
           </div>
           {outsideCollectionReceivedByType.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
