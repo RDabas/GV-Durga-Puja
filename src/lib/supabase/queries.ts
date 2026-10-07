@@ -313,6 +313,27 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
 }
 
 /**
+ * A row-level-security `using` clause that excludes a row makes update()
+ * match zero rows — Postgres and PostgREST both treat that as a perfectly
+ * successful update of nothing, so `error` stays null and the save silently
+ * does not happen. Every single-row update below asks for the row back
+ * (`.select("id")`) and passes its result through here, so a blocked or
+ * otherwise no-op edit throws a visible error instead of looking like it
+ * worked while the data never changed underneath it.
+ */
+function assertUpdated(
+  result: { data: { id: string }[] | null; error: { message: string } | null },
+  label: string,
+): void {
+  if (result.error) throw new Error(`${label}: ${result.error.message}`);
+  if (!result.data || result.data.length === 0) {
+    throw new Error(
+      `${label}: nothing was updated — you may not have permission to edit this, or it was removed. Try reloading.`,
+    );
+  }
+}
+
+/**
  * All years' data is fetched at once (this is a small committee dataset —
  * dozens to low hundreds of rows even across several years) so switching
  * which year you're viewing, and comparing to last year, needs no round trip.
@@ -417,11 +438,12 @@ export async function dbSaveTenants(
   names: string[],
   phone?: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const result = await supabase
     .from("houses")
     .update({ tenant_names: names, tenant_phone: phone ?? null })
-    .eq("id", houseId);
-  if (error) throw new Error(error.message);
+    .eq("id", houseId)
+    .select("id");
+  assertUpdated(result, "save tenants");
 }
 
 /** Toggles whether a flat's tenant counts toward this year's money totals and follow-up lists — their record and history stay intact either way. */
@@ -430,11 +452,12 @@ export async function dbSetTenantDisabled(
   houseId: string,
   disabled: boolean,
 ): Promise<void> {
-  const { error } = await supabase
+  const result = await supabase
     .from("houses")
     .update({ tenant_disabled: disabled })
-    .eq("id", houseId);
-  if (error) throw new Error(error.message);
+    .eq("id", houseId)
+    .select("id");
+  assertUpdated(result, "toggle tenant disabled");
 }
 
 /** Links (or unlinks, when targetHouseId is null) this flat's owner accounting to another flat — see House.paidViaHouseId. */
@@ -443,11 +466,12 @@ export async function dbSetPaidViaHouse(
   houseId: string,
   targetHouseId: string | null,
 ): Promise<void> {
-  const { error } = await supabase
+  const result = await supabase
     .from("houses")
     .update({ paid_via_house_id: targetHouseId })
-    .eq("id", houseId);
-  if (error) throw new Error(error.message);
+    .eq("id", houseId)
+    .select("id");
+  assertUpdated(result, "link paid-via flat");
 }
 
 /** Renames an owner in place, or creates one and attaches it to the flat. Returns the owner id. */
@@ -459,11 +483,12 @@ export async function dbSaveOwner(
   phone?: string,
 ): Promise<string> {
   if (existingOwnerId) {
-    const { error } = await supabase
+    const result = await supabase
       .from("owners")
       .update({ names, phone: phone ?? null })
-      .eq("id", existingOwnerId);
-    if (error) throw new Error(error.message);
+      .eq("id", existingOwnerId)
+      .select("id");
+    assertUpdated(result, "save owner");
     return existingOwnerId;
   }
 
@@ -474,8 +499,12 @@ export async function dbSaveOwner(
     .single();
   const owner = unwrap<OwnerRow>(inserted, "insert owner");
 
-  const { error } = await supabase.from("houses").update({ owner_id: owner.id }).eq("id", houseId);
-  if (error) throw new Error(error.message);
+  const result = await supabase
+    .from("houses")
+    .update({ owner_id: owner.id })
+    .eq("id", houseId)
+    .select("id");
+  assertUpdated(result, "link owner to flat");
   return owner.id;
 }
 
@@ -485,8 +514,8 @@ export async function dbSetOwnerDisabled(
   ownerId: string,
   disabled: boolean,
 ): Promise<void> {
-  const { error } = await supabase.from("owners").update({ disabled }).eq("id", ownerId);
-  if (error) throw new Error(error.message);
+  const result = await supabase.from("owners").update({ disabled }).eq("id", ownerId).select("id");
+  assertUpdated(result, "toggle owner disabled");
 }
 
 /** Renames an ex-resident in place, or creates one — not tied to any flat/house. Returns the ex-resident id. */
@@ -497,11 +526,12 @@ export async function dbSaveExResident(
   phone?: string,
 ): Promise<string> {
   if (existingId) {
-    const { error } = await supabase
+    const result = await supabase
       .from("ex_residents")
       .update({ names, phone: phone ?? null })
-      .eq("id", existingId);
-    if (error) throw new Error(error.message);
+      .eq("id", existingId)
+      .select("id");
+    assertUpdated(result, "save ex-resident");
     return existingId;
   }
 
@@ -519,8 +549,12 @@ export async function dbSetExResidentDisabled(
   exResidentId: string,
   disabled: boolean,
 ): Promise<void> {
-  const { error } = await supabase.from("ex_residents").update({ disabled }).eq("id", exResidentId);
-  if (error) throw new Error(error.message);
+  const result = await supabase
+    .from("ex_residents")
+    .update({ disabled })
+    .eq("id", exResidentId)
+    .select("id");
+  assertUpdated(result, "toggle ex-resident disabled");
 }
 
 /** Renames an outside-collection entry in place, or creates one — not tied to any flat/house. Returns its id. */
@@ -532,11 +566,12 @@ export async function dbSaveOutsideCollection(
   stallDetails?: string,
 ): Promise<string> {
   if (existingId) {
-    const { error } = await supabase
+    const result = await supabase
       .from("outside_collections")
       .update({ name, type, stall_details: stallDetails ?? null })
-      .eq("id", existingId);
-    if (error) throw new Error(error.message);
+      .eq("id", existingId)
+      .select("id");
+    assertUpdated(result, "save outside collection");
     return existingId;
   }
 
@@ -554,11 +589,12 @@ export async function dbSetOutsideCollectionDisabled(
   outsideCollectionId: string,
   disabled: boolean,
 ): Promise<void> {
-  const { error } = await supabase
+  const result = await supabase
     .from("outside_collections")
     .update({ disabled })
-    .eq("id", outsideCollectionId);
-  if (error) throw new Error(error.message);
+    .eq("id", outsideCollectionId)
+    .select("id");
+  assertUpdated(result, "toggle outside collection disabled");
 }
 
 export async function dbAddMember(
@@ -576,11 +612,12 @@ export async function dbUpdateMember(
   memberId: string,
   input: { name: string; phone?: string; role: CommitteeMember["role"] },
 ): Promise<void> {
-  const { error } = await supabase
+  const result = await supabase
     .from("committee_members")
     .update({ name: input.name, phone: input.phone ?? null, role: input.role })
-    .eq("id", memberId);
-  if (error) throw new Error(error.message);
+    .eq("id", memberId)
+    .select("id");
+  assertUpdated(result, "update member");
 }
 
 /** The DB's own foreign keys reject this if the member is still referenced anywhere. */
@@ -688,9 +725,16 @@ export async function dbSaveContribution(
     follow_up_note: input.followUpNote ?? null,
   };
 
-  const { error } = existingId
-    ? await supabase.from("contributions").update(row).eq("id", existingId)
-    : await supabase.from("contributions").insert(row);
+  if (existingId) {
+    const result = await supabase
+      .from("contributions")
+      .update(row)
+      .eq("id", existingId)
+      .select("id");
+    assertUpdated(result, "save contribution");
+    return;
+  }
+  const { error } = await supabase.from("contributions").insert(row);
   if (error) throw new Error(error.message);
 }
 
@@ -738,14 +782,16 @@ export async function dbUpdateVendorExpense(
       service_type: input.serviceType,
       phone: input.phone ?? null,
     })
-    .eq("id", vendorId);
-  if (vendorUpdate.error) throw new Error(vendorUpdate.error.message);
+    .eq("id", vendorId)
+    .select("id");
+  assertUpdated(vendorUpdate, "update vendor");
 
   const expenseUpdate = await supabase
     .from("vendor_expenses")
     .update({ total_amount: input.totalAmount, notes: input.notes ?? null })
-    .eq("id", expenseId);
-  if (expenseUpdate.error) throw new Error(expenseUpdate.error.message);
+    .eq("id", expenseId)
+    .select("id");
+  assertUpdated(expenseUpdate, "update vendor bill");
 }
 
 /**
@@ -784,7 +830,7 @@ export async function dbUpdateVendorPayment(
   paymentId: string,
   input: PaymentWrite,
 ): Promise<void> {
-  const { error } = await supabase
+  const result = await supabase
     .from("vendor_payments")
     .update({
       member_id: input.memberId,
@@ -794,8 +840,9 @@ export async function dbUpdateVendorPayment(
       note: input.note ?? null,
       self_funded: input.selfFunded ?? false,
     })
-    .eq("id", paymentId);
-  if (error) throw new Error(error.message);
+    .eq("id", paymentId)
+    .select("id");
+  assertUpdated(result, "update vendor payment");
 }
 
 export async function dbDeleteVendorPayment(
@@ -839,8 +886,8 @@ export async function dbUpdateYear(
   if (patch.shashthiDate !== undefined) row.shashthi_date = patch.shashthiDate;
   if (patch.dashamiDate !== undefined) row.dashami_date = patch.dashamiDate;
 
-  const { error } = await supabase.from("puja_years").update(row).eq("id", yearId);
-  if (error) throw new Error(error.message);
+  const result = await supabase.from("puja_years").update(row).eq("id", yearId).select("id");
+  assertUpdated(result, "update puja year");
 }
 
 /**

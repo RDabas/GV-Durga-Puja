@@ -326,11 +326,13 @@ create policy "committee can read contributions" on contributions
   for select using (is_committee_member());
 create policy "committee can add contributions" on contributions
   for insert with check (is_committee_member());
-create policy "collectors update own contributions, admins update all" on contributions
-  for update using (
-    is_committee_admin()
-    or collector_id = (select id from committee_members where auth_user_id = auth.uid())
-  );
+-- Any committee member can correct any contribution (e.g. Adarsh recorded a
+-- flat but Hirdesh is the one who later fixes the amount) — restricting
+-- updates to "only the original collector" silently blocked every non-admin
+-- collector from editing someone else's entry, since a filtered-out update
+-- in Postgres matches zero rows with no error, not a rejected one.
+create policy "committee can update contributions" on contributions
+  for update using (is_committee_member());
 create policy "admins delete contributions" on contributions
   for delete using (is_committee_admin());
 
