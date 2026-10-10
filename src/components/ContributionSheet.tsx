@@ -117,6 +117,18 @@ export function ContributionSheet({
   const bhogChecked = bhogOnlyStatus || hasBhog;
   const needsFollowUp =
     !isPaidVia && (status === "not_home" || status === "not_visited" || status === "pending");
+
+  // Moving from Promised to Partial — the figure in the single "Promised"
+  // field was never a received amount, so it becomes the pledge total and
+  // "Amount received" starts fresh at 0, rather than silently carrying the
+  // promised figure over as if it had already been paid.
+  function handleStatusChoiceChange(next: StatusChoice) {
+    if (status === "promised" && next === "partial") {
+      setOriginalPledgeAmount(moneyAmount);
+      setMoneyAmount(0);
+    }
+    setStatusChoice(next);
+  }
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
@@ -204,7 +216,11 @@ export function ContributionSheet({
         </Field>
 
         <Field label="Status">
-          <OptionGroup value={statusChoice} onChange={setStatusChoice} options={statusChoiceOptions} />
+          <OptionGroup
+            value={statusChoice}
+            onChange={handleStatusChoiceChange}
+            options={statusChoiceOptions}
+          />
         </Field>
 
         {isPaidVia && (

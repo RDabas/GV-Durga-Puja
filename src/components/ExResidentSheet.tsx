@@ -75,6 +75,18 @@ export function ExResidentSheet({
   const needsFollowUp = status === "not_home" || status === "not_visited" || status === "pending";
   const { submitting, error, run } = useAsyncAction();
 
+  // Moving from Promised to Partial — the figure in the single "Promised"
+  // field was never a received amount, so it becomes the pledge total and
+  // "Amount received" starts fresh at 0, rather than silently carrying the
+  // promised figure over as if it had already been paid.
+  function handleStatusChange(next: ContributionStatus) {
+    if (status === "promised" && next === "partial") {
+      setOriginalPledgeAmount(moneyAmount);
+      setMoneyAmount(0);
+    }
+    setStatus(next);
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
@@ -136,7 +148,7 @@ export function ExResidentSheet({
         </Field>
 
         <Field label="Status">
-          <OptionGroup value={status} onChange={setStatus} options={statusOptions} />
+          <OptionGroup value={status} onChange={handleStatusChange} options={statusOptions} />
         </Field>
 
         {(received || promised) && (
