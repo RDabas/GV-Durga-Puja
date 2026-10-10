@@ -59,14 +59,10 @@ export function amountFieldLabel(status: ContributionStatus, originalPledgeAmoun
 export const bhogOnlyHint =
   "If they're giving only Bhog / groceries, no money at all, use the \"Bhog Only\" status above instead.";
 
-export function originalPledgeFieldLabel(status: ContributionStatus): string {
-  return status === "promised"
-    ? "Originally promised, if higher (optional)"
-    : "Total amount promised, if more than what's paid (optional)";
-}
+// Only ever shown for "partial" — a "promised" entry no longer tracks a
+// separate original-pledge figure, since the main amount field already is
+// the full promised amount.
+export const originalPledgeFieldLabel = "Total amount promised, if more than what's paid (optional)";
 
-export function originalPledgeHelpText(status: ContributionStatus): string {
-  return status === "promised"
-    ? "Fill this in only if part of the promise was already covered another way (e.g. they paid a vendor bill directly) — then “Amount remaining” above becomes what’s still pending. Leave at 0 for a plain promise."
-    : "Fill this in if what's been paid is only part of a bigger promise — the card will then show what's still pending. Leave at 0 if there's no larger promise behind this payment.";
-}
+export const originalPledgeHelpText =
+  "Fill this in if what's been paid is only part of a bigger promise — the card will then show what's still pending. Leave at 0 if there's no larger promise behind this payment.";

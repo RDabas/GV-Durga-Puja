@@ -104,9 +104,7 @@ export function ExResidentSheet({
             needsFollowUp && assignedTo === "other" ? assignedToName.trim() || undefined : undefined,
           moneyAmount: finalMoneyAmount,
           originalPledgeAmount:
-            (promised || partial) && originalPledgeAmount > moneyAmount
-              ? originalPledgeAmount
-              : undefined,
+            partial && originalPledgeAmount > moneyAmount ? originalPledgeAmount : undefined,
           bhogGroceryAmount: finalBhogAmount,
           contributionKind:
             finalMoneyAmount > 0 && bhogChecked ? "both" : bhogChecked ? "bhog_grocery" : "money",
@@ -148,10 +146,10 @@ export function ExResidentSheet({
           </Field>
         )}
 
-        {(promised || partial) && (
-          <Field label={originalPledgeFieldLabel(status)}>
+        {partial && (
+          <Field label={originalPledgeFieldLabel}>
             <AmountInput value={originalPledgeAmount} onChange={setOriginalPledgeAmount} />
-            <p className="mt-1.5 text-[0.72rem] text-ink-faint">{originalPledgeHelpText(status)}</p>
+            <p className="mt-1.5 text-[0.72rem] text-ink-faint">{originalPledgeHelpText}</p>
           </Field>
         )}
 
