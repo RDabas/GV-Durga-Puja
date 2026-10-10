@@ -15,6 +15,7 @@ import { useAsyncAction } from "@/lib/useAsyncAction";
 import { today } from "@/lib/format";
 import {
   amountFieldLabel,
+  bhogOnlyHint,
   followUpNoteLabel,
   followUpNotePlaceholder,
   modeOptions,
@@ -174,6 +175,7 @@ export function OutsideCollectionSheet({
         {(received || promised) && (
           <Field label={amountFieldLabel(status, originalPledgeAmount)}>
             <AmountInput value={moneyAmount} onChange={setMoneyAmount} autoFocus={received} />
+            <p className="mt-1.5 text-[0.72rem] text-ink-faint">{bhogOnlyHint}</p>
           </Field>
         )}
 

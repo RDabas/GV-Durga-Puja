@@ -230,7 +230,9 @@ export function PayerRow({
                 ? formatINR(contribution.originalPledgeAmount)
                 : contribution && contribution.moneyAmount > 0
                   ? formatINR(contribution.moneyAmount)
-                  : "—"}
+                  : contribution && contribution.bhogGroceryAmount > 0
+                    ? formatINR(contribution.bhogGroceryAmount)
+                    : "—"}
             </span>
             {contribution?.originalPledgeAmount != null && (
               <span className="mt-0.5 block whitespace-nowrap text-[0.7rem] font-semibold tabular-nums text-gold">

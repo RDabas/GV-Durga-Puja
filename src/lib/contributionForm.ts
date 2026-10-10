@@ -54,6 +54,10 @@ export function amountFieldLabel(status: ContributionStatus, originalPledgeAmoun
   return originalPledgeAmount > 0 ? "Amount remaining" : "Amount promised";
 }
 
+/** Shown under the money-amount field so "they only gave Bhog, no money" has an obvious path — leave this at 0 and use the Bhog option below instead of forcing a status that doesn't fit. */
+export const bhogOnlyHint =
+  "Leave at 0 if they're giving only Bhog / groceries, no money — use the Bhog option below for that.";
+
 export function originalPledgeFieldLabel(status: ContributionStatus): string {
   return status === "promised"
     ? "Originally promised, if higher (optional)"
