@@ -8,14 +8,16 @@ import { statusRank } from "@/components/FlatCard";
 import { usePujaData } from "@/lib/store";
 import type { Contribution, OutsideCollection } from "@/lib/types";
 
-/** Current-year figure for an entry — same paid/partial/promised convention used elsewhere. */
+/** Current-year figure for an entry — same paid/partial/promised convention used elsewhere, plus any Bhog/groceries value regardless of money status. */
 function amountFor(contribution: Contribution | undefined): number {
   if (!contribution) return 0;
-  return contribution.status === "paid" ||
+  const money =
+    contribution.status === "paid" ||
     contribution.status === "partial" ||
     contribution.status === "promised"
-    ? contribution.moneyAmount
-    : 0;
+      ? contribution.moneyAmount
+      : 0;
+  return money + contribution.bhogGroceryAmount;
 }
 
 export default function OutsideCollectionPage() {

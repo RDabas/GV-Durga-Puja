@@ -40,6 +40,7 @@ const defaultFollowUpStatuses: ContributionStatus[] = ["pending", "not_home"];
 const followUpAvatarTone: Record<ContributionStatus, string> = {
   paid: "bg-success text-surface",
   partial: "bg-warning text-surface",
+  bhog_only: "bg-info text-surface",
   promised: "bg-gold text-surface",
   pending: "bg-brand text-surface",
   not_home: "bg-critical text-surface",
@@ -81,7 +82,9 @@ function isExResidentFollowUp(e: FollowUpEntry): e is Extract<FollowUpEntry, { k
 function thisYearAmountFor(entry: FollowUpEntry): number {
   const c = entry.contribution;
   if (!c) return 0;
-  return c.status === "paid" || c.status === "partial" || c.status === "promised" ? c.moneyAmount : 0;
+  const money =
+    c.status === "paid" || c.status === "partial" || c.status === "promised" ? c.moneyAmount : 0;
+  return money + c.bhogGroceryAmount;
 }
 
 /**
@@ -125,6 +128,8 @@ function followUpDescription(
         .join(" · ");
     case "partial":
       return `Partial — ${formatINR(contribution?.moneyAmount ?? 0)} so far`;
+    case "bhog_only":
+      return `Bhog / groceries only — ${formatINR(contribution?.bhogGroceryAmount ?? 0)}`;
     case "wont_pay":
       return contribution?.followUpNote ?? "Won't pay — no need to follow up";
     default:
@@ -152,6 +157,11 @@ export default function DashboardPage() {
   const [blockFilter, setBlockFilter] = useState<MoneyGroup | "all">("all");
   const [statusFilters, setStatusFilters] = useState<ContributionStatus[]>(defaultFollowUpStatuses);
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  // Independent of statusFilters — shows anyone who gave Bhog/groceries in any
+  // of the three forms (money+Bhog, Bhog-only, or a Bhog-only status),
+  // regardless of their money status, since a "Paid" entry with Bhog on it is
+  // otherwise invisible here (statusFilters never includes "paid").
+  const [bhogFilterOn, setBhogFilterOn] = useState(false);
   const [followUpSort, setFollowUpSort] = useState<{
     field: "flat" | "lastYear" | "thisYear";
     dir: "asc" | "desc";
@@ -297,7 +307,7 @@ export default function DashboardPage() {
   // actually have overall", combining resident collections with sponsor
   // money and netting off what's gone out to vendors.
   const residentPaidOverall = followUpEntries
-    .filter((e) => e.status === "paid" || e.status === "partial")
+    .filter((e) => e.status === "paid" || e.status === "partial" || e.status === "bhog_only")
     .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
   const totalCollected = residentPaidOverall + outsideCollectionReceived;
   const balance = totalCollected - vendorPaid;
@@ -311,7 +321,7 @@ export default function DashboardPage() {
       ? followUpEntries
       : followUpEntries.filter((e) => e.block === moneyBlockFilter);
   const paidAmount = moneyEntries
-    .filter((e) => e.status === "paid" || e.status === "partial")
+    .filter((e) => e.status === "paid" || e.status === "partial" || e.status === "bhog_only")
     .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
   const promisedAmount = moneyEntries.reduce(
     (sum, e) =>
@@ -429,6 +439,7 @@ export default function DashboardPage() {
   const followUps = followUpEntries.filter((e) => {
     if (blockFilter !== "all" && e.block !== blockFilter) return false;
     if (assigneeFilter !== "all" && assigneeKey(e.contribution) !== assigneeFilter) return false;
+    if (bhogFilterOn) return (e.contribution?.bhogGroceryAmount ?? 0) > 0;
     return statusFilters.includes(e.status);
   });
 
@@ -735,6 +746,20 @@ export default function DashboardPage() {
         </div>
 
         <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+          <button
+            type="button"
+            onClick={() => setBhogFilterOn((on) => !on)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold whitespace-nowrap ${
+              bhogFilterOn ? "bg-info text-white" : "border border-border bg-surface text-ink-soft"
+            }`}
+          >
+            Gave Bhog
+          </button>
+        </div>
+
+        <div
+          className={`-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5 ${bhogFilterOn ? "pointer-events-none opacity-40" : ""}`}
+        >
           <button
             type="button"
             onClick={() =>

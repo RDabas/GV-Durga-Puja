@@ -5,6 +5,7 @@ export type PaymentMode = "cash" | "upi" | "pending";
 export type ContributionStatus =
   | "paid"
   | "partial"
+  | "bhog_only"
   | "promised"
   | "pending"
   | "not_visited"

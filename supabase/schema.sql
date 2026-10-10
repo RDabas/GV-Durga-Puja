@@ -5,7 +5,7 @@ create extension if not exists "pgcrypto";
 
 create type block_letter as enum ('A', 'B', 'C', 'D', 'E', 'F', 'G');
 create type payment_mode as enum ('cash', 'upi', 'pending');
-create type contribution_status as enum ('paid', 'partial', 'promised', 'pending', 'not_visited', 'not_home', 'wont_pay');
+create type contribution_status as enum ('paid', 'partial', 'bhog_only', 'promised', 'pending', 'not_visited', 'not_home', 'wont_pay');
 create type contribution_kind as enum ('money', 'bhog_grocery', 'both');
 create type outside_collection_type as enum ('outsider', 'donation', 'donation_box', 'stall', 'dandiya_collection', 'promotion');
 create type committee_role as enum ('admin', 'collector');

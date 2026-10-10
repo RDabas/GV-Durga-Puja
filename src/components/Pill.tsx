@@ -6,6 +6,7 @@ const styles = {
   // a glance instead of blending in with the other soft-tinted statuses.
   paid: "bg-success text-surface shadow-[0_1px_3px_rgba(28,143,107,0.35)]",
   partial: "bg-warning-tint text-warning",
+  bhog_only: "bg-info text-surface shadow-[0_1px_3px_rgba(59,110,168,0.35)]",
   promised: "bg-gold-tint text-gold",
   pending: "bg-brand-tint text-brand",
   not_visited: "bg-ground-alt text-ink-faint",
@@ -23,13 +24,14 @@ const styles = {
   disabled: "bg-ground-alt text-ink-faint",
 } as const;
 
-const checkTones = new Set(["paid", "paid_full"]);
+const checkTones = new Set(["paid", "paid_full", "bhog_only"]);
 
 export type PillTone = keyof typeof styles;
 
 export const pillLabels: Record<PillTone, string> = {
   paid: "Paid",
   partial: "Partial",
+  bhog_only: "Bhog Only",
   promised: "Promised",
   pending: "Pending",
   not_visited: "Not visited",

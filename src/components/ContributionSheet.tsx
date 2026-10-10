@@ -113,6 +113,8 @@ export function ContributionSheet({
   const received = status === "paid" || status === "partial";
   const promised = status === "promised";
   const partial = status === "partial";
+  const bhogOnlyStatus = status === "bhog_only";
+  const bhogChecked = bhogOnlyStatus || hasBhog;
   const needsFollowUp =
     !isPaidVia && (status === "not_home" || status === "not_visited" || status === "pending");
   const { submitting, error, run } = useAsyncAction();
@@ -152,8 +154,8 @@ export function ContributionSheet({
       if (!isOwner) await saveTenants(house.id, parsed);
 
       const finalMoneyAmount = received || promised ? moneyAmount : 0;
-      const finalBhogAmount = hasBhog ? bhogAmount : 0;
-      const handedOver = received || hasBhog;
+      const finalBhogAmount = bhogChecked ? bhogAmount : 0;
+      const handedOver = received || bhogChecked;
       await saveContribution(target, {
         collectorId: handedOver ? collectorId : undefined,
         assignedToMemberId:
@@ -237,7 +239,13 @@ export function ContributionSheet({
           </Field>
         )}
 
-        {!isPaidVia && status !== "not_visited" && (
+        {bhogOnlyStatus && (
+          <Field label="Bhog / groceries value">
+            <AmountInput value={bhogAmount} onChange={setBhogAmount} autoFocus />
+          </Field>
+        )}
+
+        {!isPaidVia && !bhogOnlyStatus && status !== "not_visited" && (
           <>
             <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
               <input
@@ -260,11 +268,13 @@ export function ContributionSheet({
           </>
         )}
 
-        {(received || hasBhog) && (
+        {(received || bhogChecked) && (
           <>
-            <Field label="Paid by">
-              <OptionGroup value={mode} onChange={setMode} options={modeOptions} />
-            </Field>
+            {received && (
+              <Field label="Paid by">
+                <OptionGroup value={mode} onChange={setMode} options={modeOptions} />
+              </Field>
+            )}
 
             <Field label="Collected by">
               <OptionGroup

@@ -8,6 +8,7 @@ import type { ContributionStatus, OutsideCollectionType } from "@/lib/types";
 const statusLabels: Record<ContributionStatus, string> = {
   paid: "Paid",
   partial: "Partial",
+  bhog_only: "Bhog Only",
   promised: "Promised",
   pending: "Pending",
   not_visited: "Not visited",

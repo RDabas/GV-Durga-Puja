@@ -70,6 +70,8 @@ export function ExResidentSheet({
   const received = status === "paid" || status === "partial";
   const promised = status === "promised";
   const partial = status === "partial";
+  const bhogOnlyStatus = status === "bhog_only";
+  const bhogChecked = bhogOnlyStatus || hasBhog;
   const needsFollowUp = status === "not_home" || status === "not_visited" || status === "pending";
   const { submitting, error, run } = useAsyncAction();
 
@@ -82,8 +84,8 @@ export function ExResidentSheet({
       .filter(Boolean);
 
     const finalMoneyAmount = received || promised ? moneyAmount : 0;
-    const finalBhogAmount = hasBhog ? bhogAmount : 0;
-    const handedOver = received || hasBhog;
+    const finalBhogAmount = bhogChecked ? bhogAmount : 0;
+    const handedOver = received || bhogChecked;
 
     run(async () => {
       if (parsed.length === 0) throw new Error("Enter at least one name");
@@ -154,7 +156,13 @@ export function ExResidentSheet({
           </Field>
         )}
 
-        {status !== "not_visited" && (
+        {bhogOnlyStatus && (
+          <Field label="Bhog / groceries value">
+            <AmountInput value={bhogAmount} onChange={setBhogAmount} autoFocus />
+          </Field>
+        )}
+
+        {!bhogOnlyStatus && status !== "not_visited" && (
           <>
             <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
               <input
@@ -177,11 +185,13 @@ export function ExResidentSheet({
           </>
         )}
 
-        {(received || hasBhog) && (
+        {(received || bhogChecked) && (
           <>
-            <Field label="Paid by">
-              <OptionGroup value={mode} onChange={setMode} options={modeOptions} />
-            </Field>
+            {received && (
+              <Field label="Paid by">
+                <OptionGroup value={mode} onChange={setMode} options={modeOptions} />
+              </Field>
+            )}
 
             <Field label="Collected by">
               <OptionGroup

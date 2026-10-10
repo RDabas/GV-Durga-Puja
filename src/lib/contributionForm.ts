@@ -10,6 +10,7 @@ import type { ContributionStatus, PaymentMode } from "@/lib/types";
 export const statusOptions: { value: ContributionStatus; label: string }[] = [
   { value: "paid", label: "Paid" },
   { value: "partial", label: "Partial" },
+  { value: "bhog_only", label: "Bhog Only" },
   { value: "promised", label: "Promised" },
   { value: "pending", label: "Pending" },
   { value: "not_home", label: "Nobody home" },
@@ -54,9 +55,9 @@ export function amountFieldLabel(status: ContributionStatus, originalPledgeAmoun
   return originalPledgeAmount > 0 ? "Amount remaining" : "Amount promised";
 }
 
-/** Shown under the money-amount field so "they only gave Bhog, no money" has an obvious path — leave this at 0 and use the Bhog option below instead of forcing a status that doesn't fit. */
+/** Shown under the money-amount field so "they only gave Bhog, no money" has an obvious path, rather than forcing an amount that doesn't apply. */
 export const bhogOnlyHint =
-  "Leave at 0 if they're giving only Bhog / groceries, no money — use the Bhog option below for that.";
+  "If they're giving only Bhog / groceries, no money at all, use the \"Bhog Only\" status above instead.";
 
 export function originalPledgeFieldLabel(status: ContributionStatus): string {
   return status === "promised"

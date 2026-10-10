@@ -21,6 +21,7 @@ function summarise(names: string[]): string {
 export const cardAccent: Record<ContributionStatus, { badge: string; border: string }> = {
   paid: { badge: "bg-success text-surface", border: "border-success/40 border-r-success" },
   partial: { badge: "bg-warning text-surface", border: "border-warning/40 border-r-warning" },
+  bhog_only: { badge: "bg-info text-surface", border: "border-info/40 border-r-info" },
   promised: { badge: "bg-gold text-surface", border: "border-gold/40 border-r-gold" },
   pending: { badge: "bg-brand text-surface", border: "border-brand/40 border-r-brand" },
   not_home: { badge: "bg-critical text-surface", border: "border-critical/40 border-r-critical" },
@@ -35,6 +36,7 @@ export const cardAccent: Record<ContributionStatus, { badge: string; border: str
 export const statusRank: ContributionStatus[] = [
   "paid",
   "partial",
+  "bhog_only",
   "promised",
   "pending",
   "not_home",
