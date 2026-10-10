@@ -202,7 +202,7 @@ export function PayerRow({
                 (contribution.contributionKind === "both" ||
                   contribution.contributionKind === "bhog_grocery") && (
                   <span className="rounded-full bg-gold-tint px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-gold">
-                    + Bhog
+                    Bhog
                     {contribution.bhogGroceryAmount > 0 && ` ${formatINR(contribution.bhogGroceryAmount)}`}
                   </span>
                 )}
