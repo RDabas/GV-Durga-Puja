@@ -105,7 +105,7 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleVerifyCode} className="mt-6 space-y-3.5">
             <p className="text-[0.82rem] text-ink-faint">
-              Enter the 6-digit code sent to <span className="font-semibold text-ink">{email}</span>.
+              Enter the code sent to <span className="font-semibold text-ink">{email}</span>.
             </p>
             <div>
               <label htmlFor="code" className="mb-1.5 block text-[0.8rem] font-semibold text-ink">
@@ -120,8 +120,8 @@ export default function LoginPage() {
                 autoFocus
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface-sunken px-3.5 py-2.5 text-center text-[1.1rem] tracking-[0.3em] text-ink outline-none focus-visible:border-brand"
-                placeholder="000000"
+                className="w-full rounded-xl border border-border bg-surface-sunken px-3.5 py-2.5 text-center text-[1.1rem] tracking-[0.2em] text-ink outline-none focus-visible:border-brand"
+                placeholder="00000000"
               />
             </div>
 
