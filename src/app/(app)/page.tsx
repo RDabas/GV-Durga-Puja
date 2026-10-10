@@ -52,6 +52,8 @@ interface FollowUpEntryBase {
   badge: string;
   name: string;
   /** Kept separate from name — a long name shouldn't be able to truncate this away. */
+  roleLabel: string;
+  /** Kept separate from name — a long name shouldn't be able to truncate this away. */
   flatInfo: string;
   block: MoneyGroup;
   status: ContributionStatus;
@@ -223,7 +225,8 @@ export default function DashboardPage() {
         kind: "flat",
         key: `owner-${owner.id}`,
         badge: `${primaryHouse.block}-${primaryHouse.flatNo}`,
-        name: `${owner.names.join(", ")} · owner`,
+        name: owner.names.join(", "),
+        roleLabel: "owner",
         flatInfo: ownerHouses.map((h) => `${h.block}-${h.flatNo}`).join(", "),
         block: primaryHouse.block,
         status: contribution?.status ?? "not_visited",
@@ -242,7 +245,8 @@ export default function DashboardPage() {
         kind: "flat",
         key: `tenant-${house.id}`,
         badge: `${house.block}-${house.flatNo}`,
-        name: `${house.tenantNames.join(", ") || "Tenant"} · tenant`,
+        name: house.tenantNames.join(", ") || "Tenant",
+        roleLabel: "tenant",
         flatInfo: `${house.block}-${house.flatNo}`,
         block: house.block,
         status: contribution?.status ?? "not_visited",
@@ -259,7 +263,8 @@ export default function DashboardPage() {
         kind: "ex_resident",
         key: `ex-${exResident.id}`,
         badge: "EX",
-        name: `${exResident.names.join(", ")} · ex-resident`,
+        name: exResident.names.join(", "),
+        roleLabel: "ex-resident",
         flatInfo: "Ex Resident",
         block: "ex_resident",
         status: contribution?.status ?? "not_visited",
@@ -847,7 +852,14 @@ export default function DashboardPage() {
                   {entry.badge}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[0.88rem] font-semibold text-ink">{entry.name}</div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="min-w-0 truncate text-[0.88rem] font-semibold text-ink">
+                      {entry.name}
+                    </span>
+                    <span className="shrink-0 text-[0.75rem] font-semibold text-ink-faint">
+                      · {entry.roleLabel}
+                    </span>
+                  </div>
                   <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
                     {followUpDescription(entry.status, entry.contribution, memberName)}
                   </div>
