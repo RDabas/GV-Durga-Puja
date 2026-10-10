@@ -68,6 +68,20 @@ type FollowUpEntry =
     })
   | (FollowUpEntryBase & { kind: "ex_resident"; block: "ex_resident"; exResident: ExResident });
 
+function isFlatFollowUp(e: FollowUpEntry): e is Extract<FollowUpEntry, { kind: "flat" }> {
+  return e.kind === "flat";
+}
+function isExResidentFollowUp(e: FollowUpEntry): e is Extract<FollowUpEntry, { kind: "ex_resident" }> {
+  return e.kind === "ex_resident";
+}
+
+/** How much this entry brought in this year — only paid/partial/promised have a known figure. */
+function thisYearAmountFor(entry: FollowUpEntry): number {
+  const c = entry.contribution;
+  if (!c) return 0;
+  return c.status === "paid" || c.status === "partial" || c.status === "promised" ? c.moneyAmount : 0;
+}
+
 /**
  * Stable key for "who's following this up" — a committee member id when
  * assigned to one, or the free-text name (someone not in the committee,
@@ -136,6 +150,10 @@ export default function DashboardPage() {
   const [blockFilter, setBlockFilter] = useState<MoneyGroup | "all">("all");
   const [statusFilters, setStatusFilters] = useState<ContributionStatus[]>(defaultFollowUpStatuses);
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [followUpSort, setFollowUpSort] = useState<{
+    field: "flat" | "lastYear" | "thisYear";
+    dir: "asc" | "desc";
+  }>({ field: "flat", dir: "desc" });
   const [moneyBlockFilter, setMoneyBlockFilter] = useState<MoneyGroup | "all">("all");
   const [editing, setEditing] = useState<
     | { kind: "flat"; house: House; role: "owner" | "tenant" }
@@ -204,7 +222,7 @@ export default function DashboardPage() {
       entries.push({
         kind: "flat",
         key: `owner-${owner.id}`,
-        badge: primaryHouse.flatNo,
+        badge: `${primaryHouse.block}-${primaryHouse.flatNo}`,
         name: `${owner.names.join(", ")} · owner`,
         flatInfo: ownerHouses.map((h) => `${h.block}-${h.flatNo}`).join(", "),
         block: primaryHouse.block,
@@ -223,8 +241,8 @@ export default function DashboardPage() {
       entries.push({
         kind: "flat",
         key: `tenant-${house.id}`,
-        badge: house.flatNo,
-        name: house.tenantNames.join(", ") || "Tenant",
+        badge: `${house.block}-${house.flatNo}`,
+        name: `${house.tenantNames.join(", ") || "Tenant"} · tenant`,
         flatInfo: `${house.block}-${house.flatNo}`,
         block: house.block,
         status: contribution?.status ?? "not_visited",
@@ -408,6 +426,45 @@ export default function DashboardPage() {
     if (assigneeFilter !== "all" && assigneeKey(e.contribution) !== assigneeFilter) return false;
     return statusFilters.includes(e.status);
   });
+
+  // Owner-role entries are keyed by the owner (a multi-flat owner's prior
+  // payment is one figure, not split per flat); tenant-role entries by the
+  // flat itself; ex-residents by their own id — same key choice as
+  // previousYearAmountByBlock above.
+  function lastYearAmountFor(entry: FollowUpEntry): number {
+    const key =
+      entry.kind === "ex_resident"
+        ? entry.exResident.id
+        : entry.role === "owner"
+          ? (entry.house.ownerId ?? "")
+          : entry.house.id;
+    return (previousYearInfo[key] ?? []).reduce((sum, e) => sum + e.amount, 0);
+  }
+
+  function toggleFollowUpSort(field: "flat" | "lastYear" | "thisYear") {
+    setFollowUpSort((prev) =>
+      prev.field === field ? { field, dir: prev.dir === "asc" ? "desc" : "asc" } : { field, dir: "desc" },
+    );
+  }
+
+  const sortedFollowUps = (() => {
+    const dir = followUpSort.dir === "asc" ? 1 : -1;
+    if (followUpSort.field === "flat") {
+      const flats = followUps.filter(isFlatFollowUp);
+      const exResidentEntries = followUps.filter(isExResidentFollowUp);
+      const sortedFlats = [...flats].sort(
+        (a, b) =>
+          dir *
+          (a.house.block.localeCompare(b.house.block) ||
+            a.house.floor - b.house.floor ||
+            a.house.flatNo.localeCompare(b.house.flatNo)),
+      );
+      const sortedExResidents = [...exResidentEntries].sort((a, b) => a.name.localeCompare(b.name));
+      return [...sortedFlats, ...sortedExResidents];
+    }
+    const metric = followUpSort.field === "lastYear" ? lastYearAmountFor : thisYearAmountFor;
+    return [...followUps].sort((a, b) => dir * (metric(a) - metric(b)));
+  })();
 
   const vendorTotal = vendorPaid + vendorPending;
   const vendorPaidPercent = vendorTotal > 0 ? (vendorPaid / vendorTotal) * 100 : 0;
@@ -740,46 +797,83 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card)]">
-          {followUps.length === 0 && (
-            <p className="p-3 text-[0.8rem] text-ink-faint">Nothing matches this filter.</p>
-          )}
-          {followUps.map((entry, i) => (
+        <div className="-mx-1 mb-2 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
+          <span className="shrink-0 text-[0.68rem] font-semibold text-ink-faint">Sort</span>
+          {(
+            [
+              { field: "flat" as const, label: "Flat" },
+              { field: "lastYear" as const, label: "Last year" },
+              { field: "thisYear" as const, label: "This year" },
+            ]
+          ).map(({ field, label }) => (
             <button
+              key={field}
               type="button"
-              key={entry.key}
-              onClick={() =>
-                entry.kind === "flat"
-                  ? setEditing({ kind: "flat", house: entry.house, role: entry.role })
-                  : setEditing({ kind: "ex_resident", exResident: entry.exResident })
-              }
-              className={`flex w-full items-start gap-3 p-3 text-left transition active:scale-[0.99] ${i > 0 ? "border-t border-border" : ""}`}
+              onClick={() => toggleFollowUpSort(field)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold transition active:scale-95 ${
+                followUpSort.field === field
+                  ? "bg-brand text-white"
+                  : "border border-border bg-surface text-ink-soft"
+              }`}
             >
-              <span
-                className={`flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] px-1 font-display text-[0.78rem] font-bold ${followUpAvatarTone[entry.status]}`}
-              >
-                {entry.badge}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[0.88rem] font-semibold text-ink">{entry.name}</div>
-                <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
-                  {followUpDescription(entry.status, entry.contribution, memberName)}
-                </div>
-                {entry.contribution?.originalPledgeAmount != null && (
-                  <div className="mt-0.5 text-[0.72rem] font-semibold text-gold">
-                    {pledgeProgressLabel(
-                      entry.contribution.status,
-                      entry.contribution.moneyAmount,
-                      entry.contribution.originalPledgeAmount,
-                    )}
-                  </div>
-                )}
-                {/* Never truncated — a long name shouldn't be able to hide which flat(s) this is. */}
-                <div className="mt-1 text-[0.68rem] font-semibold text-ink-soft">{entry.flatInfo}</div>
-              </div>
-              <Pill tone={entry.status} />
+              {label}
+              {followUpSort.field === field && (followUpSort.dir === "asc" ? " ↑" : " ↓")}
             </button>
           ))}
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card)]">
+          {sortedFollowUps.length === 0 && (
+            <p className="p-3 text-[0.8rem] text-ink-faint">Nothing matches this filter.</p>
+          )}
+          {sortedFollowUps.map((entry, i) => {
+            const hasPledgeLine = entry.contribution?.originalPledgeAmount != null;
+            const lastYear = lastYearAmountFor(entry);
+            const thisYear = thisYearAmountFor(entry);
+            return (
+              <button
+                type="button"
+                key={entry.key}
+                onClick={() =>
+                  entry.kind === "flat"
+                    ? setEditing({ kind: "flat", house: entry.house, role: entry.role })
+                    : setEditing({ kind: "ex_resident", exResident: entry.exResident })
+                }
+                className={`flex w-full items-start gap-3 p-3 text-left transition active:scale-[0.99] ${i > 0 ? "border-t border-border" : ""}`}
+              >
+                <span
+                  className={`flex h-[38px] min-w-[38px] shrink-0 items-center justify-center rounded-[11px] px-1 font-display text-[0.72rem] font-bold whitespace-nowrap ${followUpAvatarTone[entry.status]}`}
+                >
+                  {entry.badge}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[0.88rem] font-semibold text-ink">{entry.name}</div>
+                  <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
+                    {followUpDescription(entry.status, entry.contribution, memberName)}
+                  </div>
+                  {hasPledgeLine && (
+                    <div className="mt-0.5 text-[0.72rem] font-semibold text-gold">
+                      {pledgeProgressLabel(
+                        entry.contribution!.status,
+                        entry.contribution!.moneyAmount,
+                        entry.contribution!.originalPledgeAmount!,
+                      )}
+                    </div>
+                  )}
+                  {(lastYear > 0 || (!hasPledgeLine && thisYear > 0)) && (
+                    <div className="mt-0.5 text-[0.7rem] tabular-nums text-ink-soft">
+                      {lastYear > 0 && `Last year ${formatINR(lastYear)}`}
+                      {lastYear > 0 && !hasPledgeLine && thisYear > 0 && " · "}
+                      {!hasPledgeLine && thisYear > 0 && `This year ${formatINR(thisYear)}`}
+                    </div>
+                  )}
+                  {/* Never truncated — a long name shouldn't be able to hide which flat(s) this is. */}
+                  <div className="mt-1 text-[0.68rem] font-semibold text-ink-soft">{entry.flatInfo}</div>
+                </div>
+                <Pill tone={entry.status} />
+              </button>
+            );
+          })}
         </div>
       </div>
 
