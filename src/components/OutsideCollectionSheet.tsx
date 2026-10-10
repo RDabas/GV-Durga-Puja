@@ -201,10 +201,7 @@ export function OutsideCollectionSheet({
               onChange={(e) => setHasBhog(e.target.checked)}
               className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
             />
-            <span className="text-[0.8rem] text-ink-soft">
-              Also brought Bhog / groceries, on top of (or instead of) money — even if the money
-              itself is still pending.
-            </span>
+            <span className="text-[0.8rem] text-ink-soft">Bhog</span>
           </label>
         )}
 
