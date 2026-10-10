@@ -4,15 +4,53 @@ import { useState } from "react";
 import { OutsideCollectionCard } from "@/components/OutsideCollectionCard";
 import { OutsideCollectionSheet } from "@/components/OutsideCollectionSheet";
 import { PlusIcon } from "@/components/icons";
+import { statusRank } from "@/components/FlatCard";
 import { usePujaData } from "@/lib/store";
-import type { OutsideCollection } from "@/lib/types";
+import type { Contribution, OutsideCollection } from "@/lib/types";
+
+/** Current-year figure for an entry — same paid/partial/promised convention used elsewhere. */
+function amountFor(contribution: Contribution | undefined): number {
+  if (!contribution) return 0;
+  return contribution.status === "paid" ||
+    contribution.status === "partial" ||
+    contribution.status === "promised"
+    ? contribution.moneyAmount
+    : 0;
+}
 
 export default function OutsideCollectionPage() {
   const { outsideCollections, contributionFor, memberName, setOutsideCollectionDisabled } =
     usePujaData();
   const [editing, setEditing] = useState<{ outsideCollection?: OutsideCollection } | null>(null);
+  const [sort, setSort] = useState<{ field: "name" | "amount" | "status"; dir: "asc" | "desc" }>({
+    field: "name",
+    dir: "asc",
+  });
 
-  const sorted = [...outsideCollections].sort((a, b) => a.name.localeCompare(b.name));
+  function toggleSort(field: "name" | "amount" | "status") {
+    setSort((prev) =>
+      prev.field === field
+        ? { field, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { field, dir: field === "name" ? "asc" : "desc" },
+    );
+  }
+
+  const dir = sort.dir === "asc" ? 1 : -1;
+  const sorted = [...outsideCollections].sort((a, b) => {
+    if (sort.field === "amount") {
+      return (
+        dir *
+        (amountFor(contributionFor({ outsideCollectionId: a.id })) -
+          amountFor(contributionFor({ outsideCollectionId: b.id })))
+      );
+    }
+    if (sort.field === "status") {
+      const aRank = statusRank.indexOf(contributionFor({ outsideCollectionId: a.id })?.status ?? "not_visited");
+      const bRank = statusRank.indexOf(contributionFor({ outsideCollectionId: b.id })?.status ?? "not_visited");
+      return dir * (aRank - bRank);
+    }
+    return dir * a.name.localeCompare(b.name);
+  });
 
   return (
     <div className="space-y-2.5">
@@ -28,6 +66,31 @@ export default function OutsideCollectionPage() {
           <PlusIcon className="h-[13px] w-[13px]" />
           Add
         </button>
+      </div>
+
+      <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
+        <span className="shrink-0 text-[0.68rem] font-semibold text-ink-faint">Sort</span>
+        {(
+          [
+            { field: "name" as const, label: "Name" },
+            { field: "amount" as const, label: "Amount" },
+            { field: "status" as const, label: "Status" },
+          ]
+        ).map(({ field, label }) => (
+          <button
+            key={field}
+            type="button"
+            onClick={() => toggleSort(field)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold transition active:scale-95 ${
+              sort.field === field
+                ? "bg-brand text-white"
+                : "border border-border bg-surface text-ink-soft"
+            }`}
+          >
+            {label}
+            {sort.field === field && (sort.dir === "asc" ? " ↑" : " ↓")}
+          </button>
+        ))}
       </div>
 
       {sorted.length === 0 && (

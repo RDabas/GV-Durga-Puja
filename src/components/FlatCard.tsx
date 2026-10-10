@@ -30,8 +30,9 @@ export const cardAccent: Record<ContributionStatus, { badge: string; border: str
 
 // Best-to-worst — the card shows whichever status is furthest along between
 // its owner and tenant, so a "paid" owner isn't outranked by a "not visited"
-// tenant slot that simply hasn't been looked at yet.
-const statusRank: ContributionStatus[] = [
+// tenant slot that simply hasn't been looked at yet. Exported so other lists
+// (e.g. the Outside Collection tab's status sort) can order by the same scale.
+export const statusRank: ContributionStatus[] = [
   "paid",
   "partial",
   "promised",
@@ -195,8 +196,10 @@ export function PayerRow({
               <Pill tone={status} />
               {extraBadge}
               {contribution && <PaymentTag mode={contribution.paymentMode} />}
-              {contribution?.contributionKind === "both" && (
-                <span className="text-[0.7rem] text-ink-faint">+ bhog</span>
+              {contribution && contribution.bhogGroceryAmount > 0 && (
+                <span className="rounded-full bg-gold-tint px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-gold">
+                  + Bhog {formatINR(contribution.bhogGroceryAmount)}
+                </span>
               )}
             </span>
             {(collectorName || contribution?.paymentDate) && (

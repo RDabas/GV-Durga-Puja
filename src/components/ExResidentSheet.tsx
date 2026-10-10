@@ -53,6 +53,8 @@ export function ExResidentSheet({
   const [originalPledgeAmount, setOriginalPledgeAmount] = useState(
     contribution?.originalPledgeAmount ?? 0,
   );
+  const [hasBhog, setHasBhog] = useState((contribution?.bhogGroceryAmount ?? 0) > 0);
+  const [bhogAmount, setBhogAmount] = useState(contribution?.bhogGroceryAmount ?? 0);
   const [collectorId, setCollectorId] = useState(
     contribution?.collectorId ?? members.find((m) => m.name === "Hirdesh")?.id ?? members[0]?.id ?? "",
   );
@@ -78,6 +80,9 @@ export function ExResidentSheet({
       .map((n) => n.trim())
       .filter(Boolean);
 
+    const finalMoneyAmount = received || promised ? moneyAmount : 0;
+    const finalBhogAmount = received && hasBhog ? bhogAmount : 0;
+
     run(async () => {
       if (parsed.length === 0) throw new Error("Enter at least one name");
       const exResidentId = await saveExResident(exResident?.id, parsed);
@@ -90,13 +95,18 @@ export function ExResidentSheet({
             needsFollowUp && assignedTo && assignedTo !== "other" ? assignedTo : undefined,
           assignedToName:
             needsFollowUp && assignedTo === "other" ? assignedToName.trim() || undefined : undefined,
-          moneyAmount: received || promised ? moneyAmount : 0,
+          moneyAmount: finalMoneyAmount,
           originalPledgeAmount:
             (promised || partial) && originalPledgeAmount > moneyAmount
               ? originalPledgeAmount
               : undefined,
-          bhogGroceryAmount: 0,
-          contributionKind: "money",
+          bhogGroceryAmount: finalBhogAmount,
+          contributionKind:
+            finalMoneyAmount > 0 && finalBhogAmount > 0
+              ? "both"
+              : finalBhogAmount > 0
+                ? "bhog_grocery"
+                : "money",
           paymentMode: received ? mode : "pending",
           status,
           paymentDate: received ? paymentDate : undefined,
@@ -170,6 +180,24 @@ export function ExResidentSheet({
                 placeholder="Optional"
               />
             </Field>
+
+            <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+              <input
+                type="checkbox"
+                checked={hasBhog}
+                onChange={(e) => setHasBhog(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              />
+              <span className="text-[0.8rem] text-ink-soft">
+                Also brought Bhog / groceries, on top of (or instead of) money.
+              </span>
+            </label>
+
+            {hasBhog && (
+              <Field label="Bhog / groceries value">
+                <AmountInput value={bhogAmount} onChange={setBhogAmount} />
+              </Field>
+            )}
           </>
         )}
 

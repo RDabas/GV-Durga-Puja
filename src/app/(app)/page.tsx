@@ -155,7 +155,7 @@ export default function DashboardPage() {
   const [followUpSort, setFollowUpSort] = useState<{
     field: "flat" | "lastYear" | "thisYear";
     dir: "asc" | "desc";
-  }>({ field: "flat", dir: "desc" });
+  }>({ field: "lastYear", dir: "desc" });
   const [moneyBlockFilter, setMoneyBlockFilter] = useState<MoneyGroup | "all">("all");
   const [editing, setEditing] = useState<
     | { kind: "flat"; house: House; role: "owner" | "tenant" }

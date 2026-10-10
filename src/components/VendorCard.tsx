@@ -68,12 +68,6 @@ export function VendorCard({
       </div>
       <div className="mt-3 flex justify-between text-[0.72rem] text-ink-faint">
         <span>
-          Total
-          <b className="mt-0.5 block text-[0.86rem] font-bold tabular-nums text-ink">
-            {formatINR(expense.totalAmount)}
-          </b>
-        </span>
-        <span>
           Paid
           <b className="mt-0.5 block text-[0.86rem] font-bold tabular-nums text-ink">
             {formatINR(paid)}
@@ -83,6 +77,12 @@ export function VendorCard({
           Balance
           <b className="mt-0.5 block text-[0.86rem] font-bold tabular-nums text-ink">
             {formatINR(balance)}
+          </b>
+        </span>
+        <span>
+          Total
+          <b className="mt-0.5 block text-[0.86rem] font-bold tabular-nums text-ink">
+            {formatINR(expense.totalAmount)}
           </b>
         </span>
       </div>

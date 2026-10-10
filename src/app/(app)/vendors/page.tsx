@@ -8,6 +8,8 @@ import { PlusIcon } from "@/components/icons";
 import { usePujaData } from "@/lib/store";
 import type { VendorPayment } from "@/lib/types";
 
+type SortField = "name" | "total" | "balance";
+
 export default function VendorsPage() {
   const { vendorExpenses, addVendorPayment, updateVendorPayment, deleteVendorPayment, deleteVendorExpense } =
     usePujaData();
@@ -18,12 +20,35 @@ export default function VendorsPage() {
     expenseId: string;
     payment: VendorPayment;
   } | null>(null);
+  const [sort, setSort] = useState<{ field: SortField; dir: "asc" | "desc" }>({
+    field: "name",
+    dir: "asc",
+  });
 
   const editing = vendorExpenses.find((e) => e.id === editingId);
   const paying = vendorExpenses.find((e) => e.id === payingFor);
   const editingPaymentExpense = editingPayment
     ? vendorExpenses.find((e) => e.id === editingPayment.expenseId)
     : undefined;
+
+  function toggleSort(field: SortField) {
+    setSort((prev) =>
+      prev.field === field
+        ? { field, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { field, dir: field === "name" ? "asc" : "desc" },
+    );
+  }
+
+  function balanceOf(expense: (typeof vendorExpenses)[number]): number {
+    return expense.totalAmount - expense.payments.reduce((sum, p) => sum + p.amount, 0);
+  }
+
+  const dir = sort.dir === "asc" ? 1 : -1;
+  const sortedExpenses = [...vendorExpenses].sort((a, b) => {
+    if (sort.field === "total") return dir * (a.totalAmount - b.totalAmount);
+    if (sort.field === "balance") return dir * (balanceOf(a) - balanceOf(b));
+    return dir * a.vendor.name.localeCompare(b.vendor.name);
+  });
 
   return (
     <div className="space-y-2.5">
@@ -41,7 +66,32 @@ export default function VendorsPage() {
         </button>
       </div>
 
-      {vendorExpenses.map((expense) => (
+      <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
+        <span className="shrink-0 text-[0.68rem] font-semibold text-ink-faint">Sort</span>
+        {(
+          [
+            { field: "name" as const, label: "Name" },
+            { field: "total" as const, label: "Total" },
+            { field: "balance" as const, label: "Balance" },
+          ]
+        ).map(({ field, label }) => (
+          <button
+            key={field}
+            type="button"
+            onClick={() => toggleSort(field)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold transition active:scale-95 ${
+              sort.field === field
+                ? "bg-brand text-white"
+                : "border border-border bg-surface text-ink-soft"
+            }`}
+          >
+            {label}
+            {sort.field === field && (sort.dir === "asc" ? " ↑" : " ↓")}
+          </button>
+        ))}
+      </div>
+
+      {sortedExpenses.map((expense) => (
         <VendorCard
           key={expense.id}
           expense={expense}
