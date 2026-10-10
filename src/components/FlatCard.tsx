@@ -198,11 +198,14 @@ export function PayerRow({
               <Pill tone={status} />
               {extraBadge}
               {contribution && <PaymentTag mode={contribution.paymentMode} />}
-              {contribution && contribution.bhogGroceryAmount > 0 && (
-                <span className="rounded-full bg-gold-tint px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-gold">
-                  + Bhog {formatINR(contribution.bhogGroceryAmount)}
-                </span>
-              )}
+              {contribution &&
+                (contribution.contributionKind === "both" ||
+                  contribution.contributionKind === "bhog_grocery") && (
+                  <span className="rounded-full bg-gold-tint px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-gold">
+                    + Bhog
+                    {contribution.bhogGroceryAmount > 0 && ` ${formatINR(contribution.bhogGroceryAmount)}`}
+                  </span>
+                )}
             </span>
             {(collectorName || contribution?.paymentDate) && (
               <span className="mt-1 block truncate text-[0.68rem] text-ink-faint">

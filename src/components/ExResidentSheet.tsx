@@ -84,7 +84,10 @@ export function ExResidentSheet({
       .filter(Boolean);
 
     const finalMoneyAmount = received || promised ? moneyAmount : 0;
-    const finalBhogAmount = bhogChecked ? bhogAmount : 0;
+    // The optional Bhog add-on (any status other than "Bhog Only") is a
+    // plain yes/no flag — no amount is asked for it, so it never carries a
+    // number. Only the dedicated "Bhog Only" status tracks an actual value.
+    const finalBhogAmount = bhogOnlyStatus ? bhogAmount : 0;
     const handedOver = received || bhogChecked;
 
     run(async () => {
@@ -106,11 +109,7 @@ export function ExResidentSheet({
               : undefined,
           bhogGroceryAmount: finalBhogAmount,
           contributionKind:
-            finalMoneyAmount > 0 && finalBhogAmount > 0
-              ? "both"
-              : finalBhogAmount > 0
-                ? "bhog_grocery"
-                : "money",
+            finalMoneyAmount > 0 && bhogChecked ? "both" : bhogChecked ? "bhog_grocery" : "money",
           paymentMode: received ? mode : "pending",
           status,
           paymentDate: handedOver ? paymentDate : undefined,
@@ -163,26 +162,18 @@ export function ExResidentSheet({
         )}
 
         {!bhogOnlyStatus && status !== "not_visited" && (
-          <>
-            <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
-              <input
-                type="checkbox"
-                checked={hasBhog}
-                onChange={(e) => setHasBhog(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-              />
-              <span className="text-[0.8rem] text-ink-soft">
-                Also brought Bhog / groceries, on top of (or instead of) money — even if the
-                money itself is still pending.
-              </span>
-            </label>
-
-            {hasBhog && (
-              <Field label="Bhog / groceries value">
-                <AmountInput value={bhogAmount} onChange={setBhogAmount} />
-              </Field>
-            )}
-          </>
+          <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+            <input
+              type="checkbox"
+              checked={hasBhog}
+              onChange={(e) => setHasBhog(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+            />
+            <span className="text-[0.8rem] text-ink-soft">
+              Also brought Bhog / groceries, on top of (or instead of) money — even if the money
+              itself is still pending.
+            </span>
+          </label>
         )}
 
         {(received || bhogChecked) && (
