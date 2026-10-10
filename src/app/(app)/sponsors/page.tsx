@@ -22,6 +22,7 @@ export default function OutsideCollectionPage() {
   const { outsideCollections, contributionFor, memberName, setOutsideCollectionDisabled } =
     usePujaData();
   const [editing, setEditing] = useState<{ outsideCollection?: OutsideCollection } | null>(null);
+  const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ field: "name" | "amount" | "status"; dir: "asc" | "desc" }>({
     field: "name",
     dir: "asc",
@@ -35,8 +36,13 @@ export default function OutsideCollectionPage() {
     );
   }
 
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? outsideCollections.filter((entry) => entry.name.toLowerCase().includes(q))
+    : outsideCollections;
+
   const dir = sort.dir === "asc" ? 1 : -1;
-  const sorted = [...outsideCollections].sort((a, b) => {
+  const sorted = [...filtered].sort((a, b) => {
     if (sort.field === "amount") {
       return (
         dir *
@@ -68,6 +74,14 @@ export default function OutsideCollectionPage() {
         </button>
       </div>
 
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by name"
+        className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2.5 text-[0.9rem] text-ink outline-none focus:border-brand"
+      />
+
       <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
         <span className="shrink-0 text-[0.68rem] font-semibold text-ink-faint">Sort</span>
         {(
@@ -95,7 +109,7 @@ export default function OutsideCollectionPage() {
 
       {sorted.length === 0 && (
         <p className="rounded-2xl border border-border bg-surface p-3.5 text-[0.8rem] text-ink-faint">
-          Nothing added yet.
+          {q ? `No matches for "${search}".` : "Nothing added yet."}
         </p>
       )}
 

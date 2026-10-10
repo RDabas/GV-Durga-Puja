@@ -20,6 +20,7 @@ export default function VendorsPage() {
     expenseId: string;
     payment: VendorPayment;
   } | null>(null);
+  const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ field: SortField; dir: "asc" | "desc" }>({
     field: "name",
     dir: "asc",
@@ -43,8 +44,16 @@ export default function VendorsPage() {
     return expense.totalAmount - expense.payments.reduce((sum, p) => sum + p.amount, 0);
   }
 
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? vendorExpenses.filter(
+        (e) =>
+          e.vendor.name.toLowerCase().includes(q) || e.vendor.serviceType.toLowerCase().includes(q),
+      )
+    : vendorExpenses;
+
   const dir = sort.dir === "asc" ? 1 : -1;
-  const sortedExpenses = [...vendorExpenses].sort((a, b) => {
+  const sortedExpenses = [...filtered].sort((a, b) => {
     if (sort.field === "total") return dir * (a.totalAmount - b.totalAmount);
     if (sort.field === "balance") return dir * (balanceOf(a) - balanceOf(b));
     return dir * a.vendor.name.localeCompare(b.vendor.name);
@@ -65,6 +74,14 @@ export default function VendorsPage() {
           Add bill
         </button>
       </div>
+
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by vendor or service"
+        className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2.5 text-[0.9rem] text-ink outline-none focus:border-brand"
+      />
 
       <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
         <span className="shrink-0 text-[0.68rem] font-semibold text-ink-faint">Sort</span>
@@ -90,6 +107,12 @@ export default function VendorsPage() {
           </button>
         ))}
       </div>
+
+      {sortedExpenses.length === 0 && (
+        <p className="rounded-2xl border border-border bg-surface p-3.5 text-[0.8rem] text-ink-faint">
+          {q ? `No matches for "${search}".` : "No vendor bills yet."}
+        </p>
+      )}
 
       {sortedExpenses.map((expense) => (
         <VendorCard
