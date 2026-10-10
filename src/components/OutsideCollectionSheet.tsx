@@ -95,7 +95,8 @@ export function OutsideCollectionSheet({
     if (!name.trim()) return;
 
     const finalMoneyAmount = received || promised ? moneyAmount : 0;
-    const finalBhogAmount = received && hasBhog ? bhogAmount : 0;
+    const finalBhogAmount = hasBhog ? bhogAmount : 0;
+    const handedOver = received || hasBhog;
 
     run(async () => {
       const outsideCollectionId = await saveOutsideCollection(
@@ -108,7 +109,7 @@ export function OutsideCollectionSheet({
       await saveContribution(
         { outsideCollectionId },
         {
-          collectorId: received ? collectorId : undefined,
+          collectorId: handedOver ? collectorId : undefined,
           assignedToMemberId:
             needsFollowUp && assignedTo && assignedTo !== "other" ? assignedTo : undefined,
           assignedToName:
@@ -127,7 +128,7 @@ export function OutsideCollectionSheet({
                 : "money",
           paymentMode: received ? mode : "pending",
           status,
-          paymentDate: received ? paymentDate : undefined,
+          paymentDate: handedOver ? paymentDate : undefined,
           note: note.trim() || undefined,
           followUpNote: followUpNote.trim() || undefined,
         },
@@ -183,7 +184,30 @@ export function OutsideCollectionSheet({
           </Field>
         )}
 
-        {received && (
+        {status !== "not_visited" && (
+          <>
+            <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+              <input
+                type="checkbox"
+                checked={hasBhog}
+                onChange={(e) => setHasBhog(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              />
+              <span className="text-[0.8rem] text-ink-soft">
+                Also brought Bhog / groceries, on top of (or instead of) money — even if the
+                money itself is still pending.
+              </span>
+            </label>
+
+            {hasBhog && (
+              <Field label="Bhog / groceries value">
+                <AmountInput value={bhogAmount} onChange={setBhogAmount} />
+              </Field>
+            )}
+          </>
+        )}
+
+        {(received || hasBhog) && (
           <>
             <Field label="Paid by">
               <OptionGroup value={mode} onChange={setMode} options={modeOptions} />
@@ -212,24 +236,6 @@ export function OutsideCollectionSheet({
                 placeholder="Optional"
               />
             </Field>
-
-            <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
-              <input
-                type="checkbox"
-                checked={hasBhog}
-                onChange={(e) => setHasBhog(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-              />
-              <span className="text-[0.8rem] text-ink-soft">
-                Also brought Bhog / groceries, on top of (or instead of) money.
-              </span>
-            </label>
-
-            {hasBhog && (
-              <Field label="Bhog / groceries value">
-                <AmountInput value={bhogAmount} onChange={setBhogAmount} />
-              </Field>
-            )}
           </>
         )}
 
