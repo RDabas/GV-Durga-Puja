@@ -10,8 +10,10 @@ import {
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
+import { ScanPaymentButton } from "@/components/ScanPaymentButton";
 import { modeOptions } from "@/lib/contributionForm";
 import { today } from "@/lib/format";
+import type { ScannedPayment } from "@/lib/scanPayment";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { PaymentMode, VendorExpense } from "@/lib/types";
@@ -41,8 +43,16 @@ export function VendorExpenseSheet({
   const [paidById, setPaidById] = useState(members[0]?.id ?? "");
   const [paidDate, setPaidDate] = useState(today());
   const [selfFunded, setSelfFunded] = useState(false);
+  const [scanned, setScanned] = useState(false);
 
   const { submitting, error, run } = useAsyncAction();
+
+  function handleScanned(result: ScannedPayment) {
+    if (result.amount !== undefined) setPaidAmount(result.amount);
+    if (result.mode !== undefined) setPaidMode(result.mode);
+    if (result.paymentDate !== undefined) setPaidDate(result.paymentDate);
+    setScanned(true);
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -77,6 +87,7 @@ export function VendorExpenseSheet({
         setTotalAmount(0);
         setRecordingPayment(false);
         setPaidAmount(0);
+        setScanned(false);
         onClose();
       },
     );
@@ -122,6 +133,11 @@ export function VendorExpenseSheet({
 
             {recordingPayment && (
               <>
+                <ScanPaymentButton onExtracted={handleScanned} />
+                {scanned && (
+                  <p className="text-[0.75rem] text-ink-faint">Scanned — check the details below.</p>
+                )}
+
                 <Field label="Amount paid">
                   <AmountInput value={paidAmount} onChange={setPaidAmount} />
                 </Field>

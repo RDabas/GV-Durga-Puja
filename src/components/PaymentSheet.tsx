@@ -10,10 +10,12 @@ import {
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
+import { ScanPaymentButton } from "@/components/ScanPaymentButton";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import { today } from "@/lib/format";
 import { modeOptions } from "@/lib/contributionForm";
+import type { ScannedPayment } from "@/lib/scanPayment";
 import type { PaymentInput } from "@/lib/store";
 import type { PaymentMode } from "@/lib/types";
 
@@ -53,7 +55,15 @@ export function PaymentSheet({
   const [paymentDate, setPaymentDate] = useState(payment?.paymentDate ?? today());
   const [note, setNote] = useState(payment?.note ?? "");
   const [selfFunded, setSelfFunded] = useState(payment?.selfFunded ?? false);
+  const [scanned, setScanned] = useState(false);
   const { submitting, error, run } = useAsyncAction();
+
+  function handleScanned(result: ScannedPayment) {
+    if (result.amount !== undefined) setAmount(result.amount);
+    if (result.mode !== undefined) setMode(result.mode);
+    if (result.paymentDate !== undefined) setPaymentDate(result.paymentDate);
+    setScanned(true);
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -80,6 +90,11 @@ export function PaymentSheet({
   return (
     <Sheet open={open} onClose={onClose} title={title} subtitle={subtitle}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        <ScanPaymentButton onExtracted={handleScanned} />
+        {scanned && (
+          <p className="text-[0.75rem] text-ink-faint">Scanned — check the details below.</p>
+        )}
+
         <Field label="Amount">
           <AmountInput value={amount} onChange={setAmount} autoFocus />
         </Field>
