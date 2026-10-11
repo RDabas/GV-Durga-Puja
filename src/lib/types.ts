@@ -75,6 +75,8 @@ export interface OutsideCollection {
   stallDetails?: string;
   /** Excluded from this year's money totals, but kept on record — see the Disable/Enable toggle, shared with Owner/ExResident. */
   disabled: boolean;
+  /** When this entry was added — used for "most recent first" sorting. */
+  createdAt: string;
 }
 
 /** A flat in the society directory. */
@@ -164,6 +166,8 @@ export interface VendorExpense {
   yearId: string;
   totalAmount: number;
   notes?: string;
+  /** When this bill was added — used for "most recent first" sorting. */
+  createdAt: string;
   vendor: Vendor;
   payments: VendorPayment[];
 }

@@ -6,12 +6,15 @@ import {
   AmountInput,
   Field,
   FormError,
+  OptionGroup,
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
+import { modeOptions } from "@/lib/contributionForm";
+import { today } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
-import type { VendorExpense } from "@/lib/types";
+import type { PaymentMode, VendorExpense } from "@/lib/types";
 
 export function VendorExpenseSheet({
   open,
@@ -23,11 +26,22 @@ export function VendorExpenseSheet({
   expense?: VendorExpense;
   onClose: () => void;
 }) {
-  const { addVendorExpense, updateVendorExpense } = usePujaData();
+  const { members, addVendorExpense, updateVendorExpense } = usePujaData();
   const [vendorName, setVendorName] = useState(expense?.vendor.name ?? "");
   const [serviceType, setServiceType] = useState(expense?.vendor.serviceType ?? "");
-  const [phone, setPhone] = useState(expense?.vendor.phone ?? "");
   const [totalAmount, setTotalAmount] = useState(expense?.totalAmount ?? 0);
+
+  // Some bills are settled the moment they're added (instant pay), others
+  // run as installments over time — this lets the former skip the separate
+  // "Record payment" step. Only offered when adding a new bill; an existing
+  // bill already has its own payment history and Record-payment action.
+  const [recordingPayment, setRecordingPayment] = useState(false);
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [paidMode, setPaidMode] = useState<PaymentMode>("upi");
+  const [paidById, setPaidById] = useState(members[0]?.id ?? "");
+  const [paidDate, setPaidDate] = useState(today());
+  const [selfFunded, setSelfFunded] = useState(false);
+
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
@@ -36,16 +50,33 @@ export function VendorExpenseSheet({
     const input = {
       vendorName: vendorName.trim(),
       serviceType: serviceType.trim() || "Other",
-      phone: phone.trim() || undefined,
       totalAmount,
     };
     run(
-      () => (expense ? updateVendorExpense(expense.id, input) : addVendorExpense(input)),
+      async () => {
+        if (expense) {
+          await updateVendorExpense(expense.id, input);
+          return;
+        }
+        await addVendorExpense(
+          input,
+          recordingPayment && paidAmount > 0 && paidById
+            ? {
+                amount: paidAmount,
+                mode: paidMode,
+                memberId: paidById,
+                paymentDate: paidDate,
+                selfFunded,
+              }
+            : undefined,
+        );
+      },
       () => {
         setVendorName("");
         setServiceType("");
-        setPhone("");
         setTotalAmount(0);
+        setRecordingPayment(false);
+        setPaidAmount(0);
         onClose();
       },
     );
@@ -75,13 +106,58 @@ export function VendorExpenseSheet({
           <AmountInput value={totalAmount} onChange={setTotalAmount} />
         </Field>
 
-        <Field label="Phone">
-          <TextInput
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Optional"
-          />
-        </Field>
+        {!expense && (
+          <>
+            <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+              <input
+                type="checkbox"
+                checked={recordingPayment}
+                onChange={(e) => setRecordingPayment(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              />
+              <span className="text-[0.8rem] text-ink-soft">
+                Already paid — fully or as the first installment
+              </span>
+            </label>
+
+            {recordingPayment && (
+              <>
+                <Field label="Amount paid">
+                  <AmountInput value={paidAmount} onChange={setPaidAmount} />
+                </Field>
+                <Field label="Method">
+                  <OptionGroup value={paidMode} onChange={setPaidMode} options={modeOptions} />
+                </Field>
+                <Field label="Paid by">
+                  <OptionGroup
+                    value={paidById}
+                    onChange={setPaidById}
+                    options={members.map((m) => ({ value: m.id, label: m.name }))}
+                  />
+                </Field>
+                <Field label="Date">
+                  <TextInput
+                    type="date"
+                    value={paidDate}
+                    onChange={(e) => setPaidDate(e.target.value)}
+                  />
+                </Field>
+                <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+                  <input
+                    type="checkbox"
+                    checked={selfFunded}
+                    onChange={(e) => setSelfFunded(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                  />
+                  <span className="text-[0.8rem] text-ink-soft">
+                    Paid from their own pocket, not committee cash — won&rsquo;t count against
+                    their balance in hand.
+                  </span>
+                </label>
+              </>
+            )}
+          </>
+        )}
 
         <FormError message={error} />
         <SubmitButton disabled={submitting} submitting={submitting}>

@@ -59,6 +59,7 @@ interface OutsideCollectionRow {
   type: OutsideCollectionType;
   stall_details: string | null;
   disabled: boolean;
+  created_at: string;
 }
 
 interface HouseRow {
@@ -147,6 +148,7 @@ interface VendorExpenseRow {
   year_id: string;
   total_amount: number;
   notes: string | null;
+  created_at: string;
   vendors: VendorRow;
   vendor_payments: VendorPaymentRow[];
 }
@@ -190,6 +192,7 @@ const mapOutsideCollection = (r: OutsideCollectionRow): OutsideCollection => ({
   type: r.type,
   stallDetails: r.stall_details ?? undefined,
   disabled: r.disabled,
+  createdAt: r.created_at,
 });
 
 const mapHouse = (r: HouseRow): House => ({
@@ -278,6 +281,7 @@ const mapVendorExpense = (r: VendorExpenseRow): VendorExpense => ({
   yearId: r.year_id,
   totalAmount: r.total_amount,
   notes: r.notes ?? undefined,
+  createdAt: r.created_at,
   vendor: mapVendor(r.vendors),
   payments: (r.vendor_payments ?? []).map(mapVendorPayment),
 });
@@ -747,40 +751,44 @@ interface PaymentWrite {
   selfFunded?: boolean;
 }
 
+/** Returns the new bill's id, so callers can immediately record a payment against it. */
 export async function dbAddVendorExpense(
   supabase: SupabaseClient,
   yearId: string,
-  input: { vendorName: string; serviceType: string; phone?: string; totalAmount: number; notes?: string },
-): Promise<void> {
+  input: { vendorName: string; serviceType: string; totalAmount: number; notes?: string },
+): Promise<string> {
   const insertedVendor = await supabase
     .from("vendors")
-    .insert({ name: input.vendorName, service_type: input.serviceType, phone: input.phone ?? null })
+    .insert({ name: input.vendorName, service_type: input.serviceType })
     .select()
     .single();
   const vendor = unwrap<VendorRow>(insertedVendor, "insert vendor");
 
-  const { error } = await supabase.from("vendor_expenses").insert({
-    vendor_id: vendor.id,
-    year_id: yearId,
-    total_amount: input.totalAmount,
-    notes: input.notes ?? null,
-  });
-  if (error) throw new Error(error.message);
+  const insertedExpense = await supabase
+    .from("vendor_expenses")
+    .insert({
+      vendor_id: vendor.id,
+      year_id: yearId,
+      total_amount: input.totalAmount,
+      notes: input.notes ?? null,
+    })
+    .select()
+    .single();
+  return unwrap<VendorExpenseRow>(insertedExpense, "insert vendor_expense").id;
 }
 
-/** Corrects a vendor bill entered wrong — the vendor's own name/service/phone and the bill's total/notes. */
+/** Corrects a vendor bill entered wrong — the vendor's own name/service and the bill's total/notes. */
 export async function dbUpdateVendorExpense(
   supabase: SupabaseClient,
   vendorId: string,
   expenseId: string,
-  input: { vendorName: string; serviceType: string; phone?: string; totalAmount: number; notes?: string },
+  input: { vendorName: string; serviceType: string; totalAmount: number; notes?: string },
 ): Promise<void> {
   const vendorUpdate = await supabase
     .from("vendors")
     .update({
       name: input.vendorName,
       service_type: input.serviceType,
-      phone: input.phone ?? null,
     })
     .eq("id", vendorId)
     .select("id");

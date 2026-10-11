@@ -90,7 +90,6 @@ export interface PaymentInput {
 export interface VendorExpenseInput {
   vendorName: string;
   serviceType: string;
-  phone?: string;
   totalAmount: number;
   notes?: string;
 }
@@ -224,7 +223,12 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   addFundTransfer: (input: FundTransferInput) => Promise<void>;
   removeFundTransfer: (transferId: string) => Promise<void>;
   saveContribution: (payer: PayerRef, input: ContributionInput) => Promise<void>;
-  addVendorExpense: (input: VendorExpenseInput) => Promise<void>;
+  /**
+   * Returns the new bill's id. Pass initialPayment when the bill is being
+   * paid right away (fully or as the first installment) instead of a
+   * separate "Record payment" step afterward.
+   */
+  addVendorExpense: (input: VendorExpenseInput, initialPayment?: PaymentInput) => Promise<string>;
   updateVendorExpense: (expenseId: string, input: VendorExpenseInput) => Promise<void>;
   addVendorPayment: (expenseId: string, input: PaymentInput) => Promise<void>;
   /** Corrects a vendor payment entered wrong — amount, mode, date, who paid, etc. */
@@ -589,14 +593,23 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await logActivity("contribution.save", summary, activeYear.id);
         await load();
       },
-      addVendorExpense: async (input) => {
-        await dbAddVendorExpense(supabase, activeYear.id, input);
+      addVendorExpense: async (input, initialPayment) => {
+        const expenseId = await dbAddVendorExpense(supabase, activeYear.id, input);
         await logActivity(
           "vendor_expense.add",
           `added a bill from ${input.vendorName} for ${formatINR(input.totalAmount)} (${input.serviceType})`,
           activeYear.id,
         );
+        if (initialPayment) {
+          await dbAddVendorPayment(supabase, expenseId, initialPayment);
+          await logActivity(
+            "vendor_payment.add",
+            `paid ${formatINR(initialPayment.amount)} to vendor ${input.vendorName}${initialPayment.selfFunded ? " (self-funded)" : ""} (by ${memberName(initialPayment.memberId)})`,
+            activeYear.id,
+          );
+        }
         await load();
+        return expenseId;
       },
       updateVendorExpense: async (expenseId, input) => {
         const expense = data.vendorExpenses.find((e) => e.id === expenseId);

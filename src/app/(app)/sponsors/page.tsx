@@ -25,12 +25,15 @@ export default function OutsideCollectionPage() {
     usePujaData();
   const [editing, setEditing] = useState<{ outsideCollection?: OutsideCollection } | null>(null);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<{ field: "name" | "amount" | "status"; dir: "asc" | "desc" }>({
-    field: "name",
-    dir: "asc",
+  const [sort, setSort] = useState<{
+    field: "date" | "name" | "amount" | "status";
+    dir: "asc" | "desc";
+  }>({
+    field: "date",
+    dir: "desc",
   });
 
-  function toggleSort(field: "name" | "amount" | "status") {
+  function toggleSort(field: "date" | "name" | "amount" | "status") {
     setSort((prev) =>
       prev.field === field
         ? { field, dir: prev.dir === "asc" ? "desc" : "asc" }
@@ -45,6 +48,9 @@ export default function OutsideCollectionPage() {
 
   const dir = sort.dir === "asc" ? 1 : -1;
   const sorted = [...filtered].sort((a, b) => {
+    if (sort.field === "date") {
+      return dir * a.createdAt.localeCompare(b.createdAt);
+    }
     if (sort.field === "amount") {
       return (
         dir *
@@ -88,6 +94,7 @@ export default function OutsideCollectionPage() {
         <span className="shrink-0 text-[0.68rem] font-semibold text-ink-faint">Sort</span>
         {(
           [
+            { field: "date" as const, label: "Date" },
             { field: "name" as const, label: "Name" },
             { field: "amount" as const, label: "Amount" },
             { field: "status" as const, label: "Status" },

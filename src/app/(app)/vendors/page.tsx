@@ -8,7 +8,7 @@ import { PlusIcon } from "@/components/icons";
 import { usePujaData } from "@/lib/store";
 import type { VendorPayment } from "@/lib/types";
 
-type SortField = "name" | "total" | "balance";
+type SortField = "date" | "name" | "total" | "balance";
 
 export default function VendorsPage() {
   const { vendorExpenses, addVendorPayment, updateVendorPayment, deleteVendorPayment, deleteVendorExpense } =
@@ -22,8 +22,8 @@ export default function VendorsPage() {
   } | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ field: SortField; dir: "asc" | "desc" }>({
-    field: "name",
-    dir: "asc",
+    field: "date",
+    dir: "desc",
   });
 
   const editing = vendorExpenses.find((e) => e.id === editingId);
@@ -54,6 +54,7 @@ export default function VendorsPage() {
 
   const dir = sort.dir === "asc" ? 1 : -1;
   const sortedExpenses = [...filtered].sort((a, b) => {
+    if (sort.field === "date") return dir * a.createdAt.localeCompare(b.createdAt);
     if (sort.field === "total") return dir * (a.totalAmount - b.totalAmount);
     if (sort.field === "balance") return dir * (balanceOf(a) - balanceOf(b));
     return dir * a.vendor.name.localeCompare(b.vendor.name);
@@ -87,6 +88,7 @@ export default function VendorsPage() {
         <span className="shrink-0 text-[0.68rem] font-semibold text-ink-faint">Sort</span>
         {(
           [
+            { field: "date" as const, label: "Date" },
             { field: "name" as const, label: "Name" },
             { field: "total" as const, label: "Total" },
             { field: "balance" as const, label: "Balance" },
