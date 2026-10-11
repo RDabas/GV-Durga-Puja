@@ -10,9 +10,8 @@ import {
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
-import { ScanPaymentButton } from "@/components/ScanPaymentButton";
-import { modeOptions } from "@/lib/contributionForm";
 import { today } from "@/lib/format";
+import { modeOptions } from "@/lib/contributionForm";
 import type { ScannedPayment } from "@/lib/scanPayment";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
@@ -21,38 +20,35 @@ import type { PaymentMode, VendorExpense } from "@/lib/types";
 export function VendorExpenseSheet({
   open,
   expense,
+  initialScan,
   onClose,
 }: {
   open: boolean;
   /** Present to edit an existing bill (fixing a typo'd name or amount); absent to add a new one. */
   expense?: VendorExpense;
+  /** Pre-fills this as paid-on-add, from a payment screenshot scanned before this sheet opened (see the "Scan payment" button on the Vendors page). */
+  initialScan?: ScannedPayment;
   onClose: () => void;
 }) {
   const { members, addVendorExpense, updateVendorExpense } = usePujaData();
   const [vendorName, setVendorName] = useState(expense?.vendor.name ?? "");
   const [serviceType, setServiceType] = useState(expense?.vendor.serviceType ?? "");
-  const [totalAmount, setTotalAmount] = useState(expense?.totalAmount ?? 0);
+  const [totalAmount, setTotalAmount] = useState(expense?.totalAmount ?? initialScan?.amount ?? 0);
 
   // Some bills are settled the moment they're added (instant pay), others
   // run as installments over time — this lets the former skip the separate
   // "Record payment" step. Only offered when adding a new bill; an existing
   // bill already has its own payment history and Record-payment action.
-  const [recordingPayment, setRecordingPayment] = useState(false);
-  const [paidAmount, setPaidAmount] = useState(0);
-  const [paidMode, setPaidMode] = useState<PaymentMode>("upi");
+  // Pre-checked when opened from a scan, since scanning one implies this
+  // bill is being added specifically because it's already been paid.
+  const [recordingPayment, setRecordingPayment] = useState(Boolean(initialScan));
+  const [paidAmount, setPaidAmount] = useState(initialScan?.amount ?? 0);
+  const [paidMode, setPaidMode] = useState<PaymentMode>(initialScan?.mode ?? "upi");
   const [paidById, setPaidById] = useState(members[0]?.id ?? "");
-  const [paidDate, setPaidDate] = useState(today());
+  const [paidDate, setPaidDate] = useState(initialScan?.paymentDate ?? today());
   const [selfFunded, setSelfFunded] = useState(false);
-  const [scanned, setScanned] = useState(false);
 
   const { submitting, error, run } = useAsyncAction();
-
-  function handleScanned(result: ScannedPayment) {
-    if (result.amount !== undefined) setPaidAmount(result.amount);
-    if (result.mode !== undefined) setPaidMode(result.mode);
-    if (result.paymentDate !== undefined) setPaidDate(result.paymentDate);
-    setScanned(true);
-  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -87,7 +83,6 @@ export function VendorExpenseSheet({
         setTotalAmount(0);
         setRecordingPayment(false);
         setPaidAmount(0);
-        setScanned(false);
         onClose();
       },
     );
@@ -133,9 +128,10 @@ export function VendorExpenseSheet({
 
             {recordingPayment && (
               <>
-                <ScanPaymentButton onExtracted={handleScanned} />
-                {scanned && (
-                  <p className="text-[0.75rem] text-ink-faint">Scanned — check the details below.</p>
+                {initialScan && (
+                  <p className="text-[0.75rem] text-ink-faint">
+                    Scanned — check the details below.
+                  </p>
                 )}
 
                 <Field label="Amount paid">

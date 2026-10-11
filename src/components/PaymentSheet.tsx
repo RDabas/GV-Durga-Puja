@@ -10,7 +10,6 @@ import {
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
-import { ScanPaymentButton } from "@/components/ScanPaymentButton";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import { today } from "@/lib/format";
@@ -33,6 +32,7 @@ export function PaymentSheet({
   memberLabel,
   allowSelfFunded,
   payment,
+  initialScan,
   onSubmit,
   onClose,
 }: {
@@ -45,25 +45,21 @@ export function PaymentSheet({
   allowSelfFunded?: boolean;
   /** Present to edit an existing payment in place; absent to record a new one. */
   payment?: PaymentInput;
+  /** Pre-fills amount/mode/date, from a payment screenshot scanned before this sheet opened (see the "Scan payment" button on the Vendors page). */
+  initialScan?: ScannedPayment;
   onSubmit: (input: PaymentInput) => Promise<void>;
   onClose: () => void;
 }) {
   const { members } = usePujaData();
-  const [amount, setAmount] = useState(payment?.amount ?? 0);
-  const [mode, setMode] = useState<PaymentMode>(payment?.mode ?? "upi");
+  const [amount, setAmount] = useState(payment?.amount ?? initialScan?.amount ?? 0);
+  const [mode, setMode] = useState<PaymentMode>(payment?.mode ?? initialScan?.mode ?? "upi");
   const [memberId, setMemberId] = useState(payment?.memberId ?? members[0]?.id ?? "");
-  const [paymentDate, setPaymentDate] = useState(payment?.paymentDate ?? today());
+  const [paymentDate, setPaymentDate] = useState(
+    payment?.paymentDate ?? initialScan?.paymentDate ?? today(),
+  );
   const [note, setNote] = useState(payment?.note ?? "");
   const [selfFunded, setSelfFunded] = useState(payment?.selfFunded ?? false);
-  const [scanned, setScanned] = useState(false);
   const { submitting, error, run } = useAsyncAction();
-
-  function handleScanned(result: ScannedPayment) {
-    if (result.amount !== undefined) setAmount(result.amount);
-    if (result.mode !== undefined) setMode(result.mode);
-    if (result.paymentDate !== undefined) setPaymentDate(result.paymentDate);
-    setScanned(true);
-  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -90,8 +86,7 @@ export function PaymentSheet({
   return (
     <Sheet open={open} onClose={onClose} title={title} subtitle={subtitle}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <ScanPaymentButton onExtracted={handleScanned} />
-        {scanned && (
+        {initialScan && (
           <p className="text-[0.75rem] text-ink-faint">Scanned — check the details below.</p>
         )}
 

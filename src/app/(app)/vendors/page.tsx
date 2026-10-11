@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import { PaymentSheet } from "@/components/PaymentSheet";
+import { ScanPaymentButton } from "@/components/ScanPaymentButton";
+import { Sheet } from "@/components/Sheet";
 import { VendorCard } from "@/components/VendorCard";
 import { VendorExpenseSheet } from "@/components/VendorExpenseSheet";
 import { PlusIcon } from "@/components/icons";
+import { formatINR } from "@/lib/format";
+import type { ScannedPayment } from "@/lib/scanPayment";
 import { usePujaData } from "@/lib/store";
 import type { VendorPayment } from "@/lib/types";
 
@@ -26,11 +30,24 @@ export default function VendorsPage() {
     dir: "desc",
   });
 
+  // After a page-level scan, the extracted values wait here until the
+  // person picks which bill they're for — then open the matching sheet
+  // (a brand-new bill, or "Record payment" on an existing one) pre-filled.
+  const [scanResult, setScanResult] = useState<ScannedPayment | null>(null);
+  const [scanTarget, setScanTarget] = useState<"new" | string | null>(null);
+
   const editing = vendorExpenses.find((e) => e.id === editingId);
   const paying = vendorExpenses.find((e) => e.id === payingFor);
   const editingPaymentExpense = editingPayment
     ? vendorExpenses.find((e) => e.id === editingPayment.expenseId)
     : undefined;
+  const scanTargetExpense =
+    scanTarget && scanTarget !== "new" ? vendorExpenses.find((e) => e.id === scanTarget) : undefined;
+
+  function closeScanFlow() {
+    setScanResult(null);
+    setScanTarget(null);
+  }
 
   function toggleSort(field: SortField) {
     setSort((prev) =>
@@ -62,18 +79,21 @@ export default function VendorsPage() {
 
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
           Vendor expenses
         </p>
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
-        >
-          <PlusIcon className="h-[13px] w-[13px]" />
-          Add bill
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <ScanPaymentButton onExtracted={setScanResult} />
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
+          >
+            <PlusIcon className="h-[13px] w-[13px]" />
+            Add bill
+          </button>
+        </div>
       </div>
 
       <input
@@ -165,6 +185,58 @@ export default function VendorsPage() {
             updateVendorPayment(editingPayment.expenseId, editingPayment.payment.id, input)
           }
           onClose={() => setEditingPayment(null)}
+        />
+      )}
+
+      {scanResult && scanTarget === null && (
+        <Sheet open onClose={closeScanFlow} title="Which bill is this for?">
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setScanTarget("new")}
+              className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border py-3 text-[0.85rem] font-semibold text-brand active:scale-[0.99]"
+            >
+              <PlusIcon className="h-[13px] w-[13px]" />
+              New bill
+            </button>
+            {sortedExpenses.map((expense) => (
+              <button
+                key={expense.id}
+                type="button"
+                onClick={() => setScanTarget(expense.id)}
+                className="flex w-full items-center justify-between gap-2 rounded-xl border border-border px-3.5 py-2.5 text-left active:scale-[0.99]"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[0.85rem] font-semibold text-ink">
+                    {expense.vendor.name}
+                  </span>
+                  <span className="block text-[0.72rem] text-ink-faint">
+                    {expense.vendor.serviceType}
+                  </span>
+                </span>
+                <span className="shrink-0 text-[0.78rem] font-semibold tabular-nums text-ink-soft">
+                  {formatINR(balanceOf(expense))} due
+                </span>
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
+
+      {scanResult && scanTarget === "new" && (
+        <VendorExpenseSheet open initialScan={scanResult} onClose={closeScanFlow} />
+      )}
+
+      {scanResult && scanTargetExpense && (
+        <PaymentSheet
+          open
+          title="Record vendor payment"
+          subtitle={scanTargetExpense.vendor.name}
+          memberLabel="Paid by"
+          allowSelfFunded
+          initialScan={scanResult}
+          onSubmit={(input) => addVendorPayment(scanTargetExpense.id, input)}
+          onClose={closeScanFlow}
         />
       )}
     </div>
