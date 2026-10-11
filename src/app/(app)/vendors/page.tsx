@@ -199,26 +199,28 @@ export default function VendorsPage() {
               <PlusIcon className="h-[13px] w-[13px]" />
               New bill
             </button>
-            {sortedExpenses.map((expense) => (
-              <button
-                key={expense.id}
-                type="button"
-                onClick={() => setScanTarget(expense.id)}
-                className="flex w-full items-center justify-between gap-2 rounded-xl border border-border px-3.5 py-2.5 text-left active:scale-[0.99]"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-[0.85rem] font-semibold text-ink">
-                    {expense.vendor.name}
+            {sortedExpenses
+              .filter((expense) => balanceOf(expense) > 0)
+              .map((expense) => (
+                <button
+                  key={expense.id}
+                  type="button"
+                  onClick={() => setScanTarget(expense.id)}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-border px-3.5 py-2.5 text-left active:scale-[0.99]"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-[0.85rem] font-semibold text-ink">
+                      {expense.vendor.name}
+                    </span>
+                    <span className="block text-[0.72rem] text-ink-faint">
+                      {expense.vendor.serviceType}
+                    </span>
                   </span>
-                  <span className="block text-[0.72rem] text-ink-faint">
-                    {expense.vendor.serviceType}
+                  <span className="shrink-0 text-[0.78rem] font-semibold tabular-nums text-ink-soft">
+                    {formatINR(balanceOf(expense))} due
                   </span>
-                </span>
-                <span className="shrink-0 text-[0.78rem] font-semibold tabular-nums text-ink-soft">
-                  {formatINR(balanceOf(expense))} due
-                </span>
-              </button>
-            ))}
+                </button>
+              ))}
           </div>
         </Sheet>
       )}
