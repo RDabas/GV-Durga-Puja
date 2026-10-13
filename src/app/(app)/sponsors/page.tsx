@@ -82,6 +82,66 @@ export default function OutsideCollectionPage() {
     <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         <p className="px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
+          Dandiya Night Passes
+        </p>
+        <button
+          type="button"
+          onClick={() => setEditingPass({})}
+          className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
+        >
+          <PlusIcon className="h-[13px] w-[13px]" />
+          Add pass
+        </button>
+      </div>
+
+      {passes.length === 0 && (
+        <p className="rounded-2xl border border-border bg-surface p-3.5 text-[0.8rem] text-ink-faint">
+          No Dandiya Night passes sold yet.
+        </p>
+      )}
+
+      {passes.map((entry) => {
+        const passContribution = contributionFor({ outsideCollectionId: entry.id });
+        return (
+          <OutsideCollectionCard
+            key={entry.id}
+            outsideCollection={entry}
+            contribution={passContribution}
+            collectorName={memberName(passContribution?.collectorId)}
+            assignedToName={
+              memberName(passContribution?.assignedToMemberId) ?? passContribution?.assignedToName
+            }
+            onEdit={() => setEditingPass({ outsideCollection: entry })}
+            onToggleDisabled={() => setOutsideCollectionDisabled(entry.id, !entry.disabled)}
+          />
+        );
+      })}
+
+      {editingPass && (
+        <DandiyaPassSheet
+          key={editingPass.outsideCollection?.id ?? "new"}
+          open
+          pass={
+            editingPass.outsideCollection
+              ? (() => {
+                  const c = contributionFor({
+                    outsideCollectionId: editingPass.outsideCollection!.id,
+                  });
+                  return {
+                    outsideCollection: editingPass.outsideCollection!,
+                    peopleCount: c?.passPeopleCount ?? 1,
+                    day18: c?.passDay18 ?? true,
+                    day19: c?.passDay19 ?? true,
+                  };
+                })()
+              : undefined
+          }
+          onClose={() => setEditingPass(null)}
+        />
+      )}
+
+      <div className="flex items-center justify-between pt-2">
+        <p className="px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
           Outside Collection
         </p>
         <button
@@ -157,66 +217,6 @@ export default function OutsideCollectionPage() {
           open
           outsideCollection={editing.outsideCollection}
           onClose={() => setEditing(null)}
-        />
-      )}
-
-      <div className="flex items-center justify-between pt-2">
-        <p className="px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-          Dandiya Night Passes
-        </p>
-        <button
-          type="button"
-          onClick={() => setEditingPass({})}
-          className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
-        >
-          <PlusIcon className="h-[13px] w-[13px]" />
-          Add pass
-        </button>
-      </div>
-
-      {passes.length === 0 && (
-        <p className="rounded-2xl border border-border bg-surface p-3.5 text-[0.8rem] text-ink-faint">
-          No Dandiya Night passes sold yet.
-        </p>
-      )}
-
-      {passes.map((entry) => {
-        const contribution = contributionFor({ outsideCollectionId: entry.id });
-        return (
-          <OutsideCollectionCard
-            key={entry.id}
-            outsideCollection={entry}
-            contribution={contribution}
-            collectorName={memberName(contribution?.collectorId)}
-            assignedToName={
-              memberName(contribution?.assignedToMemberId) ?? contribution?.assignedToName
-            }
-            onEdit={() => setEditingPass({ outsideCollection: entry })}
-            onToggleDisabled={() => setOutsideCollectionDisabled(entry.id, !entry.disabled)}
-          />
-        );
-      })}
-
-      {editingPass && (
-        <DandiyaPassSheet
-          key={editingPass.outsideCollection?.id ?? "new"}
-          open
-          pass={
-            editingPass.outsideCollection
-              ? (() => {
-                  const c = contributionFor({
-                    outsideCollectionId: editingPass.outsideCollection!.id,
-                  });
-                  return {
-                    outsideCollection: editingPass.outsideCollection!,
-                    peopleCount: c?.passPeopleCount ?? 1,
-                    day18: c?.passDay18 ?? true,
-                    day19: c?.passDay19 ?? true,
-                  };
-                })()
-              : undefined
-          }
-          onClose={() => setEditingPass(null)}
         />
       )}
     </div>

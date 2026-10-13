@@ -59,13 +59,52 @@ const INK_RGB: [number, number, number] = [25, 25, 35];
 const PAGE_MARGIN_X = 16;
 const BOX_TOP = 16;
 
-/** Draws the shared letterhead (society name, subtitle, year, divider) every generated document opens with. Returns the y cursor just below the divider. */
-function drawLetterhead(doc: jsPDF, pageWidth: number, subtitle: string, year: PujaYear): number {
+// The Durga Maa crest cropped from the committee's own reference slip —
+// public/durga-logo.png, ~98x166px (w:h ≈ 1:1.69). Fetched once and cached
+// as raw bytes so every PDF generated in this session re-embeds the same
+// buffer instead of re-fetching.
+const LOGO_ASPECT = 166 / 98;
+let logoBytesPromise: Promise<Uint8Array | null> | null = null;
+function loadLogo(): Promise<Uint8Array | null> {
+  logoBytesPromise ??= fetch("/durga-logo.png")
+    .then((res) => (res.ok ? res.arrayBuffer() : null))
+    .then((buf) => (buf ? new Uint8Array(buf) : null))
+    .catch(() => null);
+  return logoBytesPromise;
+}
+
+/** Draws the shared letterhead (Durga Maa crest, society name, subtitle, year, divider) every generated document opens with. Returns the y cursor just below the divider. */
+async function drawLetterhead(
+  doc: jsPDF,
+  pageWidth: number,
+  subtitle: string,
+  year: PujaYear,
+): Promise<number> {
   let y = BOX_TOP + 14;
+  const logo = await loadLogo();
+
+  const title = "Ganga Vertica Celebrates Durga Puja";
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
+  const titleWidth = doc.getTextWidth(title);
+  const logoW = 11;
+  const logoH = logoW * LOGO_ASPECT;
+  const gap = 3;
+  const blockWidth = logo ? logoW + gap + titleWidth : titleWidth;
+  const startX = pageWidth / 2 - blockWidth / 2;
+
+  if (logo) {
+    try {
+      doc.addImage(logo, "PNG", startX, y - logoH + 5, logoW, logoH);
+    } catch {
+      // A broken/unreachable image shouldn't block the rest of the document —
+      // the letterhead just falls back to text-only below.
+    }
+  }
   doc.setTextColor(...BRAND_RGB);
-  doc.text("Ganga Vertica Celebrates Durga Puja", pageWidth / 2, y, { align: "center" });
+  doc.text(title, logo ? startX + logoW + gap : pageWidth / 2, y, {
+    align: logo ? "left" : "center",
+  });
   y += 7;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
@@ -208,7 +247,7 @@ export async function generateReceiptPdf(
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  let y = drawLetterhead(doc, pageWidth, payment.slipTitle ?? "Receipt of Contribution", year);
+  let y = await drawLetterhead(doc, pageWidth, payment.slipTitle ?? "Receipt of Contribution", year);
   y = drawReferenceLine(doc, pageWidth, y, reference, `Date: ${formatShortDate(payment.paymentDate)}, ${year.year}`);
   y = drawPayerBlock(doc, y, "Received with thanks from", payer);
 
@@ -280,7 +319,7 @@ export async function generateContributionRequestPdf(
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  let y = drawLetterhead(doc, pageWidth, "Contribution Request", year);
+  let y = await drawLetterhead(doc, pageWidth, "Contribution Request", year);
   y = drawReferenceLine(doc, pageWidth, y, reference, `Date: ${formatShortDate(requestDate)}, ${year.year}`);
   y = drawPayerBlock(doc, y, "To", payer);
 
