@@ -22,6 +22,7 @@ const outsideCollectionTypeLabels: Record<OutsideCollectionType, string> = {
   donation_box: "Donation Box Collection",
   stall: "Stall",
   dandiya_collection: "Dandiya Night Collection",
+  dandiya_pass: "Dandiya Night Pass",
   promotion: "Promotion",
 };
 

@@ -1,5 +1,7 @@
 import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { formatShortDate, today } from "@/lib/format";
+import { paymentModeLabels } from "@/lib/payment";
 import { formatINRForPdf as formatINR, numberToIndianWords } from "@/lib/pdfFormat";
 import type { PaymentMode, PujaYear } from "@/lib/types";
 
@@ -7,7 +9,7 @@ export interface ReceiptPayer {
   name: string;
   /** Shown under the name — e.g. "A-101 · Owner", "Ex Resident", "Stall · Gate 2". */
   context?: string;
-  /** Short, stable code this payer is known by — used to build the "No." reference (no running counter; see generateReceiptPdf's doc comment). */
+  /** Short, stable code this payer is known by — used to build the reference (no running counter; see generateReceiptPdf's doc comment). */
   refCode: string;
 }
 
@@ -27,8 +29,10 @@ export interface ReceiptPaymentDetails {
    * settlement.
    */
   originalPledgeAmount?: number;
-  /** Shown on the "towards" line instead of the generic "Durga Pooja" — e.g. a Dandiya Night Pass's people/night breakdown. */
+  /** Shown on the "Towards" row instead of the generic "Durga Puja Celebration <year>" — e.g. a Dandiya Night Pass's people/night breakdown. */
   towardsOverride?: string;
+  /** Shown as the document's title instead of the generic "Receipt of Contribution" — e.g. "Dandiya Night Pass". */
+  slipTitle?: string;
 }
 
 /** Either a specific pledge still owed ("promised") or a plain, no-figure ask ("pending" — nothing's been discussed yet). */
@@ -45,125 +49,92 @@ function compactDate(iso: string): string {
   return `${dd}${mm}${yy}`;
 }
 
-// Matches the committee's real printed "Donation Slip" booklet — a navy/
-// indigo ink on a bordered slip, not the app's own maroon brand color.
-const SLIP_BLUE: [number, number, number] = [36, 52, 125];
-const SLIP_FAINT: [number, number, number] = [100, 108, 150];
-const SLIP_INK: [number, number, number] = [25, 25, 35];
+// Navy/indigo, matching the committee's real printed Donation Slip booklet —
+// kept local to this file (not pdfFormat.ts's shared brand color, which the
+// Funds-tab audit report still uses its own maroon for).
+const BRAND_RGB: [number, number, number] = [36, 52, 125];
+const FAINT_RGB: [number, number, number] = [100, 108, 150];
+const INK_RGB: [number, number, number] = [25, 25, 35];
 
 const PAGE_MARGIN_X = 16;
 const BOX_TOP = 16;
 
-/** The letterhead every generated slip opens with — society name, address, divider, and the slip's title. Returns the y cursor below it. */
-function drawLetterhead(doc: jsPDF, pageWidth: number, title: string): number {
-  let y = BOX_TOP + 13;
+/** Draws the shared letterhead (society name, subtitle, year, divider) every generated document opens with. Returns the y cursor just below the divider. */
+function drawLetterhead(doc: jsPDF, pageWidth: number, subtitle: string, year: PujaYear): number {
+  let y = BOX_TOP + 14;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(17);
-  doc.setTextColor(...SLIP_BLUE);
-  doc.text("Ganga Vertica Celebrates", pageWidth / 2, y, { align: "center" });
+  doc.setFontSize(16);
+  doc.setTextColor(...BRAND_RGB);
+  doc.text("Ganga Vertica Celebrates Durga Puja", pageWidth / 2, y, { align: "center" });
   y += 7;
-  doc.setFont("times", "bolditalic");
-  doc.setFontSize(14);
-  doc.text("Durga Puja", pageWidth / 2, y, { align: "center" });
-  y += 5.5;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...SLIP_FAINT);
-  doc.text(
-    "Ganga Vertica Apartment, Neeladri Road, Electronic City Phase 1, Bengaluru - 560 100.",
-    pageWidth / 2,
-    y,
-    { align: "center" },
-  );
-  y += 6;
+  doc.setFontSize(11);
+  doc.setTextColor(...INK_RGB);
+  doc.text(subtitle, pageWidth / 2, y, { align: "center" });
+  y += 5.5;
+  doc.setFontSize(9);
+  doc.setTextColor(...FAINT_RGB);
+  doc.text(`Durga Puja Celebration ${year.year}`, pageWidth / 2, y, { align: "center" });
+  y += 7;
 
-  doc.setDrawColor(...SLIP_BLUE);
+  doc.setDrawColor(...BRAND_RGB);
   doc.setLineWidth(0.6);
   doc.line(PAGE_MARGIN_X, y, pageWidth - PAGE_MARGIN_X, y);
-  y += 8;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(...SLIP_INK);
-  doc.text(title, pageWidth / 2, y, { align: "center" });
-  const titleWidth = doc.getTextWidth(title);
-  doc.setLineWidth(0.4);
-  doc.line(pageWidth / 2 - titleWidth / 2, y + 1.3, pageWidth / 2 + titleWidth / 2, y + 1.3);
-  return y + 10;
+  return y + 9;
 }
 
-/** "No. [ref]" (left) and "Date: [date]" (right), like the slip's top row. Returns the y cursor below it. */
-function drawNoAndDateRow(doc: jsPDF, pageWidth: number, y: number, reference: string, dateLabel: string): number {
+/** Reference line (left) and date (right), just under the letterhead. Returns the y cursor below it. */
+function drawReferenceLine(
+  doc: jsPDF,
+  pageWidth: number,
+  y: number,
+  reference: string,
+  dateLabel: string,
+): number {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
-  doc.setTextColor(...SLIP_INK);
-  doc.text(`No. ${reference}`, PAGE_MARGIN_X, y);
+  doc.setTextColor(...FAINT_RGB);
+  doc.text(`Reference: ${reference}`, PAGE_MARGIN_X, y);
   doc.text(dateLabel, pageWidth - PAGE_MARGIN_X, y, { align: "right" });
   return y + 9;
 }
 
-/** The "Received with thanks the sum of Rupees ... Only" line, with the words sitting on their own underlined blank, same as the slip. Returns the y cursor below it. */
-function drawAmountInWordsLine(doc: jsPDF, pageWidth: number, y: number, words: string): number {
+/** The payer's name block — a lead-in line, the bold name, and an optional faint context line. Returns the y cursor below it. */
+function drawPayerBlock(doc: jsPDF, y: number, leadIn: string, payer: ReceiptPayer): number {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
-  doc.setTextColor(...SLIP_INK);
-  doc.text("Received with thanks the sum of Rupees", PAGE_MARGIN_X, y);
+  doc.setTextColor(...FAINT_RGB);
+  doc.text(leadIn, PAGE_MARGIN_X, y);
   y += 6.5;
   doc.setFont("helvetica", "bold");
-  doc.text(words, PAGE_MARGIN_X, y);
-  doc.setDrawColor(...SLIP_FAINT);
-  doc.setLineWidth(0.25);
-  doc.line(PAGE_MARGIN_X, y + 1.5, pageWidth - PAGE_MARGIN_X, y + 1.5);
-  return y + 9;
-}
-
-/** "Smt/Shri [Name]" (or just the name for a non-individual payer) plus an optional faint context line. Returns the y cursor below it. */
-function drawPayerLine(doc: jsPDF, pageWidth: number, y: number, payer: ReceiptPayer, honorific: boolean): number {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12.5);
-  doc.setTextColor(...SLIP_INK);
-  doc.text(`${honorific ? "Smt/Shri " : ""}${payer.name}`, PAGE_MARGIN_X, y);
-  doc.setDrawColor(...SLIP_FAINT);
-  doc.setLineWidth(0.25);
-  doc.line(PAGE_MARGIN_X, y + 1.5, pageWidth - PAGE_MARGIN_X, y + 1.5);
-  y += 6;
+  doc.setFontSize(14);
+  doc.setTextColor(...INK_RGB);
+  doc.text(payer.name, PAGE_MARGIN_X, y);
   if (payer.context) {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(...SLIP_FAINT);
-    doc.text(payer.context, PAGE_MARGIN_X, y);
+    doc.setFontSize(9.5);
+    doc.setTextColor(...FAINT_RGB);
+    doc.text(payer.context, PAGE_MARGIN_X, y + 5);
     y += 5;
   }
-  return y + 4;
+  return y + 10;
 }
 
-/** The slip's closing "Rs. [amount]" / "Signature" row, the bordered frame around everything, and a small footer note. Returns nothing — this is always the last thing drawn. */
-function closeSlip(
-  doc: jsPDF,
-  pageWidth: number,
-  y: number,
-  amountLabel: string | undefined,
-  footerNote: string,
-): void {
-  if (amountLabel) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(...SLIP_INK);
-    doc.text(amountLabel, PAGE_MARGIN_X, y);
-  }
-  const sigX = pageWidth - PAGE_MARGIN_X - 45;
-  doc.setDrawColor(...SLIP_FAINT);
+/** Signature line ("For GV Durga Puja Committee") + the bordered frame around everything + the small footer note, drawn last so the frame encloses the whole page. */
+function closeDocumentFrame(doc: jsPDF, pageWidth: number, y: number, footerNote: string): void {
+  const sigX = pageWidth - PAGE_MARGIN_X - 60;
+  doc.setDrawColor(...FAINT_RGB);
   doc.setLineWidth(0.3);
   doc.line(sigX, y, pageWidth - PAGE_MARGIN_X, y);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(9);
-  doc.setTextColor(...SLIP_FAINT);
-  doc.text("Signature", pageWidth - PAGE_MARGIN_X, y + 5, { align: "right" });
   y += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...FAINT_RGB);
+  doc.text("For GV Durga Puja Committee", pageWidth - PAGE_MARGIN_X, y, { align: "right" });
 
   const boxBottom = y + 10;
-  doc.setDrawColor(...SLIP_BLUE);
-  doc.setLineWidth(0.9);
+  doc.setDrawColor(...BRAND_RGB);
+  doc.setLineWidth(0.8);
   doc.roundedRect(
     PAGE_MARGIN_X - 6,
     BOX_TOP,
@@ -172,19 +143,10 @@ function closeSlip(
     3,
     3,
   );
-  doc.setLineWidth(0.3);
-  doc.roundedRect(
-    PAGE_MARGIN_X - 4,
-    BOX_TOP + 2,
-    pageWidth - PAGE_MARGIN_X * 2 + 8,
-    boxBottom - BOX_TOP - 4,
-    2,
-    2,
-  );
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...SLIP_FAINT);
+  doc.setFontSize(7.5);
+  doc.setTextColor(...FAINT_RGB);
   doc.text(footerNote, pageWidth / 2, boxBottom + 8, { align: "center" });
 }
 
@@ -224,83 +186,83 @@ async function shareOrDownloadPdf(
 }
 
 /**
- * A one-page PDF "Donation Slip" for a single contribution, matching the
- * committee's real printed slip booklet (society letterhead, No./Date row,
- * "Received with thanks the sum of Rupees ...", name, amount, signature) —
- * built client-side and shared the same way as the Funds-tab audit report
- * (Web Share API on a phone, otherwise a direct download).
+ * A one-page PDF receipt for a single contribution — "Ganga Vertica
+ * Celebrates Durga Puja received Rs. X from <payer>, via <mode>, on
+ * <date>" — built client-side and shared the same way as the Funds-tab
+ * audit report (Web Share API on a phone, otherwise a direct download).
  *
- * No permanent sequential slip number is kept (that would need a counter
- * persisted in Supabase, unlike the physical booklet's pre-printed numbers);
- * instead each slip's "No." combines the payer's own code with the payment
- * date, which is unique enough for a payer who — as is the norm here — pays
- * once a year, without needing any schema change.
+ * No permanent sequential receipt number is kept (that would need a counter
+ * persisted in Supabase); instead each receipt's reference combines the
+ * payer's own code with the payment date, which is unique enough for a
+ * payer who — as is the norm here — pays once a year, without needing any
+ * schema change.
  */
 export async function generateReceiptPdf(
   payer: ReceiptPayer,
   payment: ReceiptPaymentDetails,
   year: PujaYear,
-  honorific = true,
 ): Promise<void> {
   const totalAmount = payment.moneyAmount + payment.bhogGroceryAmount;
-  const reference = `${payer.refCode}/${compactDate(payment.paymentDate)}`;
+  const reference = `GVDP/${payer.refCode}/${compactDate(payment.paymentDate)}`;
 
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  let y = drawLetterhead(doc, pageWidth, "DONATION SLIP");
-  y = drawNoAndDateRow(doc, pageWidth, y, reference, `Date: ${formatShortDate(payment.paymentDate)}, ${year.year}`);
-  y = drawAmountInWordsLine(doc, pageWidth, y, `${numberToIndianWords(totalAmount)} Only`);
-  y = drawPayerLine(doc, pageWidth, y, payer, honorific);
+  let y = drawLetterhead(doc, pageWidth, payment.slipTitle ?? "Receipt of Contribution", year);
+  y = drawReferenceLine(doc, pageWidth, y, reference, `Date: ${formatShortDate(payment.paymentDate)}, ${year.year}`);
+  y = drawPayerBlock(doc, y, "Received with thanks from", payer);
 
   const isPartPayment =
     payment.originalPledgeAmount != null && payment.originalPledgeAmount > payment.moneyAmount;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.setTextColor(...SLIP_INK);
-  doc.text(`towards ${payment.towardsOverride ?? "Durga Pooja"}`, PAGE_MARGIN_X, y);
-  y += 7;
-
+  const rows: (string | number)[][] = [];
   if (isPartPayment) {
-    doc.setFontSize(8.5);
-    doc.setTextColor(...SLIP_FAINT);
-    doc.text(
-      `Pledged ${formatINR(payment.originalPledgeAmount!)} · balance pending ${formatINR(payment.originalPledgeAmount! - payment.moneyAmount)}`,
-      PAGE_MARGIN_X,
-      y,
-    );
-    y += 6;
+    rows.push(["Total amount pledged", formatINR(payment.originalPledgeAmount!)]);
   }
   if (payment.moneyAmount > 0 && payment.bhogGroceryAmount > 0) {
-    doc.setFontSize(8.5);
-    doc.setTextColor(...SLIP_FAINT);
-    doc.text(
-      `Cash/UPI ${formatINR(payment.moneyAmount)} + Bhog & groceries (in-kind) ${formatINR(payment.bhogGroceryAmount)}`,
-      PAGE_MARGIN_X,
-      y,
-    );
-    y += 6;
+    rows.push(["Cash / UPI contribution", formatINR(payment.moneyAmount)]);
+    rows.push(["Bhog & groceries (in-kind)", formatINR(payment.bhogGroceryAmount)]);
   }
-  y += 6;
+  rows.push([isPartPayment ? "Amount received now" : "Amount received", formatINR(totalAmount)]);
+  rows.push(["In words", `Rupees ${numberToIndianWords(totalAmount)} Only`]);
+  if (isPartPayment) {
+    rows.push(["Balance pending", formatINR(payment.originalPledgeAmount! - payment.moneyAmount)]);
+  }
+  if (payment.moneyAmount > 0) {
+    rows.push(["Payment mode", paymentModeLabels[payment.paymentMode]]);
+  }
+  rows.push(["Towards", payment.towardsOverride ?? `Durga Puja Celebration ${year.year}`]);
+  if (payment.collectorName) {
+    rows.push(["Received by", `${payment.collectorName}, on behalf of GV Durga Puja Committee`]);
+  }
 
-  closeSlip(doc, pageWidth, y, formatINR(totalAmount), "System-generated via the GV Durga Puja app.");
+  autoTable(doc, {
+    startY: y,
+    theme: "plain",
+    margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X },
+    styles: { fontSize: 10, cellPadding: 1.8 },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 }, 1: {} },
+    body: rows,
+  });
+  y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
 
-  const filename = `Donation Slip - ${payer.name} - GV Durga Puja ${year.year}.pdf`;
+  closeDocumentFrame(doc, pageWidth, y, "This is a system-generated receipt from the GV Durga Puja app.");
+
+  const titlePrefix = payment.slipTitle ?? "Receipt";
+  const filename = `${titlePrefix} - ${payer.name} - GV Durga Puja ${year.year}.pdf`;
   await shareOrDownloadPdf(
     doc,
     filename,
     filename,
-    `Donation slip for ${payer.name} — GV Durga Puja ${year.year}`,
+    `${titlePrefix} for ${payer.name} — GV Durga Puja ${year.year}`,
   );
 }
 
 /**
  * A one-page PDF request/reminder for a contribution that hasn't come in
  * yet — "promised" shows the pledged figure still owed, "pending" (nothing
- * discussed yet) is a plain, no-figure ask. Same letterhead/style as
- * generateReceiptPdf, shared the same way (Web Share API on a phone,
- * otherwise a direct download).
+ * discussed yet) is a plain, no-figure ask. Shared the same way as a
+ * receipt (Web Share API on a phone, otherwise a direct download).
  *
  * The chip that triggers this swaps to generateReceiptPdf automatically
  * once the status actually becomes paid/partial/bhog_only — both share the
@@ -311,30 +273,52 @@ export async function generateContributionRequestPdf(
   payer: ReceiptPayer,
   request: ContributionRequestDetails,
   year: PujaYear,
-  honorific = true,
 ): Promise<void> {
   const requestDate = today();
-  const reference = `${payer.refCode}/${compactDate(requestDate)}`;
+  const reference = `GVDP/${payer.refCode}/${compactDate(requestDate)}`;
 
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  let y = drawLetterhead(doc, pageWidth, "CONTRIBUTION REQUEST");
-  y = drawNoAndDateRow(doc, pageWidth, y, reference, `Date: ${formatShortDate(requestDate)}, ${year.year}`);
-  y = drawPayerLine(doc, pageWidth, y, payer, honorific);
+  let y = drawLetterhead(doc, pageWidth, "Contribution Request", year);
+  y = drawReferenceLine(doc, pageWidth, y, reference, `Date: ${formatShortDate(requestDate)}, ${year.year}`);
+  y = drawPayerBlock(doc, y, "To", payer);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.setTextColor(...SLIP_INK);
+  const rows: (string | number)[][] =
+    request.kind === "promised"
+      ? [
+          ["Amount pledged", formatINR(request.pledgedAmount)],
+          ["In words", `Rupees ${numberToIndianWords(request.pledgedAmount)} Only`],
+          ["Status", "Payment pending"],
+          ["Towards", `Durga Puja Celebration ${year.year}`],
+        ]
+      : [
+          ["Status", "Contribution awaited"],
+          ["Towards", `Durga Puja Celebration ${year.year}`],
+        ];
+
+  autoTable(doc, {
+    startY: y,
+    theme: "plain",
+    margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X },
+    styles: { fontSize: 10, cellPadding: 1.8 },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 }, 1: {} },
+    body: rows,
+  });
+  y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
   const message =
     request.kind === "promised"
-      ? `A gentle reminder of your kind pledge of ${formatINR(request.pledgedAmount)} (${numberToIndianWords(request.pledgedAmount)} Only) towards this year's Durga Puja celebration — we'd be grateful if you could complete it at your convenience.`
+      ? "This is a gentle reminder of your kind pledge towards this year's Durga Puja celebration. We'd be grateful if you could complete the contribution at your convenience."
       : "We would be grateful for your kind contribution towards this year's Durga Puja celebration, in whatever amount you're comfortable with.";
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(...INK_RGB);
   const wrapped = doc.splitTextToSize(message, pageWidth - PAGE_MARGIN_X * 2);
   doc.text(wrapped, PAGE_MARGIN_X, y);
-  y += wrapped.length * 5 + 10;
+  y += wrapped.length * 5 + 12;
 
-  closeSlip(doc, pageWidth, y, undefined, "System-generated via the GV Durga Puja app.");
+  closeDocumentFrame(doc, pageWidth, y, "This is a system-generated request from the GV Durga Puja app.");
 
   const filename = `Contribution Request - ${payer.name} - GV Durga Puja ${year.year}.pdf`;
   await shareOrDownloadPdf(

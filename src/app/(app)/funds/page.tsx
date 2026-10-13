@@ -24,6 +24,7 @@ const outsideCollectionTypeShortLabels: Record<OutsideCollectionType, string> = 
   donation_box: "Donation Box",
   stall: "Stall",
   dandiya_collection: "Dandiya",
+  dandiya_pass: "Dandiya Pass",
   promotion: "Promotion",
 };
 

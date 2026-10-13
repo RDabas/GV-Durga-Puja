@@ -20,6 +20,7 @@ export type OutsideCollectionType =
   | "donation_box"
   | "stall"
   | "dandiya_collection"
+  | "dandiya_pass"
   | "promotion";
 
 export type VendorPaymentStatus = "paid_full" | "installment" | "not_paid";
@@ -137,6 +138,15 @@ export interface Contribution {
   paymentDate?: string;
   note?: string;
   followUpNote?: string;
+  /**
+   * Only meaningful for a Dandiya Night Pass sale (outsideCollectionId with
+   * type "dandiya_pass") — how many people the pass covers and which of the
+   * two nights, so the sheet can re-show the original breakdown when
+   * editing rather than just the computed total.
+   */
+  passPeopleCount?: number;
+  passDay18?: boolean;
+  passDay19?: boolean;
 }
 
 export interface Vendor {

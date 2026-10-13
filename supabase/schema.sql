@@ -7,7 +7,7 @@ create type block_letter as enum ('A', 'B', 'C', 'D', 'E', 'F', 'G');
 create type payment_mode as enum ('cash', 'upi', 'pending');
 create type contribution_status as enum ('paid', 'partial', 'bhog_only', 'promised', 'pending', 'not_visited', 'not_home', 'wont_pay');
 create type contribution_kind as enum ('money', 'bhog_grocery', 'both');
-create type outside_collection_type as enum ('outsider', 'donation', 'donation_box', 'stall', 'dandiya_collection', 'promotion');
+create type outside_collection_type as enum ('outsider', 'donation', 'donation_box', 'stall', 'dandiya_collection', 'dandiya_pass', 'promotion');
 create type committee_role as enum ('admin', 'collector');
 create type transfer_mode as enum ('cash', 'upi');
 create type carried_fund_kind as enum ('cash', 'fd', 'bank');
@@ -138,6 +138,13 @@ create table contributions (
   payment_date date,
   note text,
   follow_up_note text,
+  -- Only meaningful for a Dandiya Night Pass sale (outside_collection_id with
+  -- type 'dandiya_pass') — how many people the pass covers and which of the
+  -- two nights, so the sheet can re-show the original breakdown when editing
+  -- rather than just the computed total.
+  pass_people_count integer,
+  pass_day18 boolean,
+  pass_day19 boolean,
   updated_at timestamptz not null default now(),
   constraint contributions_one_payer check (
     num_nonnulls(house_id, owner_id, ex_resident_id, outside_collection_id) = 1

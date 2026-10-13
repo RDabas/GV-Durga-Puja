@@ -31,8 +31,10 @@ export function paymentActionChipFor(
   context: string,
   refCode: string,
   collectorName?: string,
-  /** False for a business/stall payer — "Smt/Shri" only fits an individual's name. */
-  honorific = true,
+  /** Shown on the receipt's "Towards" row instead of the generic "Durga Puja Celebration <year>" — e.g. a Dandiya Night Pass's people/night breakdown. */
+  towardsOverride?: string,
+  /** Shown as the receipt's title instead of the generic "Receipt of Contribution" — e.g. "Dandiya Night Pass". */
+  slipTitle?: string,
 ): ReactNode {
   const payer = { name: payerName, context, refCode };
   const status = contribution?.status;
@@ -41,7 +43,6 @@ export function paymentActionChipFor(
     return (
       <IssueReceiptChip
         payer={payer}
-        honorific={honorific}
         payment={{
           moneyAmount: contribution!.moneyAmount,
           bhogGroceryAmount: contribution!.bhogGroceryAmount,
@@ -49,6 +50,8 @@ export function paymentActionChipFor(
           paymentDate: contribution!.paymentDate ?? today(),
           collectorName,
           originalPledgeAmount: contribution!.originalPledgeAmount,
+          towardsOverride,
+          slipTitle,
         }}
       />
     );
@@ -57,13 +60,12 @@ export function paymentActionChipFor(
     return (
       <RequestContributionChip
         payer={payer}
-        honorific={honorific}
         request={{ kind: "promised", pledgedAmount: contribution!.moneyAmount }}
       />
     );
   }
   if (status === "pending") {
-    return <RequestContributionChip payer={payer} honorific={honorific} request={{ kind: "pending" }} />;
+    return <RequestContributionChip payer={payer} request={{ kind: "pending" }} />;
   }
   return undefined;
 }

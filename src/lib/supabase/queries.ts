@@ -101,6 +101,9 @@ interface ContributionRow {
   payment_date: string | null;
   note: string | null;
   follow_up_note: string | null;
+  pass_people_count: number | null;
+  pass_day18: boolean | null;
+  pass_day19: boolean | null;
 }
 
 interface FundTransferRow {
@@ -234,6 +237,9 @@ const mapContribution = (r: ContributionRow): Contribution => ({
   paymentDate: r.payment_date ?? undefined,
   note: r.note ?? undefined,
   followUpNote: r.follow_up_note ?? undefined,
+  passPeopleCount: r.pass_people_count ?? undefined,
+  passDay18: r.pass_day18 ?? undefined,
+  passDay19: r.pass_day19 ?? undefined,
 });
 
 const mapFundTransfer = (r: FundTransferRow): FundTransfer => ({
@@ -696,6 +702,9 @@ interface ContributionWrite {
   paymentDate?: string;
   note?: string;
   followUpNote?: string;
+  passPeopleCount?: number;
+  passDay18?: boolean;
+  passDay19?: boolean;
 }
 
 export async function dbSaveContribution(
@@ -727,6 +736,9 @@ export async function dbSaveContribution(
     payment_date: input.paymentDate ?? null,
     note: input.note ?? null,
     follow_up_note: input.followUpNote ?? null,
+    pass_people_count: input.passPeopleCount ?? null,
+    pass_day18: input.passDay18 ?? null,
+    pass_day19: input.passDay19 ?? null,
   };
 
   if (existingId) {

@@ -2,6 +2,21 @@ import { cardAccent, DisableToggleButton, PayerRow, paymentActionChipFor } from 
 import { Pill, pillLabels } from "@/components/Pill";
 import type { Contribution, OutsideCollection } from "@/lib/types";
 
+/** "4 people · Both nights (18 & 19 Oct)" — built from the contribution's pass fields, not stored as its own string. */
+function passHint(contribution: Contribution | undefined): string | undefined {
+  if (!contribution?.passPeopleCount) return undefined;
+  const nights =
+    contribution.passDay18 && contribution.passDay19
+      ? "Both nights (18 & 19 Oct)"
+      : contribution.passDay18
+        ? "18 Oct only"
+        : contribution.passDay19
+          ? "19 Oct only"
+          : "";
+  const people = contribution.passPeopleCount;
+  return `${people} ${people === 1 ? "person" : "people"} · ${nights}`;
+}
+
 /**
  * One card per outside-collection entry — not tied to any flat/block, so no
  * floor/block header bar like FlatCard has. Reuses PayerRow for identical
@@ -37,7 +52,9 @@ export function OutsideCollectionCard({
         hint={
           outsideCollection.type === "stall" && outsideCollection.stallDetails
             ? `Stall — ${outsideCollection.stallDetails}`
-            : undefined
+            : outsideCollection.type === "dandiya_pass"
+              ? passHint(contribution)
+              : undefined
         }
         contribution={contribution}
         collectorName={collectorName}
@@ -57,7 +74,10 @@ export function OutsideCollectionCard({
           pillLabels[outsideCollection.type],
           `OC-${outsideCollection.id.slice(0, 6)}`,
           collectorName,
-          false,
+          outsideCollection.type === "dandiya_pass"
+            ? `Dandiya Night Pass — ${passHint(contribution)}`
+            : undefined,
+          outsideCollection.type === "dandiya_pass" ? "Dandiya Night Pass" : undefined,
         )}
         onClick={onEdit}
       />
