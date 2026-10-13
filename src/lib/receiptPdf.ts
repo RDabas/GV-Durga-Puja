@@ -367,3 +367,77 @@ export async function generateContributionRequestPdf(
     `Contribution request for ${payer.name} — GV Durga Puja ${year.year}`,
   );
 }
+
+export interface VendorPaymentReceiptDetails {
+  amount: number;
+  mode: PaymentMode;
+  paymentDate: string;
+  /** Name of the committee member who handed this over — omitted entirely when self-funded, since then it didn't come out of committee cash. */
+  paidByName?: string;
+  /** Paid from the member's own pocket (e.g. offsetting their own resident pledge), not committee cash. */
+  selfFunded?: boolean;
+  /** The bill's full amount and how much has been paid against it as of (and including) this payment, so the voucher can state what's still outstanding. */
+  billTotal: number;
+  billPaidToDate: number;
+  note?: string;
+}
+
+/**
+ * A one-page PDF payment voucher for a single payment made to a vendor —
+ * "Paid to <vendor>, Rs. X, via <mode>, on <date>" — the outgoing-money
+ * counterpart to generateReceiptPdf's incoming-contribution receipt. Same
+ * letterhead/signature/share-or-download as the other documents in this
+ * file.
+ */
+export async function generateVendorPaymentReceiptPdf(
+  vendor: { name: string; serviceType: string; refCode: string },
+  payment: VendorPaymentReceiptDetails,
+  year: PujaYear,
+): Promise<void> {
+  const reference = `${vendor.refCode}/${compactDate(payment.paymentDate)}`;
+
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  let y = await drawLetterhead(doc, pageWidth, "Payment Voucher", year);
+  y = drawReferenceLine(doc, pageWidth, y, reference, `Date: ${formatShortDate(payment.paymentDate)}, ${year.year}`);
+  y = drawPayerBlock(doc, y, "Paid to", { name: vendor.name, context: vendor.serviceType, refCode: vendor.refCode });
+
+  const balance = payment.billTotal - payment.billPaidToDate;
+  const rows: (string | number)[][] = [
+    ["Amount paid", formatINR(payment.amount)],
+    ["In words", `Rupees ${numberToIndianWords(payment.amount)} Only`],
+    ["Payment mode", paymentModeLabels[payment.mode]],
+    ["Bill total", formatINR(payment.billTotal)],
+    [balance > 0 ? "Balance outstanding" : "Bill status", balance > 0 ? formatINR(balance) : "Fully settled"],
+    ["Towards", `Durga Puja Celebration ${year.year} — ${vendor.serviceType}`],
+  ];
+  if (payment.paidByName) {
+    rows.push([
+      "Paid by",
+      payment.selfFunded
+        ? `${payment.paidByName} (self-funded, not committee cash)`
+        : `${payment.paidByName}, on behalf of GV Durga Puja Committee`,
+    ]);
+  }
+
+  autoTable(doc, {
+    startY: y,
+    theme: "plain",
+    margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X },
+    styles: { fontSize: 10, cellPadding: 1.8 },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 }, 1: {} },
+    body: rows,
+  });
+  y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
+
+  closeDocumentFrame(doc, pageWidth, y, "This is a system-generated payment voucher from the GV Durga Puja app.");
+
+  const filename = `Payment Voucher - ${vendor.name} - GV Durga Puja ${year.year}.pdf`;
+  await shareOrDownloadPdf(
+    doc,
+    filename,
+    filename,
+    `Payment voucher for ${vendor.name} — GV Durga Puja ${year.year}`,
+  );
+}

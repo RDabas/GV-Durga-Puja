@@ -4,9 +4,11 @@ import { BellIcon, ReceiptIcon } from "@/components/icons";
 import {
   generateContributionRequestPdf,
   generateReceiptPdf,
+  generateVendorPaymentReceiptPdf,
   type ContributionRequestDetails,
   type ReceiptPayer,
   type ReceiptPaymentDetails,
+  type VendorPaymentReceiptDetails,
 } from "@/lib/receiptPdf";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
@@ -76,6 +78,34 @@ export function RequestContributionChip({
     >
       <BellIcon className="h-3 w-3" />
       {submitting ? "…" : error ? "Retry" : "Request"}
+    </button>
+  );
+}
+
+/** Same pill, but for a payment made TO a vendor — builds a payment voucher PDF instead of a contribution receipt. Shown on each vendor payment history row. */
+export function VendorPaymentReceiptChip({
+  vendor,
+  payment,
+}: {
+  vendor: { name: string; serviceType: string; refCode: string };
+  payment: VendorPaymentReceiptDetails;
+}) {
+  const { activeYear } = usePujaData();
+  const { submitting, error, run } = useAsyncAction();
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        run(() => generateVendorPaymentReceiptPdf(vendor, payment, activeYear));
+      }}
+      disabled={submitting}
+      title={error ?? undefined}
+      className={chipClass}
+    >
+      <ReceiptIcon className="h-3 w-3" />
+      {submitting ? "…" : error ? "Retry" : "Receipt"}
     </button>
   );
 }

@@ -4,6 +4,7 @@ import { PaymentBreakdown } from "@/components/PaymentBreakdown";
 import { Pill, type PillTone } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
 import { FormError } from "@/components/FormControls";
+import { VendorPaymentReceiptChip } from "@/components/IssueReceiptButton";
 import { formatINR, formatShortDate } from "@/lib/format";
 import { paymentModeBreakdown, paymentModeLabels } from "@/lib/payment";
 import { useAsyncAction } from "@/lib/useAsyncAction";
@@ -113,6 +114,22 @@ export function VendorCard({
                 </span>
               )}
               <span className="shrink-0 tabular-nums text-ink-soft">{formatINR(p.amount)}</span>
+              <VendorPaymentReceiptChip
+                vendor={{
+                  name: expense.vendor.name,
+                  serviceType: expense.vendor.serviceType,
+                  refCode: `V-${expense.vendor.id.slice(0, 6)}`,
+                }}
+                payment={{
+                  amount: p.amount,
+                  mode: p.mode,
+                  paymentDate: p.paymentDate,
+                  paidByName: memberName(p.memberId),
+                  selfFunded: p.selfFunded,
+                  billTotal: expense.totalAmount,
+                  billPaidToDate: paid,
+                }}
+              />
               {onRemovePayment && (
                 <RemovePaymentButton onRemove={() => onRemovePayment(p.id)} />
               )}
