@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { IssueReceiptButton } from "@/components/IssueReceiptButton";
 import { Sheet } from "@/components/Sheet";
 import {
   AmountInput,
@@ -137,6 +138,22 @@ export function ExResidentSheet({
       title={exResident ? exResident.names.join(", ") : "New ex-resident"}
       subtitle="Ex Resident · not tied to any flat"
     >
+      {exResident && contribution && (contribution.moneyAmount > 0 || contribution.bhogGroceryAmount > 0) && (
+        <IssueReceiptButton
+          payer={{
+            name: exResident.names.join(", "),
+            context: "Ex Resident",
+            refCode: `EXR-${exResident.id.slice(0, 6)}`,
+          }}
+          payment={{
+            moneyAmount: contribution.moneyAmount,
+            bhogGroceryAmount: contribution.bhogGroceryAmount,
+            paymentMode: contribution.paymentMode,
+            paymentDate: contribution.paymentDate ?? today(),
+            collectorName: members.find((m) => m.id === contribution.collectorId)?.name,
+          }}
+        />
+      )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Name(s)">
           <TextInput

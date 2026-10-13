@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { IssueReceiptButton } from "@/components/IssueReceiptButton";
 import { Sheet } from "@/components/Sheet";
 import {
   AmountInput,
@@ -155,6 +156,24 @@ export function OutsideCollectionSheet({
       title={outsideCollection ? outsideCollection.name : "New outside collection"}
       subtitle="Outside Collection · not tied to any flat"
     >
+      {outsideCollection &&
+        contribution &&
+        (contribution.moneyAmount > 0 || contribution.bhogGroceryAmount > 0) && (
+          <IssueReceiptButton
+            payer={{
+              name: outsideCollection.name,
+              context: typeOptions.find((t) => t.value === outsideCollection.type)?.label,
+              refCode: `OC-${outsideCollection.id.slice(0, 6)}`,
+            }}
+            payment={{
+              moneyAmount: contribution.moneyAmount,
+              bhogGroceryAmount: contribution.bhogGroceryAmount,
+              paymentMode: contribution.paymentMode,
+              paymentDate: contribution.paymentDate ?? today(),
+              collectorName: members.find((m) => m.id === contribution.collectorId)?.name,
+            }}
+          />
+        )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Name">
           <TextInput

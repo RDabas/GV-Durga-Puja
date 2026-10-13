@@ -3,22 +3,13 @@ import autoTable from "jspdf-autotable";
 import type { PujaStore } from "@/lib/store";
 import { committeeBalances } from "@/lib/balances";
 import { formatShortDate, today } from "@/lib/format";
+import {
+  formatINRForPdf as formatINR,
+  PDF_BRAND_RGB as BRAND_RGB,
+  PDF_INK_RGB as INK_RGB,
+  PDF_FAINT_RGB as FAINT_RGB,
+} from "@/lib/pdfFormat";
 import type { OutsideCollectionType } from "@/lib/types";
-
-// jsPDF's standard fonts (Helvetica/Times/Courier) use WinAnsiEncoding,
-// which has no glyph for ₹ — it silently renders as a stray quote mark
-// instead. Embedding a custom font just for one glyph isn't worth the extra
-// weight, so the PDF spells out "Rs." instead of using formatINR's ₹ symbol.
-const inrNumber = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
-function formatINR(amount: number): string {
-  return `Rs. ${inrNumber.format(amount)}`;
-}
-
-// Same maroon as --brand in globals.css (light theme) — jsPDF needs a raw
-// RGB triple, not a CSS var, so it's duplicated here rather than shared.
-const BRAND_RGB: [number, number, number] = [140, 39, 67];
-const INK_RGB: [number, number, number] = [30, 30, 30];
-const FAINT_RGB: [number, number, number] = [110, 110, 110];
 
 const outsideCollectionTypeLabels: Record<OutsideCollectionType, string> = {
   outsider: "Outsider",
