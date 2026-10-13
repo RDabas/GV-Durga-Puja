@@ -212,6 +212,7 @@ export function ContributionSheet({
             value={names}
             onChange={(e) => setNames(e.target.value)}
             placeholder="Separate several names with commas"
+            autoFocus
           />
         </Field>
 
@@ -240,7 +241,7 @@ export function ContributionSheet({
 
         {(received || promised) && (
           <Field label={amountFieldLabel(status, originalPledgeAmount)}>
-            <AmountInput value={moneyAmount} onChange={setMoneyAmount} autoFocus={received} />
+            <AmountInput value={moneyAmount} onChange={setMoneyAmount} />
             <p className="mt-1.5 text-[0.72rem] text-ink-faint">{bhogOnlyHint}</p>
           </Field>
         )}

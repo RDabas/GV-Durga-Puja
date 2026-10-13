@@ -19,6 +19,7 @@ export interface CommitteeBalance {
   carriedBank: number;
   balanceInHand: number;
   collectedByMode: PaymentBreakdownTotals;
+  outsideCollectionByMode: PaymentBreakdownTotals;
 }
 
 /**
@@ -29,7 +30,9 @@ export interface CommitteeBalance {
  * a vendor themselves. collectedByMode splits the door-to-door figure by how
  * residents actually paid — outside-collection money is kept out of it, same
  * as it's kept as its own separate total, so a member can be asked for the
- * cash in their box separately from what sits in their UPI apps.
+ * cash in their box separately from what sits in their UPI apps. It gets its
+ * own outsideCollectionByMode breakdown instead, so the two totals' chips
+ * never look like they're missing money relative to collected + outsideCollectionReceived.
  */
 export function committeeBalances(
   members: CommitteeMember[],
@@ -45,12 +48,14 @@ export function committeeBalances(
     );
     const collected = collectedFrom.reduce((sum, c) => sum + c.moneyAmount, 0);
 
-    const outsideCollectionReceived = contributions
-      .filter(
-        (c) =>
-          c.collectorId === member.id && c.paymentMode !== "pending" && c.outsideCollectionId != null,
-      )
-      .reduce((sum, c) => sum + c.moneyAmount, 0);
+    const outsideCollectionFrom = contributions.filter(
+      (c) =>
+        c.collectorId === member.id && c.paymentMode !== "pending" && c.outsideCollectionId != null,
+    );
+    const outsideCollectionReceived = outsideCollectionFrom.reduce(
+      (sum, c) => sum + c.moneyAmount,
+      0,
+    );
 
     // A self-funded payment came out of the member's own pocket (typically
     // offsetting their own resident pledge), never out of committee cash
@@ -99,6 +104,9 @@ export function committeeBalances(
         vendorPaid,
       collectedByMode: paymentModeBreakdown(
         collectedFrom.map((c) => ({ amount: c.moneyAmount, mode: c.paymentMode })),
+      ),
+      outsideCollectionByMode: paymentModeBreakdown(
+        outsideCollectionFrom.map((c) => ({ amount: c.moneyAmount, mode: c.paymentMode })),
       ),
     };
   });
