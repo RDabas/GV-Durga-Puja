@@ -1,6 +1,4 @@
-import { cardAccent, DisableToggleButton, PayerRow } from "@/components/FlatCard";
-import { IssueReceiptChip } from "@/components/IssueReceiptButton";
-import { today } from "@/lib/format";
+import { cardAccent, DisableToggleButton, PayerRow, receiptChipFor } from "@/components/FlatCard";
 import type { Contribution, ExResident } from "@/lib/types";
 import type { PreviousYearInfo } from "@/lib/store";
 
@@ -49,24 +47,13 @@ export function ExResidentCard({
             onToggle={onToggleDisabled}
           />
         }
-        receiptAction={
-          contribution && (contribution.moneyAmount > 0 || contribution.bhogGroceryAmount > 0) ? (
-            <IssueReceiptChip
-              payer={{
-                name: exResident.names.join(", "),
-                context: "Ex Resident",
-                refCode: `EXR-${exResident.id.slice(0, 6)}`,
-              }}
-              payment={{
-                moneyAmount: contribution.moneyAmount,
-                bhogGroceryAmount: contribution.bhogGroceryAmount,
-                paymentMode: contribution.paymentMode,
-                paymentDate: contribution.paymentDate ?? today(),
-                collectorName,
-              }}
-            />
-          ) : undefined
-        }
+        receiptAction={receiptChipFor(
+          contribution,
+          exResident.names.join(", "),
+          "Ex Resident",
+          `EXR-${exResident.id.slice(0, 6)}`,
+          collectorName,
+        )}
         onClick={onEdit}
       />
     </div>

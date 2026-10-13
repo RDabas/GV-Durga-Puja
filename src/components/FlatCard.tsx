@@ -13,15 +13,20 @@ function summarise(names: string[]): string {
   return `${names[0]}, ${names[1]} +${names.length - 2}`;
 }
 
-/** A "Receipt" chip whenever this contribution actually has something to receipt — undefined (no chip) otherwise. Shared by every card that wraps PayerRow. */
-function receiptChipFor(
+// Only these statuses mean something has actually changed hands — "promised"
+// stores the pledge amount in this same moneyAmount field, so checking the
+// amount alone would offer (and issue) a receipt for money never received.
+const RECEIPTABLE_STATUSES: ContributionStatus[] = ["paid", "partial", "bhog_only"];
+
+/** A "Receipt" chip whenever this contribution actually has something to receipt — undefined (no chip) otherwise. Shared by every card that wraps PayerRow (FlatCard itself, ExResidentCard, OutsideCollectionCard). */
+export function receiptChipFor(
   contribution: Contribution | undefined,
   payerName: string,
   context: string,
   refCode: string,
   collectorName?: string,
 ): ReactNode {
-  if (!contribution || (contribution.moneyAmount <= 0 && contribution.bhogGroceryAmount <= 0)) {
+  if (!contribution || !RECEIPTABLE_STATUSES.includes(contribution.status)) {
     return undefined;
   }
   return (
@@ -33,6 +38,7 @@ function receiptChipFor(
         paymentMode: contribution.paymentMode,
         paymentDate: contribution.paymentDate ?? today(),
         collectorName,
+        originalPledgeAmount: contribution.originalPledgeAmount,
       }}
     />
   );

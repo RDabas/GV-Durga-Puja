@@ -20,12 +20,21 @@ export interface ReceiptPayer {
 }
 
 export interface ReceiptPaymentDetails {
+  /** What's actually been received so far — never a pledge/promise amount. */
   moneyAmount: number;
   bhogGroceryAmount: number;
   /** Never "pending" — the caller only offers a receipt once something has actually been received. */
   paymentMode: PaymentMode;
   paymentDate: string;
   collectorName?: string;
+  /**
+   * Set only for a part-payment against a larger pledge (status "partial"
+   * with a recorded original pledge) — moneyAmount is what's been received so
+   * far, this is the full amount they committed to, and the receipt shows
+   * both plus the gap still pending, rather than looking like a full
+   * settlement.
+   */
+  originalPledgeAmount?: number;
 }
 
 /** "11 Oct 2026" -> "111026", for a compact reference code. */
@@ -114,13 +123,22 @@ export async function generateReceiptPdf(
   y += 10;
 
   // --- Amount + breakdown ---
+  const isPartPayment =
+    payment.originalPledgeAmount != null && payment.originalPledgeAmount > payment.moneyAmount;
+
   const rows: (string | number)[][] = [];
+  if (isPartPayment) {
+    rows.push(["Total amount pledged", formatINR(payment.originalPledgeAmount!)]);
+  }
   if (payment.moneyAmount > 0 && payment.bhogGroceryAmount > 0) {
     rows.push(["Cash / UPI contribution", formatINR(payment.moneyAmount)]);
     rows.push(["Bhog & groceries (in-kind)", formatINR(payment.bhogGroceryAmount)]);
   }
-  rows.push(["Amount received", formatINR(totalAmount)]);
+  rows.push([isPartPayment ? "Amount received now" : "Amount received", formatINR(totalAmount)]);
   rows.push(["In words", `Rupees ${numberToIndianWords(totalAmount)} Only`]);
+  if (isPartPayment) {
+    rows.push(["Balance pending", formatINR(payment.originalPledgeAmount! - payment.moneyAmount)]);
+  }
   if (payment.moneyAmount > 0) {
     rows.push(["Payment mode", paymentModeLabels[payment.paymentMode]]);
   }
