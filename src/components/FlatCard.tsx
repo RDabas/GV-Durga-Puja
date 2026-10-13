@@ -31,6 +31,8 @@ export function paymentActionChipFor(
   context: string,
   refCode: string,
   collectorName?: string,
+  /** False for a business/stall payer — "Smt/Shri" only fits an individual's name. */
+  honorific = true,
 ): ReactNode {
   const payer = { name: payerName, context, refCode };
   const status = contribution?.status;
@@ -39,6 +41,7 @@ export function paymentActionChipFor(
     return (
       <IssueReceiptChip
         payer={payer}
+        honorific={honorific}
         payment={{
           moneyAmount: contribution!.moneyAmount,
           bhogGroceryAmount: contribution!.bhogGroceryAmount,
@@ -54,12 +57,13 @@ export function paymentActionChipFor(
     return (
       <RequestContributionChip
         payer={payer}
+        honorific={honorific}
         request={{ kind: "promised", pledgedAmount: contribution!.moneyAmount }}
       />
     );
   }
   if (status === "pending") {
-    return <RequestContributionChip payer={payer} request={{ kind: "pending" }} />;
+    return <RequestContributionChip payer={payer} honorific={honorific} request={{ kind: "pending" }} />;
   }
   return undefined;
 }

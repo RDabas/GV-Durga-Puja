@@ -23,9 +23,12 @@ const chipClass =
 export function IssueReceiptChip({
   payer,
   payment,
+  honorific = true,
 }: {
   payer: ReceiptPayer;
   payment: ReceiptPaymentDetails;
+  /** False for a business/stall payer — "Smt/Shri" only fits an individual's name. */
+  honorific?: boolean;
 }) {
   const { activeYear } = usePujaData();
   const { submitting, error, run } = useAsyncAction();
@@ -35,7 +38,7 @@ export function IssueReceiptChip({
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        run(() => generateReceiptPdf(payer, payment, activeYear));
+        run(() => generateReceiptPdf(payer, payment, activeYear, honorific));
       }}
       disabled={submitting}
       title={error ?? undefined}
@@ -56,9 +59,12 @@ export function IssueReceiptChip({
 export function RequestContributionChip({
   payer,
   request,
+  honorific = true,
 }: {
   payer: ReceiptPayer;
   request: ContributionRequestDetails;
+  /** False for a business/stall payer — "Smt/Shri" only fits an individual's name. */
+  honorific?: boolean;
 }) {
   const { activeYear } = usePujaData();
   const { submitting, error, run } = useAsyncAction();
@@ -68,7 +74,7 @@ export function RequestContributionChip({
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        run(() => generateContributionRequestPdf(payer, request, activeYear));
+        run(() => generateContributionRequestPdf(payer, request, activeYear, honorific));
       }}
       disabled={submitting}
       title={error ?? undefined}

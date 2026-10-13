@@ -57,6 +57,7 @@ export function OutsideCollectionCard({
           pillLabels[outsideCollection.type],
           `OC-${outsideCollection.id.slice(0, 6)}`,
           collectorName,
+          false,
         )}
         onClick={onEdit}
       />
