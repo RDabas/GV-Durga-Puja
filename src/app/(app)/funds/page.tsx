@@ -5,12 +5,13 @@ import { CarriedFundSheet } from "@/components/CarriedFundSheet";
 import { FundTransferSheet } from "@/components/FundTransferSheet";
 import { MembersSheet } from "@/components/MembersSheet";
 import { paymentModeChipStyles, PaymentTag } from "@/components/PaymentBreakdown";
-import { CloseIcon, DownloadIcon } from "@/components/icons";
+import { CloseIcon, DownloadIcon, ShareIcon } from "@/components/icons";
 import { formatINR, formatShortDate } from "@/lib/format";
 import { committeeBalances } from "@/lib/balances";
 import { carriedFundKindLabels } from "@/lib/carriedFund";
 import { exportPujaDataToExcel } from "@/lib/export";
 import { paymentModeLabels, sortedBreakdown } from "@/lib/payment";
+import { generateAuditReportPdf } from "@/lib/reportPdf";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { OutsideCollectionType, PaymentMode } from "@/lib/types";
@@ -51,6 +52,7 @@ export default function FundsPage() {
     dir: "desc",
   });
   const { submitting: exporting, error: exportError, run: runExport } = useAsyncAction();
+  const { submitting: sharingReport, error: reportError, run: runShareReport } = useAsyncAction();
 
   function toggleSort(field: "flat" | "date" | "amount") {
     setSort((prev) =>
@@ -380,6 +382,23 @@ export default function FundsPage() {
         </button>
         {exportError && (
           <p className="mt-1.5 px-0.5 text-[0.75rem] text-critical">{exportError}</p>
+        )}
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => runShareReport(() => generateAuditReportPdf(store))}
+          disabled={sharingReport}
+          className="flex w-full items-center gap-2.5 rounded-2xl border border-border bg-surface p-3.5 text-[0.82rem] font-semibold text-ink shadow-[var(--shadow-card)] transition active:scale-[0.98] disabled:opacity-60"
+        >
+          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-brand-tint text-brand">
+            <ShareIcon className="h-[15px] w-[15px]" />
+          </span>
+          {sharingReport ? "Preparing report…" : "Share summary report (PDF)"}
+        </button>
+        {reportError && (
+          <p className="mt-1.5 px-0.5 text-[0.75rem] text-critical">{reportError}</p>
         )}
       </div>
 
