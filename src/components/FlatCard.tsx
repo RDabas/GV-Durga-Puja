@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Contribution, ContributionStatus, House, Owner } from "@/lib/types";
-import { IssueReceiptChip } from "@/components/IssueReceiptButton";
+import { IssueReceiptChip, RequestContributionChip } from "@/components/IssueReceiptButton";
 import { Pill } from "@/components/Pill";
 import { PaymentTag } from "@/components/PaymentBreakdown";
 import { formatINR, formatShortDate, pledgeProgressLabel, today } from "@/lib/format";
@@ -13,35 +13,55 @@ function summarise(names: string[]): string {
   return `${names[0]}, ${names[1]} +${names.length - 2}`;
 }
 
-// Only these statuses mean something has actually changed hands — "promised"
-// stores the pledge amount in this same moneyAmount field, so checking the
-// amount alone would offer (and issue) a receipt for money never received.
-const RECEIPTABLE_STATUSES: ContributionStatus[] = ["paid", "partial", "bhog_only"];
-
-/** A "Receipt" chip whenever this contribution actually has something to receipt — undefined (no chip) otherwise. Shared by every card that wraps PayerRow (FlatCard itself, ExResidentCard, OutsideCollectionCard). */
-export function receiptChipFor(
+/**
+ * The card-header chip for this payer's current status — a "Receipt" once
+ * something's actually changed hands (paid/partial/bhog_only), a "Request"
+ * reminder/ask while it's still just promised or outright pending, and
+ * nothing at all for a flat that hasn't been visited yet, said no, or isn't
+ * home (there's nothing on record yet to put a figure to). Re-evaluated
+ * fresh from the contribution's current status every render, so this slot
+ * switches from Request to Receipt by itself the moment a payment is
+ * actually recorded — no separate state to keep in sync. Shared by every
+ * card that wraps PayerRow (FlatCard itself, ExResidentCard,
+ * OutsideCollectionCard).
+ */
+export function paymentActionChipFor(
   contribution: Contribution | undefined,
   payerName: string,
   context: string,
   refCode: string,
   collectorName?: string,
 ): ReactNode {
-  if (!contribution || !RECEIPTABLE_STATUSES.includes(contribution.status)) {
-    return undefined;
+  const payer = { name: payerName, context, refCode };
+  const status = contribution?.status;
+
+  if (status === "paid" || status === "partial" || status === "bhog_only") {
+    return (
+      <IssueReceiptChip
+        payer={payer}
+        payment={{
+          moneyAmount: contribution!.moneyAmount,
+          bhogGroceryAmount: contribution!.bhogGroceryAmount,
+          paymentMode: contribution!.paymentMode,
+          paymentDate: contribution!.paymentDate ?? today(),
+          collectorName,
+          originalPledgeAmount: contribution!.originalPledgeAmount,
+        }}
+      />
+    );
   }
-  return (
-    <IssueReceiptChip
-      payer={{ name: payerName, context, refCode }}
-      payment={{
-        moneyAmount: contribution.moneyAmount,
-        bhogGroceryAmount: contribution.bhogGroceryAmount,
-        paymentMode: contribution.paymentMode,
-        paymentDate: contribution.paymentDate ?? today(),
-        collectorName,
-        originalPledgeAmount: contribution.originalPledgeAmount,
-      }}
-    />
-  );
+  if (status === "promised") {
+    return (
+      <RequestContributionChip
+        payer={payer}
+        request={{ kind: "promised", pledgedAmount: contribution!.moneyAmount }}
+      />
+    );
+  }
+  if (status === "pending") {
+    return <RequestContributionChip payer={payer} request={{ kind: "pending" }} />;
+  }
+  return undefined;
 }
 
 /**
@@ -408,7 +428,7 @@ export function FlatCard({
           previousYear={ownerPreviousYear}
           disabled={owner?.disabled}
           headerAction={disableToggle}
-          receiptAction={receiptChipFor(
+          receiptAction={paymentActionChipFor(
             ownerContribution,
             owner ? owner.names.join(", ") : "",
             `${house.block}-${house.flatNo} · Owner`,
@@ -432,7 +452,7 @@ export function FlatCard({
             previousYear={tenantPreviousYear}
             disabled={house.tenantDisabled}
             headerAction={tenantDisableToggle}
-            receiptAction={receiptChipFor(
+            receiptAction={paymentActionChipFor(
               tenantContribution,
               summarise(house.tenantNames),
               `${house.block}-${house.flatNo} · Tenant`,

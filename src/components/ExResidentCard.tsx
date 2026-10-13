@@ -1,4 +1,4 @@
-import { cardAccent, DisableToggleButton, PayerRow, receiptChipFor } from "@/components/FlatCard";
+import { cardAccent, DisableToggleButton, PayerRow, paymentActionChipFor } from "@/components/FlatCard";
 import type { Contribution, ExResident } from "@/lib/types";
 import type { PreviousYearInfo } from "@/lib/store";
 
@@ -47,7 +47,7 @@ export function ExResidentCard({
             onToggle={onToggleDisabled}
           />
         }
-        receiptAction={receiptChipFor(
+        receiptAction={paymentActionChipFor(
           contribution,
           exResident.names.join(", "),
           "Ex Resident",

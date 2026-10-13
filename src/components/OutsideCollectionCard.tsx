@@ -1,4 +1,4 @@
-import { cardAccent, DisableToggleButton, PayerRow, receiptChipFor } from "@/components/FlatCard";
+import { cardAccent, DisableToggleButton, PayerRow, paymentActionChipFor } from "@/components/FlatCard";
 import { Pill, pillLabels } from "@/components/Pill";
 import type { Contribution, OutsideCollection } from "@/lib/types";
 
@@ -51,7 +51,7 @@ export function OutsideCollectionCard({
             onToggle={onToggleDisabled}
           />
         }
-        receiptAction={receiptChipFor(
+        receiptAction={paymentActionChipFor(
           contribution,
           outsideCollection.name,
           pillLabels[outsideCollection.type],

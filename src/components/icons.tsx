@@ -161,3 +161,12 @@ export function ShareIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function BellIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 4.2 1.4 5.6 2 6.2H4c.6-.6 2-2 2-6.2Z" />
+      <path d="M10 18.5a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
