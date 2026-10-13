@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { IssueReceiptButton } from "@/components/IssueReceiptButton";
 import { Sheet } from "@/components/Sheet";
 import {
   AmountInput,
@@ -207,22 +206,6 @@ export function ContributionSheet({
           : `Floor ${house.floor}`
       }
     >
-      {contribution && (contribution.moneyAmount > 0 || contribution.bhogGroceryAmount > 0) && (
-        <IssueReceiptButton
-          payer={{
-            name: isOwner ? (owner?.names ?? []).join(", ") : house.tenantNames.join(", "),
-            context: `${house.block}-${house.flatNo} · ${isOwner ? "Owner" : "Tenant"}`,
-            refCode: `${house.block}-${house.flatNo}`,
-          }}
-          payment={{
-            moneyAmount: contribution.moneyAmount,
-            bhogGroceryAmount: contribution.bhogGroceryAmount,
-            paymentMode: contribution.paymentMode,
-            paymentDate: contribution.paymentDate ?? today(),
-            collectorName: members.find((m) => m.id === contribution.collectorId)?.name,
-          }}
-        />
-      )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label={isOwner ? "Owner name(s)" : "Tenant name(s)"}>
           <TextInput

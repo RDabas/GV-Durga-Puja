@@ -1,5 +1,7 @@
 import { cardAccent, DisableToggleButton, PayerRow } from "@/components/FlatCard";
-import { Pill } from "@/components/Pill";
+import { IssueReceiptChip } from "@/components/IssueReceiptButton";
+import { Pill, pillLabels } from "@/components/Pill";
+import { today } from "@/lib/format";
 import type { Contribution, OutsideCollection } from "@/lib/types";
 
 /**
@@ -50,6 +52,24 @@ export function OutsideCollectionCard({
             disabled={outsideCollection.disabled}
             onToggle={onToggleDisabled}
           />
+        }
+        receiptAction={
+          contribution && (contribution.moneyAmount > 0 || contribution.bhogGroceryAmount > 0) ? (
+            <IssueReceiptChip
+              payer={{
+                name: outsideCollection.name,
+                context: pillLabels[outsideCollection.type],
+                refCode: `OC-${outsideCollection.id.slice(0, 6)}`,
+              }}
+              payment={{
+                moneyAmount: contribution.moneyAmount,
+                bhogGroceryAmount: contribution.bhogGroceryAmount,
+                paymentMode: contribution.paymentMode,
+                paymentDate: contribution.paymentDate ?? today(),
+                collectorName,
+              }}
+            />
+          ) : undefined
         }
         onClick={onEdit}
       />

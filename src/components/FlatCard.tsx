@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import type { Contribution, ContributionStatus, House, Owner } from "@/lib/types";
+import { IssueReceiptChip } from "@/components/IssueReceiptButton";
 import { Pill } from "@/components/Pill";
 import { PaymentTag } from "@/components/PaymentBreakdown";
-import { formatINR, formatShortDate, pledgeProgressLabel } from "@/lib/format";
+import { formatINR, formatShortDate, pledgeProgressLabel, today } from "@/lib/format";
 import type { PreviousYearInfo } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 
@@ -10,6 +11,31 @@ function summarise(names: string[]): string {
   if (names.length === 0) return "";
   if (names.length <= 2) return names.join(", ");
   return `${names[0]}, ${names[1]} +${names.length - 2}`;
+}
+
+/** A "Receipt" chip whenever this contribution actually has something to receipt — undefined (no chip) otherwise. Shared by every card that wraps PayerRow. */
+function receiptChipFor(
+  contribution: Contribution | undefined,
+  payerName: string,
+  context: string,
+  refCode: string,
+  collectorName?: string,
+): ReactNode {
+  if (!contribution || (contribution.moneyAmount <= 0 && contribution.bhogGroceryAmount <= 0)) {
+    return undefined;
+  }
+  return (
+    <IssueReceiptChip
+      payer={{ name: payerName, context, refCode }}
+      payment={{
+        moneyAmount: contribution.moneyAmount,
+        bhogGroceryAmount: contribution.bhogGroceryAmount,
+        paymentMode: contribution.paymentMode,
+        paymentDate: contribution.paymentDate ?? today(),
+        collectorName,
+      }}
+    />
+  );
 }
 
 /**
@@ -142,6 +168,7 @@ export function PayerRow({
   previousYear,
   disabled,
   headerAction,
+  receiptAction,
   extraBadge,
   onClick,
 }: {
@@ -155,29 +182,35 @@ export function PayerRow({
   /** Owner is excluded from this year's totals/follow-up — show that instead of their current-year status. */
   disabled?: boolean;
   headerAction?: ReactNode;
+  /** "Receipt" chip shown next to headerAction — present whenever this payer actually has something to receipt. */
+  receiptAction?: ReactNode;
   /** An extra badge shown next to the status Pill — e.g. OutsideCollectionCard's type Pill. */
   extraBadge?: ReactNode;
   onClick: () => void;
 }) {
   const status = contribution?.status ?? "not_visited";
+  const hasHeaderRow = Boolean(headerAction || receiptAction);
 
   return (
     <div className={disabled ? "opacity-50" : ""}>
-      {headerAction && (
+      {hasHeaderRow && (
         <div className="flex items-center justify-between gap-2 px-3 pt-3">
           <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
             {role}
           </span>
-          {headerAction}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {receiptAction}
+            {headerAction}
+          </div>
         </div>
       )}
       <button
         type="button"
         onClick={onClick}
-        className={`flex w-full items-start gap-3 px-3 text-left transition active:scale-[0.99] ${headerAction ? "pb-3 pt-1" : "py-3"}`}
+        className={`flex w-full items-start gap-3 px-3 text-left transition active:scale-[0.99] ${hasHeaderRow ? "pb-3 pt-1" : "py-3"}`}
       >
         <span className="min-w-0 flex-1">
-          {!headerAction && (
+          {!hasHeaderRow && (
             <span className="block text-[0.62rem] font-semibold uppercase tracking-wide text-ink-faint">
               {role}
             </span>
@@ -369,6 +402,13 @@ export function FlatCard({
           previousYear={ownerPreviousYear}
           disabled={owner?.disabled}
           headerAction={disableToggle}
+          receiptAction={receiptChipFor(
+            ownerContribution,
+            owner ? owner.names.join(", ") : "",
+            `${house.block}-${house.flatNo} · Owner`,
+            `${house.block}-${house.flatNo}`,
+            ownerCollector,
+          )}
           onClick={onEditOwner}
         />
       )}
@@ -386,6 +426,13 @@ export function FlatCard({
             previousYear={tenantPreviousYear}
             disabled={house.tenantDisabled}
             headerAction={tenantDisableToggle}
+            receiptAction={receiptChipFor(
+              tenantContribution,
+              summarise(house.tenantNames),
+              `${house.block}-${house.flatNo} · Tenant`,
+              `${house.block}-${house.flatNo}`,
+              tenantCollector,
+            )}
             onClick={onEditTenant}
           />
         </div>
