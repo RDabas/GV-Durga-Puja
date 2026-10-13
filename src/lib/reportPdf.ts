@@ -64,6 +64,10 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
     carriedFunds,
     fundTransfers,
     contributionFor,
+    houses,
+    owners,
+    ownerPrimaryHouse,
+    exResidents,
   } = store;
 
   const balances = committeeBalances(
@@ -91,12 +95,18 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
   // paid here includes self-funded payments too, since the question is
   // "how much of the bill is settled," not "how much came from committee
   // cash" (that distinction only matters for balances.ts's vendorPaid).
-  const categoryTotals = new Map<string, { billed: number; paid: number }>();
+  // Vendor names are tracked alongside each category so a catch-all bucket
+  // like "Other" (or any category several vendors share) still says exactly
+  // who's in it, instead of leaving an unexplained lump sum.
+  const categoryTotals = new Map<string, { billed: number; paid: number; vendors: Set<string> }>();
   for (const e of vendorExpenses) {
     const key = e.vendor.serviceType.trim() || "Other";
     const paid = e.payments.reduce((s, p) => s + p.amount, 0);
-    const existing = categoryTotals.get(key) ?? { billed: 0, paid: 0 };
-    categoryTotals.set(key, { billed: existing.billed + e.totalAmount, paid: existing.paid + paid });
+    const existing = categoryTotals.get(key) ?? { billed: 0, paid: 0, vendors: new Set<string>() };
+    existing.billed += e.totalAmount;
+    existing.paid += paid;
+    existing.vendors.add(e.vendor.name);
+    categoryTotals.set(key, existing);
   }
   const totalBilled = vendorExpenses.reduce((s, e) => s + e.totalAmount, 0);
   const totalPaidAgainstBills = [...categoryTotals.values()].reduce((s, c) => s + c.paid, 0);
@@ -108,6 +118,36 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
     if (!c || c.paymentMode === "pending" || c.moneyAmount <= 0) continue;
     const key = outsideCollectionTypeLabels[oc.type];
     outsideTotals.set(key, (outsideTotals.get(key) ?? 0) + c.moneyAmount);
+  }
+
+  // Door-to-door collection by block — a tenant always pays per flat, but an
+  // owner pays once for every flat they hold, so their payment is attributed
+  // once to their primary flat's block (ownerPrimaryHouse), not duplicated
+  // across every flat they own. Ex-residents aren't tied to any block, so
+  // they get their own row instead of being silently dropped from the total.
+  const blockTotals = new Map<string, number>();
+  function addToBlock(block: string, amount: number) {
+    if (amount <= 0) return;
+    blockTotals.set(block, (blockTotals.get(block) ?? 0) + amount);
+  }
+  for (const house of houses) {
+    const tenantContribution = contributionFor({ houseId: house.id });
+    if (tenantContribution && tenantContribution.paymentMode !== "pending") {
+      addToBlock(house.block, tenantContribution.moneyAmount);
+    }
+  }
+  for (const owner of owners) {
+    const primary = ownerPrimaryHouse(owner.id);
+    if (!primary) continue;
+    const ownerContribution = contributionFor({ ownerId: owner.id });
+    if (ownerContribution && ownerContribution.paymentMode !== "pending") {
+      addToBlock(primary.block, ownerContribution.moneyAmount);
+    }
+  }
+  let exResidentTotal = 0;
+  for (const r of exResidents) {
+    const c = contributionFor({ exResidentId: r.id });
+    if (c && c.paymentMode !== "pending") exResidentTotal += c.moneyAmount;
   }
 
   const doc = new jsPDF();
@@ -155,85 +195,27 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
   });
   y = lastTableBottom(doc) + 8;
 
-  // --- Payment mode split ---
-  y = sectionHeading(doc, "By payment mode", marginX, y);
-  autoTable(doc, {
-    startY: y,
-    theme: "grid",
-    margin: { left: marginX, right: marginX },
-    head: [["Mode", "Amount"]],
-    headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9.5 },
-    styles: { fontSize: 10, cellPadding: 2 },
-    columnStyles: { 1: { halign: "right" } },
-    body: [
-      ["Cash", formatINR(cashTotal)],
-      ["UPI", formatINR(upiTotal)],
-    ],
-  });
-  y = lastTableBottom(doc) + 8;
-
-  // --- Who's holding the money ---
-  y = sectionHeading(doc, "Who's holding the money", marginX, y);
-  autoTable(doc, {
-    startY: y,
-    theme: "grid",
-    margin: { left: marginX, right: marginX },
-    head: [["Member", "Houses", "Outside", "Spent", "Balance in hand"]],
-    headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9 },
-    styles: { fontSize: 9.5, cellPadding: 2 },
-    columnStyles: {
-      1: { halign: "right" },
-      2: { halign: "right" },
-      3: { halign: "right" },
-      4: { halign: "right", fontStyle: "bold" },
-    },
-    body: balances.map((b) => [
-      b.member.name,
-      formatINR(b.collected),
-      formatINR(b.outsideCollectionReceived),
-      formatINR(b.vendorPaid),
-      formatINR(b.balanceInHand),
-    ]),
-    foot: [[
-      "Total",
-      formatINR(totalHouses),
-      formatINR(totalOutside),
-      formatINR(totalVendorPaidFromCommittee),
-      formatINR(totalBalanceInHand),
-    ]],
-    footStyles: { fillColor: [245, 240, 242], textColor: INK_RGB, fontStyle: "bold", fontSize: 9.5 },
-  });
-  y = lastTableBottom(doc) + 8;
-
-  // --- Vendor spend by category ---
-  if (categoryTotals.size > 0) {
+  // --- Collection by block ---
+  if (blockTotals.size > 0 || exResidentTotal > 0) {
     if (y > doc.internal.pageSize.getHeight() - 60) {
       doc.addPage();
       y = 18;
     }
-    y = sectionHeading(doc, "Vendor spend by category", marginX, y);
+    y = sectionHeading(doc, "Collection by block", marginX, y);
+    const blockRows: (string | number)[][] = [...blockTotals.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([block, amount]) => [`${block} block`, formatINR(amount)]);
+    if (exResidentTotal > 0) blockRows.push(["Ex Residents", formatINR(exResidentTotal)]);
     autoTable(doc, {
       startY: y,
       theme: "grid",
       margin: { left: marginX, right: marginX },
-      head: [["Category", "Billed", "Paid", "Outstanding"]],
+      head: [["Block", "Collected"]],
       headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9.5 },
       styles: { fontSize: 10, cellPadding: 2 },
-      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
-      body: [...categoryTotals.entries()]
-        .sort((a, b) => b[1].billed - a[1].billed)
-        .map(([category, { billed, paid }]) => [
-          category,
-          formatINR(billed),
-          formatINR(paid),
-          formatINR(billed - paid),
-        ]),
-      foot: [[
-        "Total",
-        formatINR(totalBilled),
-        formatINR(totalPaidAgainstBills),
-        formatINR(totalBilled - totalPaidAgainstBills),
-      ]],
+      columnStyles: { 1: { halign: "right" } },
+      body: blockRows,
+      foot: [["Total", formatINR(totalHouses)]],
       footStyles: { fillColor: [245, 240, 242], textColor: INK_RGB, fontStyle: "bold", fontSize: 10 },
     });
     y = lastTableBottom(doc) + 8;
@@ -260,7 +242,65 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
       foot: [["Total", formatINR(totalOutside)]],
       footStyles: { fillColor: [245, 240, 242], textColor: INK_RGB, fontStyle: "bold", fontSize: 10 },
     });
+    y = lastTableBottom(doc) + 8;
   }
+
+  // --- Vendor spend by category ---
+  if (categoryTotals.size > 0) {
+    if (y > doc.internal.pageSize.getHeight() - 60) {
+      doc.addPage();
+      y = 18;
+    }
+    y = sectionHeading(doc, "Vendor spend by category", marginX, y);
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: marginX, right: marginX },
+      head: [["Category", "Vendor(s)", "Billed", "Paid", "Outstanding"]],
+      headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9 },
+      styles: { fontSize: 9.5, cellPadding: 2 },
+      columnStyles: {
+        1: { cellWidth: 48 },
+        2: { halign: "right" },
+        3: { halign: "right" },
+        4: { halign: "right" },
+      },
+      body: [...categoryTotals.entries()]
+        .sort((a, b) => b[1].billed - a[1].billed)
+        .map(([category, { billed, paid, vendors }]) => [
+          category,
+          [...vendors].join(", "),
+          formatINR(billed),
+          formatINR(paid),
+          formatINR(billed - paid),
+        ]),
+      foot: [[
+        "Total",
+        "",
+        formatINR(totalBilled),
+        formatINR(totalPaidAgainstBills),
+        formatINR(totalBilled - totalPaidAgainstBills),
+      ]],
+      footStyles: { fillColor: [245, 240, 242], textColor: INK_RGB, fontStyle: "bold", fontSize: 9.5 },
+    });
+    y = lastTableBottom(doc) + 8;
+  }
+
+  // --- Money holding: Cash vs UPI, as one combined row (not per-member) ---
+  if (y > doc.internal.pageSize.getHeight() - 60) {
+    doc.addPage();
+    y = 18;
+  }
+  y = sectionHeading(doc, "Money holding — Cash vs UPI", marginX, y);
+  autoTable(doc, {
+    startY: y,
+    theme: "grid",
+    margin: { left: marginX, right: marginX },
+    head: [["Cash", "UPI"]],
+    headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 10, halign: "center" },
+    styles: { fontSize: 11, cellPadding: 3, halign: "center", fontStyle: "bold" },
+    body: [[formatINR(cashTotal), formatINR(upiTotal)]],
+  });
 
   // Footer on every page, added last so pagination is already final.
   const pageCount = doc.getNumberOfPages();
