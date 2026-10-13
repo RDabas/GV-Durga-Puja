@@ -84,14 +84,8 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
   const totalVendorPaidFromCommittee = balances.reduce((s, b) => s + b.vendorPaid, 0);
   const totalBalanceInHand = balances.reduce((s, b) => s + b.balanceInHand, 0);
 
-  const cashTotal = balances.reduce(
-    (s, b) => s + (b.collectedByMode.cash ?? 0) + (b.outsideCollectionByMode.cash ?? 0),
-    0,
-  );
-  const upiTotal = balances.reduce(
-    (s, b) => s + (b.collectedByMode.upi ?? 0) + (b.outsideCollectionByMode.upi ?? 0),
-    0,
-  );
+  const cashTotal = balances.reduce((s, b) => s + (b.collectedByMode.cash ?? 0), 0);
+  const upiTotal = balances.reduce((s, b) => s + (b.collectedByMode.upi ?? 0), 0);
 
   // Vendor spend by category (serviceType is free text, entered per bill) —
   // paid here includes self-funded payments too, since the question is

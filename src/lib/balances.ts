@@ -19,7 +19,6 @@ export interface CommitteeBalance {
   carriedBank: number;
   balanceInHand: number;
   collectedByMode: PaymentBreakdownTotals;
-  outsideCollectionByMode: PaymentBreakdownTotals;
 }
 
 /**
@@ -27,12 +26,11 @@ export interface CommitteeBalance {
  * what they collected door-to-door and from outside collection, plus what
  * other members transferred to them and whatever they were still holding
  * from a previous year, minus what they've since handed over or paid out to
- * a vendor themselves. collectedByMode splits the door-to-door figure by how
- * residents actually paid — outside-collection money is kept out of it, same
- * as it's kept as its own separate total, so a member can be asked for the
- * cash in their box separately from what sits in their UPI apps. It gets its
- * own outsideCollectionByMode breakdown instead, so the two totals' chips
- * never look like they're missing money relative to collected + outsideCollectionReceived.
+ * a vendor themselves. collectedByMode splits collected + outside-collection
+ * money together by how it actually came in (Cash/UPI) — just one Cash chip
+ * and one UPI chip, not duplicated per source, per Rahul's explicit request
+ * (door-to-door and outside-collection money sit in the same cash box/UPI
+ * app once received, so there's no real reason to show them separately).
  */
 export function committeeBalances(
   members: CommitteeMember[],
@@ -103,10 +101,10 @@ export function committeeBalances(
         handedOver -
         vendorPaid,
       collectedByMode: paymentModeBreakdown(
-        collectedFrom.map((c) => ({ amount: c.moneyAmount, mode: c.paymentMode })),
-      ),
-      outsideCollectionByMode: paymentModeBreakdown(
-        outsideCollectionFrom.map((c) => ({ amount: c.moneyAmount, mode: c.paymentMode })),
+        [...collectedFrom, ...outsideCollectionFrom].map((c) => ({
+          amount: c.moneyAmount,
+          mode: c.paymentMode,
+        })),
       ),
     };
   });

@@ -44,9 +44,7 @@ export default function FundsPage() {
   const [managingMembers, setManagingMembers] = useState(false);
   const [managingCarriedFunds, setManagingCarriedFunds] = useState(false);
   const [managingTransfers, setManagingTransfers] = useState(false);
-  const [expanded, setExpanded] = useState<
-    { memberId: string; mode: PaymentMode; scope: "house" | "outside" } | null
-  >(null);
+  const [expanded, setExpanded] = useState<{ memberId: string; mode: PaymentMode } | null>(null);
   const [sort, setSort] = useState<{ field: "flat" | "date" | "amount"; dir: "asc" | "desc" }>({
     field: "amount",
     dir: "desc",
@@ -72,15 +70,10 @@ export default function FundsPage() {
     carriedFunds,
   );
 
-  /** Who a member's total for one payment mode is actually made up of — flat and amount, for tapping a Cash/GPay/… chip. */
-  function contributorsFor(memberId: string, mode: PaymentMode, scope: "house" | "outside") {
+  /** Who a member's total for one payment mode is actually made up of (houses and outside collection together) — flat and amount, for tapping a Cash/UPI chip. */
+  function contributorsFor(memberId: string, mode: PaymentMode) {
     const list = contributions
-      .filter(
-        (c) =>
-          c.collectorId === memberId &&
-          c.paymentMode === mode &&
-          (scope === "outside") === (c.outsideCollectionId != null),
-      )
+      .filter((c) => c.collectorId === memberId && c.paymentMode === mode)
       .map((c) => {
         const house = c.houseId
           ? houses.find((h) => h.id === c.houseId)
@@ -182,13 +175,12 @@ export default function FundsPage() {
               carriedBank,
               balanceInHand,
               collectedByMode,
-              outsideCollectionByMode,
             },
             i,
           ) => {
             const carried = carriedCash + carriedFd + carriedBank;
             const totalReceived = collected + outsideCollectionReceived;
-            const expandedEntry = expanded?.memberId === member.id ? expanded : null;
+            const expandedMode = expanded?.memberId === member.id ? expanded.mode : null;
             return (
               <div key={member.id} className={i > 0 ? "border-t border-border" : ""}>
                 <div className="flex items-start gap-3 p-3">
@@ -238,48 +230,20 @@ export default function FundsPage() {
                     )}
                     {sortedBreakdown(collectedByMode).length > 0 && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
-                        {sortedBreakdown(collectedByMode).map(([mode, amount]) => {
-                          const isExpanded =
-                            expandedEntry?.scope === "house" && expandedEntry.mode === mode;
-                          return (
-                            <button
-                              key={mode}
-                              type="button"
-                              onClick={() =>
-                                setExpanded(
-                                  isExpanded ? null : { memberId: member.id, mode, scope: "house" },
-                                )
-                              }
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums whitespace-nowrap transition active:scale-95 ${paymentModeChipStyles[mode]} ${isExpanded ? "ring-2 ring-offset-1 ring-ink/30" : ""}`}
-                            >
-                              {paymentModeLabels[mode]} {formatINR(amount)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {sortedBreakdown(outsideCollectionByMode).length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {sortedBreakdown(outsideCollectionByMode).map(([mode, amount]) => {
-                          const isExpanded =
-                            expandedEntry?.scope === "outside" && expandedEntry.mode === mode;
-                          return (
-                            <button
-                              key={mode}
-                              type="button"
-                              onClick={() =>
-                                setExpanded(
-                                  isExpanded
-                                    ? null
-                                    : { memberId: member.id, mode, scope: "outside" },
-                                )
-                              }
-                              className={`inline-flex items-center gap-1 rounded-full border border-dashed border-brand/40 bg-brand-tint px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums whitespace-nowrap text-brand transition active:scale-95 ${isExpanded ? "ring-2 ring-offset-1 ring-ink/30" : ""}`}
-                            >
-                              Outside · {paymentModeLabels[mode]} {formatINR(amount)}
-                            </button>
-                          );
-                        })}
+                        {sortedBreakdown(collectedByMode).map(([mode, amount]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() =>
+                              setExpanded(
+                                expandedMode === mode ? null : { memberId: member.id, mode },
+                              )
+                            }
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums whitespace-nowrap transition active:scale-95 ${paymentModeChipStyles[mode]} ${expandedMode === mode ? "ring-2 ring-offset-1 ring-ink/30" : ""}`}
+                          >
+                            {paymentModeLabels[mode]} {formatINR(amount)}
+                          </button>
+                        ))}
                       </div>
                     )}
                     {carried > 0 && (
@@ -307,7 +271,7 @@ export default function FundsPage() {
                   </span>
                 </div>
 
-                {expandedEntry && (
+                {expandedMode && (
                   <div className="border-t border-border bg-surface-sunken">
                     <div className="flex items-center gap-1.5 border-b border-border px-3 py-2">
                       <span className="text-[0.66rem] font-semibold text-ink-faint">Sort</span>
@@ -341,7 +305,7 @@ export default function FundsPage() {
                         <CloseIcon className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    {contributorsFor(member.id, expandedEntry.mode, expandedEntry.scope).map((c, ci) => (
+                    {contributorsFor(member.id, expandedMode).map((c, ci) => (
                       <div
                         key={c.key}
                         className={`flex items-center gap-3 px-3 py-2 ${ci > 0 ? "border-t border-border" : ""}`}
