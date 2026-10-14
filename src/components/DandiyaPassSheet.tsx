@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Sheet } from "@/components/Sheet";
-import { Field, FormError, OptionGroup, SubmitButton, TextInput } from "@/components/FormControls";
+import {
+  AmountInput,
+  Field,
+  FormError,
+  OptionGroup,
+  SubmitButton,
+  TextInput,
+} from "@/components/FormControls";
 import { modeOptions } from "@/lib/contributionForm";
-import { today } from "@/lib/format";
+import { formatINR, today } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { OutsideCollection, PaymentMode } from "@/lib/types";
@@ -29,7 +36,13 @@ export function DandiyaPassSheet({
   onClose,
 }: {
   /** Present to edit an existing pass sale; absent to record a new one. */
-  pass?: { outsideCollection: OutsideCollection; peopleCount: number; day18: boolean; day19: boolean };
+  pass?: {
+    outsideCollection: OutsideCollection;
+    peopleCount: number;
+    day18: boolean;
+    day19: boolean;
+    amount: number;
+  };
   open: boolean;
   onClose: () => void;
 }) {
@@ -53,8 +66,23 @@ export function DandiyaPassSheet({
   const [note, setNote] = useState(contribution?.note ?? "");
   const { submitting, error, run } = useAsyncAction();
 
-  const amount = passAmount(peopleCount, day18, day19);
+  const standardAmount = passAmount(peopleCount, day18, day19);
+  const [amount, setAmount] = useState(pass?.amount ?? standardAmount);
+  // Re-suggest the standard price whenever people/nights change, but not on
+  // the initial mount — editing an existing pass should keep whatever
+  // (possibly discounted) amount was actually charged until something about
+  // the headcount or nights actually changes.
+  const skippedFirstRun = useRef(false);
+  useEffect(() => {
+    if (!skippedFirstRun.current) {
+      skippedFirstRun.current = true;
+      return;
+    }
+    setAmount(passAmount(peopleCount, day18, day19));
+  }, [peopleCount, day18, day19]);
+
   const noNightSelected = !day18 && !day19;
+  const isDiscounted = amount !== standardAmount;
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -161,18 +189,15 @@ export function DandiyaPassSheet({
           )}
         </Field>
 
-        <div className="rounded-xl border border-border bg-surface-sunken p-3">
-          <span className="block text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-            Total
-          </span>
-          <span className="mt-0.5 block text-[1.1rem] font-bold tabular-nums text-ink">
-            Rs. {amount.toLocaleString("en-IN")}
-          </span>
-          <span className="mt-0.5 block text-[0.7rem] text-ink-faint">
-            {peopleCount} {peopleCount === 1 ? "person" : "people"} × {(day18 ? 1 : 0) + (day19 ? 1 : 0)}{" "}
-            night(s) × Rs. {PRICE_PER_PERSON_PER_NIGHT}
-          </span>
-        </div>
+        <Field label="Total">
+          <AmountInput value={amount} onChange={(v) => setAmount(Math.max(0, v))} />
+          <p className="mt-1.5 text-[0.72rem] text-ink-faint">
+            {peopleCount} {peopleCount === 1 ? "person" : "people"} ×{" "}
+            {(day18 ? 1 : 0) + (day19 ? 1 : 0)} night(s) × Rs. {PRICE_PER_PERSON_PER_NIGHT} = standard
+            price {formatINR(standardAmount)}
+            {isDiscounted && ` — adjusted to ${formatINR(amount)}`}
+          </p>
+        </Field>
 
         <Field label="Paid by">
           <OptionGroup value={mode} onChange={setMode} options={modeOptions} />

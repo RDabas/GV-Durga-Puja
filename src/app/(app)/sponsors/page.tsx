@@ -186,6 +186,7 @@ export default function OutsideCollectionPage() {
                     peopleCount: c?.passPeopleCount ?? 1,
                     day18: c?.passDay18 ?? true,
                     day19: c?.passDay19 ?? true,
+                    amount: c?.moneyAmount ?? 0,
                   };
                 })()
               : undefined
