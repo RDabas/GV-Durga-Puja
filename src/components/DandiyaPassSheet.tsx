@@ -103,12 +103,12 @@ export function DandiyaPassSheet({
         </Field>
 
         <Field label="Number of people">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between rounded-2xl border border-border bg-surface-sunken p-1.5">
             <button
               type="button"
               onClick={() => setPeopleCount((n) => Math.max(1, n - 1))}
               aria-label="Decrease number of people"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-lg font-bold text-ink-soft active:scale-95"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-xl font-bold text-white shadow-[var(--shadow-card)] transition active:scale-90"
             >
               −
             </button>
@@ -118,13 +118,13 @@ export function DandiyaPassSheet({
               min={1}
               value={peopleCount}
               onChange={(e) => setPeopleCount(Math.max(1, Number(e.target.value) || 1))}
-              className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2.5 text-center text-[0.9rem] font-semibold tabular-nums text-ink outline-none focus:border-brand"
+              className="w-16 bg-transparent text-center text-[1.15rem] font-bold tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
             <button
               type="button"
               onClick={() => setPeopleCount((n) => n + 1)}
               aria-label="Increase number of people"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-lg font-bold text-ink-soft active:scale-95"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-xl font-bold text-white shadow-[var(--shadow-card)] transition active:scale-90"
             >
               +
             </button>

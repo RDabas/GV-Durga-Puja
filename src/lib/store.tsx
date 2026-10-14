@@ -18,6 +18,7 @@ import {
   dbAddMember,
   dbAddVendorExpense,
   dbAddVendorPayment,
+  dbDeleteOutsideCollection,
   dbDeleteVendorExpense,
   dbDeleteVendorPayment,
   dbLogActivity,
@@ -215,6 +216,8 @@ export interface PujaStore extends Omit<LiveData, "years"> {
     stallDetails?: string,
   ) => Promise<string>;
   setOutsideCollectionDisabled: (outsideCollectionId: string, disabled: boolean) => Promise<void>;
+  /** Permanently removes an outside-collection entry (and its linked contribution) — only offered once it's already disabled. */
+  deleteOutsideCollection: (outsideCollectionId: string) => Promise<void>;
   addMember: (input: MemberInput) => Promise<void>;
   updateMember: (memberId: string, patch: MemberInput) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
@@ -498,6 +501,15 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await logActivity(
           disabled ? "outside_collection.disable" : "outside_collection.enable",
           `${disabled ? "disabled" : "re-enabled"} outside collection ${entry?.name ?? "?"}`,
+        );
+        await load();
+      },
+      deleteOutsideCollection: async (outsideCollectionId) => {
+        const entry = data.outsideCollections.find((r) => r.id === outsideCollectionId);
+        await dbDeleteOutsideCollection(supabase, outsideCollectionId);
+        await logActivity(
+          "outside_collection.delete",
+          `deleted outside collection ${entry?.name ?? "?"}`,
         );
         await load();
       },

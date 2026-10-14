@@ -22,8 +22,13 @@ function amountFor(contribution: Contribution | undefined): number {
 }
 
 export default function OutsideCollectionPage() {
-  const { outsideCollections, contributionFor, memberName, setOutsideCollectionDisabled } =
-    usePujaData();
+  const {
+    outsideCollections,
+    contributionFor,
+    memberName,
+    setOutsideCollectionDisabled,
+    deleteOutsideCollection,
+  } = usePujaData();
   const [editing, setEditing] = useState<{ outsideCollection?: OutsideCollection } | null>(null);
   const [editingPass, setEditingPass] = useState<{ outsideCollection?: OutsideCollection } | null>(
     null,
@@ -45,18 +50,10 @@ export default function OutsideCollectionPage() {
     );
   }
 
-  // Dandiya Night Passes get their own section/sheet below (a straight sale
-  // with a people-count + night picker, not a status-driven contribution) —
-  // excluded here so they're not listed twice.
-  const generalCollections = outsideCollections.filter((e) => e.type !== "dandiya_pass");
-  const passes = outsideCollections
-    .filter((e) => e.type === "dandiya_pass")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
   const q = search.trim().toLowerCase();
   const filtered = q
-    ? generalCollections.filter((entry) => entry.name.toLowerCase().includes(q))
-    : generalCollections;
+    ? outsideCollections.filter((entry) => entry.name.toLowerCase().includes(q))
+    : outsideCollections;
 
   const dir = sort.dir === "asc" ? 1 : -1;
   const sorted = [...filtered].sort((a, b) => {
@@ -82,76 +79,26 @@ export default function OutsideCollectionPage() {
     <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         <p className="px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-          Dandiya Night Passes
-        </p>
-        <button
-          type="button"
-          onClick={() => setEditingPass({})}
-          className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
-        >
-          <PlusIcon className="h-[13px] w-[13px]" />
-          Add pass
-        </button>
-      </div>
-
-      {passes.length === 0 && (
-        <p className="rounded-2xl border border-border bg-surface p-3.5 text-[0.8rem] text-ink-faint">
-          No Dandiya Night passes sold yet.
-        </p>
-      )}
-
-      {passes.map((entry) => {
-        const passContribution = contributionFor({ outsideCollectionId: entry.id });
-        return (
-          <OutsideCollectionCard
-            key={entry.id}
-            outsideCollection={entry}
-            contribution={passContribution}
-            collectorName={memberName(passContribution?.collectorId)}
-            assignedToName={
-              memberName(passContribution?.assignedToMemberId) ?? passContribution?.assignedToName
-            }
-            onEdit={() => setEditingPass({ outsideCollection: entry })}
-            onToggleDisabled={() => setOutsideCollectionDisabled(entry.id, !entry.disabled)}
-          />
-        );
-      })}
-
-      {editingPass && (
-        <DandiyaPassSheet
-          key={editingPass.outsideCollection?.id ?? "new"}
-          open
-          pass={
-            editingPass.outsideCollection
-              ? (() => {
-                  const c = contributionFor({
-                    outsideCollectionId: editingPass.outsideCollection!.id,
-                  });
-                  return {
-                    outsideCollection: editingPass.outsideCollection!,
-                    peopleCount: c?.passPeopleCount ?? 1,
-                    day18: c?.passDay18 ?? true,
-                    day19: c?.passDay19 ?? true,
-                  };
-                })()
-              : undefined
-          }
-          onClose={() => setEditingPass(null)}
-        />
-      )}
-
-      <div className="flex items-center justify-between pt-2">
-        <p className="px-0.5 text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
           Outside Collection
         </p>
-        <button
-          type="button"
-          onClick={() => setEditing({})}
-          className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
-        >
-          <PlusIcon className="h-[13px] w-[13px]" />
-          Add
-        </button>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => setEditingPass({})}
+            className="flex items-center gap-1 rounded-xl border border-brand px-3 py-1.5 text-[0.75rem] font-semibold text-brand active:scale-[0.98]"
+          >
+            <PlusIcon className="h-[13px] w-[13px]" />
+            Add pass
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing({})}
+            className="flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-[0.75rem] font-semibold text-white active:scale-[0.98]"
+          >
+            <PlusIcon className="h-[13px] w-[13px]" />
+            Add
+          </button>
+        </div>
       </div>
 
       <input
@@ -196,6 +143,7 @@ export default function OutsideCollectionPage() {
 
       {sorted.map((entry) => {
         const contribution = contributionFor({ outsideCollectionId: entry.id });
+        const isPass = entry.type === "dandiya_pass";
         return (
           <OutsideCollectionCard
             key={entry.id}
@@ -205,8 +153,11 @@ export default function OutsideCollectionPage() {
             assignedToName={
               memberName(contribution?.assignedToMemberId) ?? contribution?.assignedToName
             }
-            onEdit={() => setEditing({ outsideCollection: entry })}
+            onEdit={() =>
+              isPass ? setEditingPass({ outsideCollection: entry }) : setEditing({ outsideCollection: entry })
+            }
             onToggleDisabled={() => setOutsideCollectionDisabled(entry.id, !entry.disabled)}
+            onDelete={() => deleteOutsideCollection(entry.id)}
           />
         );
       })}
@@ -217,6 +168,29 @@ export default function OutsideCollectionPage() {
           open
           outsideCollection={editing.outsideCollection}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {editingPass && (
+        <DandiyaPassSheet
+          key={editingPass.outsideCollection?.id ?? "new"}
+          open
+          pass={
+            editingPass.outsideCollection
+              ? (() => {
+                  const c = contributionFor({
+                    outsideCollectionId: editingPass.outsideCollection!.id,
+                  });
+                  return {
+                    outsideCollection: editingPass.outsideCollection!,
+                    peopleCount: c?.passPeopleCount ?? 1,
+                    day18: c?.passDay18 ?? true,
+                    day19: c?.passDay19 ?? true,
+                  };
+                })()
+              : undefined
+          }
+          onClose={() => setEditingPass(null)}
         />
       )}
     </div>

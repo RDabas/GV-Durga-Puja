@@ -607,6 +607,18 @@ export async function dbSetOutsideCollectionDisabled(
   assertUpdated(result, "toggle outside collection disabled");
 }
 
+/** Permanently removes an outside-collection entry and its linked contribution (cascade). */
+export async function dbDeleteOutsideCollection(
+  supabase: SupabaseClient,
+  outsideCollectionId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("outside_collections")
+    .delete()
+    .eq("id", outsideCollectionId);
+  if (error) throw new Error(error.message);
+}
+
 export async function dbAddMember(
   supabase: SupabaseClient,
   input: { name: string; phone?: string; role: CommitteeMember["role"] },

@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { cardAccent, DisableToggleButton, PayerRow, paymentActionChipFor } from "@/components/FlatCard";
+import { FormError } from "@/components/FormControls";
 import { Pill, pillLabels } from "@/components/Pill";
+import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { Contribution, OutsideCollection } from "@/lib/types";
 
 /** "4 people · Both nights (18 & 19 Oct)" — built from the contribution's pass fields, not stored as its own string. */
@@ -31,6 +34,7 @@ export function OutsideCollectionCard({
   assignedToName,
   onEdit,
   onToggleDisabled,
+  onDelete,
 }: {
   outsideCollection: OutsideCollection;
   contribution?: Contribution;
@@ -38,9 +42,13 @@ export function OutsideCollectionCard({
   assignedToName?: string;
   onEdit: () => void;
   onToggleDisabled: () => Promise<void>;
+  /** Only ever offered once the entry is already disabled — a permanent delete, not a toggle. */
+  onDelete?: () => Promise<void>;
 }) {
   const status = contribution?.status ?? "not_visited";
   const accent = cardAccent[outsideCollection.disabled ? "not_visited" : status];
+  const [confirming, setConfirming] = useState(false);
+  const { submitting, error, run } = useAsyncAction();
 
   return (
     <div
@@ -81,6 +89,41 @@ export function OutsideCollectionCard({
         )}
         onClick={onEdit}
       />
+      {onDelete && outsideCollection.disabled && !confirming && (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="w-full border-t border-border py-1.5 text-[0.72rem] font-semibold text-critical"
+        >
+          Delete
+        </button>
+      )}
+      {onDelete && outsideCollection.disabled && confirming && (
+        <div className="space-y-2 border-t border-border p-3">
+          <p className="text-[0.75rem] text-ink-faint">
+            Permanently delete {outsideCollection.name}? This can&rsquo;t be undone.
+          </p>
+          <FormError message={error} />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={submitting}
+              className="flex-1 rounded-xl border border-border py-2 text-[0.78rem] font-semibold text-ink-soft disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => run(onDelete)}
+              disabled={submitting}
+              className="flex-1 rounded-xl bg-critical py-2 text-[0.78rem] font-semibold text-white disabled:opacity-60"
+            >
+              {submitting ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
