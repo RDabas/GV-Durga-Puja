@@ -73,6 +73,19 @@ function loadLogo(): Promise<Uint8Array | null> {
   return logoBytesPromise;
 }
 
+// public/gv-seal.png — a drawn circular committee seal (double ring, curved
+// "GANGA VERTICA CELEBRATES" / "DURGA PUJA COMMITTEE", "GV" center emblem),
+// square (1:1). The year isn't baked into the image — it's drawn separately
+// as text over the image's blank center, so one asset works for every year.
+let sealBytesPromise: Promise<Uint8Array | null> | null = null;
+function loadSeal(): Promise<Uint8Array | null> {
+  sealBytesPromise ??= fetch("/gv-seal.png")
+    .then((res) => (res.ok ? res.arrayBuffer() : null))
+    .then((buf) => (buf ? new Uint8Array(buf) : null))
+    .catch(() => null);
+  return sealBytesPromise;
+}
+
 /** Draws the shared letterhead (Durga Maa crest, society name, subtitle, year, divider) every generated document opens with. Returns the y cursor just below the divider. */
 async function drawLetterhead(
   doc: jsPDF,
@@ -165,35 +178,32 @@ function drawPayerBlock(doc: jsPDF, y: number, leadIn: string, payer: ReceiptPay
  * bordered frame around everything + the small footer note, drawn last so
  * the frame encloses the whole page.
  */
-function closeDocumentFrame(
+async function closeDocumentFrame(
   doc: jsPDF,
   pageWidth: number,
   y: number,
   year: number,
   footerNote: string,
-): void {
-  const radius = 11;
-  const centerX = pageWidth - PAGE_MARGIN_X - radius - 2;
-  const centerY = y + radius;
+): Promise<void> {
+  const seal = await loadSeal();
+  const sealSize = 26;
+  const sealX = pageWidth - PAGE_MARGIN_X - sealSize;
+  const sealY = y;
 
-  doc.setDrawColor(...BRAND_RGB);
-  doc.setLineWidth(0.8);
-  doc.circle(centerX, centerY, radius, "S");
-  doc.setLineWidth(0.3);
-  doc.circle(centerX, centerY, radius - 2.2, "S");
+  if (seal) {
+    try {
+      doc.addImage(seal, "PNG", sealX, sealY, sealSize, sealSize);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...BRAND_RGB);
+      doc.text(String(year), sealX + sealSize / 2, sealY + sealSize / 2 + 7.5, { align: "center" });
+    } catch {
+      // A broken/unreachable seal image shouldn't block the rest of the
+      // document — it just won't have a seal.
+    }
+  }
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(6.3);
-  doc.setTextColor(...BRAND_RGB);
-  doc.text("GV DURGA PUJA", centerX, centerY - 3, { align: "center" });
-  doc.text("COMMITTEE", centerX, centerY + 2, { align: "center" });
-  doc.setLineWidth(0.25);
-  doc.line(centerX - 6, centerY + 3.6, centerX + 6, centerY + 3.6);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(5.5);
-  doc.text(String(year), centerX, centerY + 7, { align: "center" });
-
-  const boxBottom = centerY + radius + 6;
+  const boxBottom = sealY + sealSize + 6;
   doc.setDrawColor(...BRAND_RGB);
   doc.setLineWidth(0.8);
   doc.roundedRect(
@@ -307,7 +317,7 @@ export async function generateReceiptPdf(
   });
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
 
-  closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated receipt from the GV Durga Puja app.");
+  await closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated receipt from the GV Durga Puja app.");
 
   const titlePrefix = payment.slipTitle ?? "Receipt";
   const filename = `${titlePrefix} - ${payer.name} - GV Durga Puja ${year.year}.pdf`;
@@ -379,7 +389,7 @@ export async function generateContributionRequestPdf(
   doc.text(wrapped, PAGE_MARGIN_X, y);
   y += wrapped.length * 5 + 12;
 
-  closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated request from the GV Durga Puja app.");
+  await closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated request from the GV Durga Puja app.");
 
   const filename = `Contribution Request - ${payer.name} - GV Durga Puja ${year.year}.pdf`;
   await shareOrDownloadPdf(
@@ -453,7 +463,7 @@ export async function generateVendorPaymentReceiptPdf(
   });
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
 
-  closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated payment voucher from the GV Durga Puja app.");
+  await closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated payment voucher from the GV Durga Puja app.");
 
   const filename = `Payment Voucher - ${vendor.name} - GV Durga Puja ${year.year}.pdf`;
   await shareOrDownloadPdf(
