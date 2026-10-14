@@ -60,10 +60,10 @@ const PAGE_MARGIN_X = 16;
 const BOX_TOP = 16;
 
 // The Durga Maa crest cropped from the committee's own reference slip —
-// public/durga-logo.png, ~98x166px (w:h ≈ 1:1.69). Fetched once and cached
+// public/durga-logo.png, ~128x166px (w:h ≈ 1:1.30). Fetched once and cached
 // as raw bytes so every PDF generated in this session re-embeds the same
 // buffer instead of re-fetching.
-const LOGO_ASPECT = 166 / 98;
+const LOGO_ASPECT = 166 / 128;
 let logoBytesPromise: Promise<Uint8Array | null> | null = null;
 function loadLogo(): Promise<Uint8Array | null> {
   logoBytesPromise ??= fetch("/durga-logo.png")
@@ -159,19 +159,41 @@ function drawPayerBlock(doc: jsPDF, y: number, leadIn: string, payer: ReceiptPay
   return y + 10;
 }
 
-/** Signature line ("For GV Durga Puja Committee") + the bordered frame around everything + the small footer note, drawn last so the frame encloses the whole page. */
-function closeDocumentFrame(doc: jsPDF, pageWidth: number, y: number, footerNote: string): void {
-  const sigX = pageWidth - PAGE_MARGIN_X - 60;
-  doc.setDrawColor(...FAINT_RGB);
-  doc.setLineWidth(0.3);
-  doc.line(sigX, y, pageWidth - PAGE_MARGIN_X, y);
-  y += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...FAINT_RGB);
-  doc.text("For GV Durga Puja Committee", pageWidth - PAGE_MARGIN_X, y, { align: "right" });
+/**
+ * A round committee seal (no signature — this is a digital document, a
+ * stamp reads as authoritative without needing a hand signature) + the
+ * bordered frame around everything + the small footer note, drawn last so
+ * the frame encloses the whole page.
+ */
+function closeDocumentFrame(
+  doc: jsPDF,
+  pageWidth: number,
+  y: number,
+  year: number,
+  footerNote: string,
+): void {
+  const radius = 11;
+  const centerX = pageWidth - PAGE_MARGIN_X - radius - 2;
+  const centerY = y + radius;
 
-  const boxBottom = y + 10;
+  doc.setDrawColor(...BRAND_RGB);
+  doc.setLineWidth(0.8);
+  doc.circle(centerX, centerY, radius, "S");
+  doc.setLineWidth(0.3);
+  doc.circle(centerX, centerY, radius - 2.2, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.3);
+  doc.setTextColor(...BRAND_RGB);
+  doc.text("GV DURGA PUJA", centerX, centerY - 3, { align: "center" });
+  doc.text("COMMITTEE", centerX, centerY + 2, { align: "center" });
+  doc.setLineWidth(0.25);
+  doc.line(centerX - 6, centerY + 3.6, centerX + 6, centerY + 3.6);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.5);
+  doc.text(String(year), centerX, centerY + 7, { align: "center" });
+
+  const boxBottom = centerY + radius + 6;
   doc.setDrawColor(...BRAND_RGB);
   doc.setLineWidth(0.8);
   doc.roundedRect(
@@ -285,7 +307,7 @@ export async function generateReceiptPdf(
   });
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
 
-  closeDocumentFrame(doc, pageWidth, y, "This is a system-generated receipt from the GV Durga Puja app.");
+  closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated receipt from the GV Durga Puja app.");
 
   const titlePrefix = payment.slipTitle ?? "Receipt";
   const filename = `${titlePrefix} - ${payer.name} - GV Durga Puja ${year.year}.pdf`;
@@ -357,7 +379,7 @@ export async function generateContributionRequestPdf(
   doc.text(wrapped, PAGE_MARGIN_X, y);
   y += wrapped.length * 5 + 12;
 
-  closeDocumentFrame(doc, pageWidth, y, "This is a system-generated request from the GV Durga Puja app.");
+  closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated request from the GV Durga Puja app.");
 
   const filename = `Contribution Request - ${payer.name} - GV Durga Puja ${year.year}.pdf`;
   await shareOrDownloadPdf(
@@ -431,7 +453,7 @@ export async function generateVendorPaymentReceiptPdf(
   });
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
 
-  closeDocumentFrame(doc, pageWidth, y, "This is a system-generated payment voucher from the GV Durga Puja app.");
+  closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated payment voucher from the GV Durga Puja app.");
 
   const filename = `Payment Voucher - ${vendor.name} - GV Durga Puja ${year.year}.pdf`;
   await shareOrDownloadPdf(

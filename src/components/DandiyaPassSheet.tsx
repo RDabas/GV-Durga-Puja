@@ -2,14 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Sheet } from "@/components/Sheet";
-import {
-  AmountInput,
-  Field,
-  FormError,
-  OptionGroup,
-  SubmitButton,
-  TextInput,
-} from "@/components/FormControls";
+import { Field, FormError, OptionGroup, SubmitButton, TextInput } from "@/components/FormControls";
 import { modeOptions } from "@/lib/contributionForm";
 import { today } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
@@ -110,7 +103,32 @@ export function DandiyaPassSheet({
         </Field>
 
         <Field label="Number of people">
-          <AmountInput value={peopleCount} onChange={(v) => setPeopleCount(Math.max(1, v))} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPeopleCount((n) => Math.max(1, n - 1))}
+              aria-label="Decrease number of people"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-lg font-bold text-ink-soft active:scale-95"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={peopleCount}
+              onChange={(e) => setPeopleCount(Math.max(1, Number(e.target.value) || 1))}
+              className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2.5 text-center text-[0.9rem] font-semibold tabular-nums text-ink outline-none focus:border-brand"
+            />
+            <button
+              type="button"
+              onClick={() => setPeopleCount((n) => n + 1)}
+              aria-label="Increase number of people"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-lg font-bold text-ink-soft active:scale-95"
+            >
+              +
+            </button>
+          </div>
         </Field>
 
         <Field label="Which night(s)?">
