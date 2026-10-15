@@ -196,7 +196,7 @@ async function closeDocumentFrame(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7);
       doc.setTextColor(...BRAND_RGB);
-      doc.text(String(year), sealX + sealSize / 2, sealY + sealSize / 2 + 7.5, { align: "center" });
+      doc.text(String(year), sealX + sealSize / 2, sealY + sealSize / 2 + 4, { align: "center" });
     } catch {
       // A broken/unreachable seal image shouldn't block the rest of the
       // document — it just won't have a seal.
