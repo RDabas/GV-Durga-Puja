@@ -276,7 +276,7 @@ export async function generateReceiptPdf(
   const totalAmount = payment.moneyAmount + payment.bhogGroceryAmount;
   const reference = `GVDP/${payer.refCode}/${compactDate(payment.paymentDate)}`;
 
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
 
   let y = await drawLetterhead(doc, pageWidth, payment.slipTitle ?? "Receipt of Contribution", year);
@@ -348,7 +348,7 @@ export async function generateContributionRequestPdf(
   const requestDate = today();
   const reference = `GVDP/${payer.refCode}/${compactDate(requestDate)}`;
 
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
 
   let y = await drawLetterhead(doc, pageWidth, "Contribution Request", year);
@@ -400,7 +400,7 @@ export async function generateContributionRequestPdf(
   );
 }
 
-export interface VendorPaymentReceiptDetails {
+export interface VendorConsolidatedPayment {
   amount: number;
   mode: PaymentMode;
   paymentDate: string;
@@ -408,58 +408,65 @@ export interface VendorPaymentReceiptDetails {
   paidByName?: string;
   /** Paid from the member's own pocket (e.g. offsetting their own resident pledge), not committee cash. */
   selfFunded?: boolean;
-  /** The bill's full amount and how much has been paid against it as of (and including) this payment, so the voucher can state what's still outstanding. */
-  billTotal: number;
-  billPaidToDate: number;
-  note?: string;
 }
 
 /**
- * A one-page PDF payment voucher for a single payment made to a vendor —
- * "Paid to <vendor>, Rs. X, via <mode>, on <date>" — the outgoing-money
- * counterpart to generateReceiptPdf's incoming-contribution receipt. Same
- * letterhead/signature/share-or-download as the other documents in this
- * file.
+ * A one-page PDF payment voucher covering every payment made so far against
+ * one vendor bill — one row per payment plus a running total, bill total,
+ * and balance — rather than a separate document per payment. The outgoing-
+ * money counterpart to generateReceiptPdf's incoming-contribution receipt.
+ * Same letterhead/seal/share-or-download as the other documents here.
  */
-export async function generateVendorPaymentReceiptPdf(
+export async function generateVendorConsolidatedReceiptPdf(
   vendor: { name: string; serviceType: string; refCode: string },
-  payment: VendorPaymentReceiptDetails,
+  payments: VendorConsolidatedPayment[],
+  billTotal: number,
   year: PujaYear,
 ): Promise<void> {
-  const reference = `${vendor.refCode}/${compactDate(payment.paymentDate)}`;
+  const sorted = [...payments].sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
+  const totalPaid = sorted.reduce((sum, p) => sum + p.amount, 0);
+  const latestDate = sorted.length > 0 ? sorted[sorted.length - 1].paymentDate : today();
+  const reference = `${vendor.refCode}/${compactDate(latestDate)}`;
 
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
 
   let y = await drawLetterhead(doc, pageWidth, "Payment Voucher", year);
-  y = drawReferenceLine(doc, pageWidth, y, reference, `Date: ${formatShortDate(payment.paymentDate)}, ${year.year}`);
+  y = drawReferenceLine(doc, pageWidth, y, reference, `Date: ${formatShortDate(today())}, ${year.year}`);
   y = drawPayerBlock(doc, y, "Paid to", { name: vendor.name, context: vendor.serviceType, refCode: vendor.refCode });
 
-  const balance = payment.billTotal - payment.billPaidToDate;
-  const rows: (string | number)[][] = [
-    ["Amount paid", formatINR(payment.amount)],
-    ["In words", `Rupees ${numberToIndianWords(payment.amount)} Only`],
-    ["Payment mode", paymentModeLabels[payment.mode]],
-    ["Bill total", formatINR(payment.billTotal)],
+  autoTable(doc, {
+    startY: y,
+    theme: "grid",
+    margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X },
+    head: [["Date", "Mode", "Paid by", "Amount"]],
+    headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9 },
+    styles: { fontSize: 9.5, cellPadding: 2 },
+    columnStyles: { 3: { halign: "right" } },
+    body: sorted.map((p) => [
+      formatShortDate(p.paymentDate),
+      paymentModeLabels[p.mode],
+      `${p.paidByName ?? "—"}${p.selfFunded ? " (self-funded)" : ""}`,
+      formatINR(p.amount),
+    ]),
+    foot: [["", "", "Total paid", formatINR(totalPaid)]],
+    footStyles: { fillColor: [235, 237, 245], textColor: INK_RGB, fontStyle: "bold", fontSize: 9.5 },
+  });
+  y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
+  const balance = billTotal - totalPaid;
+  const summaryRows: (string | number)[][] = [
+    ["Bill total", formatINR(billTotal)],
     [balance > 0 ? "Balance outstanding" : "Bill status", balance > 0 ? formatINR(balance) : "Fully settled"],
     ["Towards", `Durga Puja Celebration ${year.year} — ${vendor.serviceType}`],
   ];
-  if (payment.paidByName) {
-    rows.push([
-      "Paid by",
-      payment.selfFunded
-        ? `${payment.paidByName} (self-funded, not committee cash)`
-        : `${payment.paidByName}, on behalf of GV Durga Puja Committee`,
-    ]);
-  }
-
   autoTable(doc, {
     startY: y,
     theme: "plain",
     margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X },
     styles: { fontSize: 10, cellPadding: 1.8 },
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 }, 1: {} },
-    body: rows,
+    body: summaryRows,
   });
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
 

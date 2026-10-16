@@ -4,7 +4,7 @@ import { PaymentBreakdown } from "@/components/PaymentBreakdown";
 import { Pill, type PillTone } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
 import { FormError } from "@/components/FormControls";
-import { VendorPaymentReceiptChip } from "@/components/IssueReceiptButton";
+import { VendorConsolidatedReceiptChip } from "@/components/IssueReceiptButton";
 import { formatINR, formatShortDate } from "@/lib/format";
 import { paymentModeBreakdown, paymentModeLabels } from "@/lib/payment";
 import { useAsyncAction } from "@/lib/useAsyncAction";
@@ -65,7 +65,26 @@ export function VendorCard({
           <div className="text-[0.9rem] font-bold text-ink">{expense.vendor.name}</div>
           <div className="mt-0.5 text-[0.74rem] text-ink-faint">{expense.vendor.serviceType}</div>
         </div>
-        <Pill tone={statusFor(paid, expense.totalAmount)} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {paid > 0 && (
+            <VendorConsolidatedReceiptChip
+              vendor={{
+                name: expense.vendor.name,
+                serviceType: expense.vendor.serviceType,
+                refCode: `V-${expense.vendor.id.slice(0, 6)}`,
+              }}
+              payments={expense.payments.map((p) => ({
+                amount: p.amount,
+                mode: p.mode,
+                paymentDate: p.paymentDate,
+                paidByName: memberName(p.memberId),
+                selfFunded: p.selfFunded,
+              }))}
+              billTotal={expense.totalAmount}
+            />
+          )}
+          <Pill tone={statusFor(paid, expense.totalAmount)} />
+        </div>
       </div>
       <div className="mt-3 flex justify-between text-[0.72rem] text-ink-faint">
         <span>
@@ -114,22 +133,6 @@ export function VendorCard({
                 </span>
               )}
               <span className="shrink-0 tabular-nums text-ink-soft">{formatINR(p.amount)}</span>
-              <VendorPaymentReceiptChip
-                vendor={{
-                  name: expense.vendor.name,
-                  serviceType: expense.vendor.serviceType,
-                  refCode: `V-${expense.vendor.id.slice(0, 6)}`,
-                }}
-                payment={{
-                  amount: p.amount,
-                  mode: p.mode,
-                  paymentDate: p.paymentDate,
-                  paidByName: memberName(p.memberId),
-                  selfFunded: p.selfFunded,
-                  billTotal: expense.totalAmount,
-                  billPaidToDate: paid,
-                }}
-              />
               {onRemovePayment && (
                 <RemovePaymentButton onRemove={() => onRemovePayment(p.id)} />
               )}

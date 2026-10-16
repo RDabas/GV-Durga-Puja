@@ -142,7 +142,7 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
     if (c && c.paymentMode !== "pending") exResidentTotal += c.moneyAmount;
   }
 
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
   const marginX = 14;
   let y = 18;

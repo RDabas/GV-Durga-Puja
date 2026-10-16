@@ -4,11 +4,11 @@ import { BellIcon, ReceiptIcon } from "@/components/icons";
 import {
   generateContributionRequestPdf,
   generateReceiptPdf,
-  generateVendorPaymentReceiptPdf,
+  generateVendorConsolidatedReceiptPdf,
   type ContributionRequestDetails,
   type ReceiptPayer,
   type ReceiptPaymentDetails,
-  type VendorPaymentReceiptDetails,
+  type VendorConsolidatedPayment,
 } from "@/lib/receiptPdf";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
@@ -82,13 +82,19 @@ export function RequestContributionChip({
   );
 }
 
-/** Same pill, but for a payment made TO a vendor — builds a payment voucher PDF instead of a contribution receipt. Shown on each vendor payment history row. */
-export function VendorPaymentReceiptChip({
+/**
+ * Same pill, but for a vendor bill — builds ONE payment voucher covering
+ * every payment made against the bill so far (not a separate document per
+ * payment). Shown once on the card, not per payment-history row.
+ */
+export function VendorConsolidatedReceiptChip({
   vendor,
-  payment,
+  payments,
+  billTotal,
 }: {
   vendor: { name: string; serviceType: string; refCode: string };
-  payment: VendorPaymentReceiptDetails;
+  payments: VendorConsolidatedPayment[];
+  billTotal: number;
 }) {
   const { activeYear } = usePujaData();
   const { submitting, error, run } = useAsyncAction();
@@ -98,7 +104,7 @@ export function VendorPaymentReceiptChip({
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        run(() => generateVendorPaymentReceiptPdf(vendor, payment, activeYear));
+        run(() => generateVendorConsolidatedReceiptPdf(vendor, payments, billTotal, activeYear));
       }}
       disabled={submitting}
       title={error ?? undefined}
