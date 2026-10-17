@@ -10,6 +10,13 @@ export function formatINR(amount: number): string {
   return inr.format(amount);
 }
 
+/** 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 4 -> "4th", 11-13 -> "11th"/"12th"/"13th", etc. */
+export function ordinalLabel(n: number): string {
+  const suffixes = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
+}
+
 /**
  * moneyAmount means something different per status — for "promised" it's
  * what's still pending, for "partial" it's what's already been paid — so the

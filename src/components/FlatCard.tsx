@@ -4,7 +4,7 @@ import { IssueReceiptChip, RequestContributionChip } from "@/components/IssueRec
 import { Pill } from "@/components/Pill";
 import { PaymentTag } from "@/components/PaymentBreakdown";
 import { SplitPaymentSheet } from "@/components/SplitPaymentSheet";
-import { formatINR, formatShortDate, pledgeProgressLabel, today } from "@/lib/format";
+import { formatINR, formatShortDate, ordinalLabel, pledgeProgressLabel, today } from "@/lib/format";
 import { paymentModeLabels } from "@/lib/payment";
 import { usePujaData, type PreviousYearInfo } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
@@ -381,32 +381,48 @@ export function PayerRow({
       </button>
       {!disabled && received && contribution && (
         <div className="space-y-1 px-3 pb-2.5">
-          {installments.length > 0 && contribution.moneyAmount > 0 && (
-            <div className="flex items-center gap-2 text-[0.68rem] text-ink-faint">
-              <span className="min-w-0 flex-1 truncate">
-                {contribution.paymentDate ? formatShortDate(contribution.paymentDate) : "—"} ·{" "}
-                {paymentModeLabels[contribution.paymentMode]}
-                {collectorName ? ` · to ${collectorName}` : ""}
-              </span>
-              <span className="shrink-0 tabular-nums text-ink-soft">
-                {formatINR(contribution.moneyAmount)}
-              </span>
-            </div>
-          )}
-          {installments.map((p) => (
-            <div key={p.id} className="flex items-center gap-2 text-[0.68rem] text-ink-faint">
-              <span className="min-w-0 flex-1 truncate">
-                split · {formatShortDate(p.paymentDate)} · {paymentModeLabels[p.mode]} ·{" "}
-                {p.collectorId ? `to ${memberName(p.collectorId)}` : "settled via vendor payment"}
-              </span>
-              <span className="shrink-0 tabular-nums text-ink-soft">{formatINR(p.amount)}</span>
-              {p.collectorId && (
-                <RemoveInstallmentButton
-                  onRemove={() => removeContributionPayment(contribution.id, p.id)}
-                />
-              )}
-            </div>
-          ))}
+          {installments.length > 0 &&
+            // Every payment that makes up the total, in the order the money
+            // actually came in — "1st payment", "2nd payment", etc. — rather
+            // than singling out only the extra installment(s).
+            [
+              ...(contribution.moneyAmount > 0
+                ? [
+                    {
+                      key: "primary",
+                      paymentDate: contribution.paymentDate,
+                      mode: contribution.paymentMode,
+                      collectorLabel: collectorName ? `to ${collectorName}` : undefined,
+                      amount: contribution.moneyAmount,
+                      removable: false as const,
+                    },
+                  ]
+                : []),
+              ...installments.map((p) => ({
+                key: p.id,
+                paymentDate: p.paymentDate,
+                mode: p.mode,
+                collectorLabel: p.collectorId ? `to ${memberName(p.collectorId)}` : "settled via vendor payment",
+                amount: p.amount,
+                removable: Boolean(p.collectorId),
+              })),
+            ]
+              .sort((a, b) => (a.paymentDate ?? "").localeCompare(b.paymentDate ?? ""))
+              .map((p, i) => (
+                <div key={p.key} className="flex items-center gap-2 text-[0.68rem] text-ink-faint">
+                  <span className="min-w-0 flex-1 truncate">
+                    {ordinalLabel(i + 1)} payment · {p.paymentDate ? formatShortDate(p.paymentDate) : "—"} ·{" "}
+                    {paymentModeLabels[p.mode]}
+                    {p.collectorLabel ? ` · ${p.collectorLabel}` : ""}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-ink-soft">{formatINR(p.amount)}</span>
+                  {p.removable && (
+                    <RemoveInstallmentButton
+                      onRemove={() => removeContributionPayment(contribution.id, p.key)}
+                    />
+                  )}
+                </div>
+              ))}
           <button
             type="button"
             onClick={(e) => {
