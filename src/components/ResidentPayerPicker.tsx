@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { TextInput } from "@/components/FormControls";
-import type { PujaStore } from "@/lib/store";
+import type { PayerRef, PujaStore } from "@/lib/store";
 import { usePujaData } from "@/lib/store";
 import type { Contribution } from "@/lib/types";
 
 export interface ResidentPayerSelection {
-  contributionId: string;
+  /** Set when linking to an existing pledge. */
+  contributionId?: string;
+  /** Set instead of contributionId when this payer has no pledge on record yet — identifies who to create a fresh "paid" one for. */
+  newPledgeFor?: PayerRef;
   label: string;
 }
 
@@ -34,10 +37,10 @@ export function residentPayerLabel(
 /**
  * Search-and-pick a resident (flat, owner, or ex-resident) to attribute a
  * vendor payment to directly — used when a resident pays a vendor out of
- * their own pocket instead of handing cash/UPI to a collector. Only payers
- * who already have a pledge on record (a Contribution row) can be picked,
- * since there's nothing to settle otherwise — unrecorded ones show as
- * unselectable with a hint to record their pledge on the Collect tab first.
+ * their own pocket instead of handing cash/UPI to a collector. Picking one
+ * with an existing pledge on record settles it directly; picking one with
+ * no pledge yet (never visited/promised) creates a fresh one marked "paid"
+ * from this payment.
  */
 export function ResidentPayerPicker({
   value,
@@ -67,7 +70,12 @@ export function ResidentPayerPicker({
   }
 
   const q = search.trim().toLowerCase();
-  const results: { key: string; label: string; contribution: Contribution | undefined }[] = !q
+  const results: {
+    key: string;
+    label: string;
+    contribution: Contribution | undefined;
+    payerRef: PayerRef | undefined;
+  }[] = !q
     ? []
     : [
         // A flat's own contribution is only ever the tenant's — an
@@ -85,7 +93,7 @@ export function ResidentPayerPicker({
           .slice(0, 8)
           .flatMap((h) => {
             const owner = ownerOf(h);
-            const rows: { key: string; label: string; contribution: Contribution | undefined }[] = [];
+            const rows: typeof results = [];
             // Disabled (moved out / no longer current) — excluded the same
             // way they're left out of this year's totals and follow-up
             // lists everywhere else, so a stale duplicate record never
@@ -95,6 +103,7 @@ export function ResidentPayerPicker({
                 key: `h-${h.id}-tenant`,
                 label: `${h.block}-${h.flatNo} — ${h.tenantNames.join(", ")} (Tenant)`,
                 contribution: contributionFor({ houseId: h.id }),
+                payerRef: { houseId: h.id },
               });
             }
             if (owner && !owner.disabled) {
@@ -102,10 +111,16 @@ export function ResidentPayerPicker({
                 key: `h-${h.id}-owner`,
                 label: `${h.block}-${h.flatNo} — ${owner.names.join(", ")} (Owner)`,
                 contribution: contributionFor({ ownerId: owner.id }),
+                payerRef: { ownerId: owner.id },
               });
             }
             if (rows.length === 0) {
-              rows.push({ key: `h-${h.id}`, label: `${h.block}-${h.flatNo}`, contribution: undefined });
+              rows.push({
+                key: `h-${h.id}`,
+                label: `${h.block}-${h.flatNo}`,
+                contribution: undefined,
+                payerRef: undefined,
+              });
             }
             return rows;
           }),
@@ -116,6 +131,7 @@ export function ResidentPayerPicker({
             key: `o-${o.id}`,
             label: `${o.names.join(", ")} (Owner)`,
             contribution: contributionFor({ ownerId: o.id }),
+            payerRef: { ownerId: o.id } as PayerRef,
           })),
         ...exResidents
           .filter((r) => !r.disabled && r.names.some((n) => n.toLowerCase().includes(q)))
@@ -124,6 +140,7 @@ export function ResidentPayerPicker({
             key: `e-${r.id}`,
             label: `${r.names.join(", ")} (Ex Resident)`,
             contribution: contributionFor({ exResidentId: r.id }),
+            payerRef: { exResidentId: r.id } as PayerRef,
           })),
       ];
 
@@ -141,7 +158,7 @@ export function ResidentPayerPicker({
             <button
               key={r.key}
               type="button"
-              disabled={!r.contribution}
+              disabled={!r.contribution && !r.payerRef}
               // The search input is still focused (keyboard open on a phone)
               // when this is tapped — on many mobile browsers, a plain click
               // handler loses the race against the input's blur, so the
@@ -150,13 +167,19 @@ export function ResidentPayerPicker({
               // swallow it.
               onPointerDown={(e) => {
                 e.preventDefault();
-                if (r.contribution) onChange({ contributionId: r.contribution.id, label: r.label });
+                if (r.contribution) {
+                  onChange({ contributionId: r.contribution.id, label: r.label });
+                } else if (r.payerRef) {
+                  onChange({ newPledgeFor: r.payerRef, label: r.label });
+                }
               }}
               className="flex w-full items-center justify-between gap-2 border-b border-border px-3 py-2 text-left text-[0.8rem] text-ink last:border-b-0 disabled:opacity-40"
             >
               <span className="min-w-0 flex-1 truncate">{r.label}</span>
               {!r.contribution && (
-                <span className="shrink-0 text-[0.66rem] text-ink-faint">no pledge yet</span>
+                <span className="shrink-0 text-[0.66rem] text-ink-faint">
+                  {r.payerRef ? "no pledge yet — will mark paid" : "nothing on file"}
+                </span>
               )}
             </button>
           ))}

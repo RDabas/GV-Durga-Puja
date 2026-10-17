@@ -98,19 +98,15 @@ export function PaymentSheet({
     e.preventDefault();
     if (amount <= 0) return;
     if (payerKind === "resident" ? !residentPayer : !memberId) return;
-    const contributionId =
-      payerKind === "resident"
-        ? residentPayer?.contributionId
-        : selfFunded
-          ? settledPledge?.contributionId
-          : undefined;
+    const pledgeSelection = payerKind === "resident" ? residentPayer : selfFunded ? settledPledge : null;
     run(
       () =>
         onSubmit({
           amount,
           mode,
           memberId: payerKind === "resident" ? undefined : memberId,
-          contributionId,
+          contributionId: pledgeSelection?.contributionId,
+          newPledgeFor: pledgeSelection?.newPledgeFor,
           paymentDate,
           note: note.trim() || undefined,
           selfFunded: allowSelfFunded && payerKind === "member" ? selfFunded : undefined,

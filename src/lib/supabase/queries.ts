@@ -749,6 +749,7 @@ interface ContributionWrite {
   passDay19?: boolean;
 }
 
+/** Returns the saved row's id (existingId echoed back on update, or the newly inserted row's id) — lets a caller immediately reference a just-created contribution, e.g. to link a vendor payment to it. */
 export async function dbSaveContribution(
   supabase: SupabaseClient,
   yearId: string,
@@ -759,7 +760,7 @@ export async function dbSaveContribution(
     | { outsideCollectionId: string },
   existingId: string | undefined,
   input: ContributionWrite,
-): Promise<void> {
+): Promise<string> {
   const row = {
     year_id: yearId,
     house_id: "houseId" in payer ? payer.houseId : null,
@@ -790,10 +791,10 @@ export async function dbSaveContribution(
       .eq("id", existingId)
       .select("id");
     assertUpdated(result, "save contribution");
-    return;
+    return existingId;
   }
-  const { error } = await supabase.from("contributions").insert(row);
-  if (error) throw new Error(error.message);
+  const inserted = await supabase.from("contributions").insert(row).select("id").single();
+  return unwrap<{ id: string }>(inserted, "insert contribution").id;
 }
 
 interface PaymentWrite {

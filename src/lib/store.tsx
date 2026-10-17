@@ -100,6 +100,14 @@ export interface PaymentInput {
    * own pocket and it's settling their — or someone else's — own pledge).
    */
   contributionId?: string;
+  /**
+   * Vendor payments only, instead of contributionId — the payer has no
+   * pledge on record at all yet (never visited/promised). A fresh
+   * contribution is created and marked "paid" directly from this payment,
+   * for a resident who settled the whole thing with the vendor and was
+   * never otherwise visited.
+   */
+  newPledgeFor?: PayerRef;
 }
 
 export interface ContributionPaymentInput {
@@ -442,12 +450,10 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
      * activity or reload — callers do that once, after their own write.
      */
     const applyContributionPayment = async (
-      contributionId: string,
+      contribution: Contribution,
       input: ContributionPaymentWrite,
     ): Promise<Contribution> => {
-      const contribution = data.contributions.find((c) => c.id === contributionId);
-      if (!contribution) throw new Error("That pledge is no longer here.");
-      await dbAddContributionPayment(supabase, contributionId, input);
+      await dbAddContributionPayment(supabase, contribution.id, input);
 
       if (contribution.status === "promised") {
         const pledge = contribution.moneyAmount;
@@ -470,7 +476,7 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         });
       } else if (contribution.originalPledgeAmount && contribution.status !== "paid") {
         const existingExtras = data.contributionPayments
-          .filter((p) => p.contributionId === contributionId)
+          .filter((p) => p.contributionId === contribution.id)
           .reduce((sum, p) => sum + p.amount, 0);
         const total = contribution.moneyAmount + existingExtras + input.amount;
         if (total >= contribution.originalPledgeAmount) {
@@ -488,6 +494,58 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         }
       }
       return contribution;
+    };
+
+    /** applyContributionPayment, but resolving the contribution from an id first — the common case where it's known to already exist. */
+    const applyContributionPaymentById = async (
+      contributionId: string,
+      input: ContributionPaymentWrite,
+    ): Promise<Contribution> => {
+      const contribution = data.contributions.find((c) => c.id === contributionId);
+      if (!contribution) throw new Error("That pledge is no longer here.");
+      return applyContributionPayment(contribution, input);
+    };
+
+    /**
+     * A resident who paid a vendor directly but has no pledge on record at
+     * all yet (never visited/promised) — creates a fresh contribution
+     * marked "paid" on the spot, then settles it the same way
+     * applyContributionPayment does for an existing one. Built in JS rather
+     * than re-fetched, since the store's own data snapshot won't include
+     * this new row until the next reload.
+     */
+    const createAndSettlePledge = async (
+      payerRef: PayerRef,
+      input: ContributionPaymentWrite,
+    ): Promise<Contribution> => {
+      const freshInput: ContributionInput = {
+        exResidentId: "exResidentId" in payerRef ? payerRef.exResidentId : undefined,
+        outsideCollectionId: "outsideCollectionId" in payerRef ? payerRef.outsideCollectionId : undefined,
+        collectorId: undefined,
+        assignedToMemberId: undefined,
+        assignedToName: undefined,
+        moneyAmount: 0,
+        originalPledgeAmount: undefined,
+        bhogGroceryAmount: 0,
+        contributionKind: "money",
+        paymentMode: input.mode,
+        status: "paid",
+        paymentDate: input.paymentDate,
+        note: undefined,
+        followUpNote: undefined,
+        passPeopleCount: undefined,
+        passDay18: undefined,
+        passDay19: undefined,
+      };
+      const newId = await dbSaveContribution(supabase, activeYear.id, payerRef, undefined, freshInput);
+      const contribution: Contribution = {
+        id: newId,
+        yearId: activeYear.id,
+        houseId: "houseId" in payerRef ? payerRef.houseId : undefined,
+        ownerId: "ownerId" in payerRef ? payerRef.ownerId : undefined,
+        ...freshInput,
+      };
+      return applyContributionPayment(contribution, input);
     };
 
     /**
@@ -759,7 +817,7 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await load();
       },
       addContributionPayment: async (contributionId, input) => {
-        const contribution = await applyContributionPayment(contributionId, input);
+        const contribution = await applyContributionPaymentById(contributionId, input);
         await logActivity(
           "contribution_payment.add",
           `added a ${formatINR(input.amount)} ${paymentModeLabels[input.mode]} installment for ${payerLabel(data, payerRefFor(contribution))}${input.collectorId ? ` (collected by ${memberName(input.collectorId)})` : ""}`,
@@ -790,13 +848,21 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
           const newPaymentId = await dbAddVendorPayment(supabase, expenseId, initialPayment);
           let settledLabel = "";
           if (initialPayment.contributionId) {
-            const contribution = await applyContributionPayment(initialPayment.contributionId, {
+            const contribution = await applyContributionPaymentById(initialPayment.contributionId, {
               amount: initialPayment.amount,
               mode: initialPayment.mode,
               paymentDate: initialPayment.paymentDate,
               vendorPaymentId: newPaymentId,
             });
             settledLabel = ` — settles ${payerLabel(data, payerRefFor(contribution))}'s pledge directly`;
+          } else if (initialPayment.newPledgeFor) {
+            const contribution = await createAndSettlePledge(initialPayment.newPledgeFor, {
+              amount: initialPayment.amount,
+              mode: initialPayment.mode,
+              paymentDate: initialPayment.paymentDate,
+              vendorPaymentId: newPaymentId,
+            });
+            settledLabel = ` — marks ${payerLabel(data, payerRefFor(contribution))} as paid, settled directly`;
           }
           const paidByLabel = initialPayment.memberId ? ` (by ${memberName(initialPayment.memberId)})` : "";
           await logActivity(
@@ -826,13 +892,21 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         const newPaymentId = await dbAddVendorPayment(supabase, expenseId, input);
         let settledLabel = "";
         if (input.contributionId) {
-          const contribution = await applyContributionPayment(input.contributionId, {
+          const contribution = await applyContributionPaymentById(input.contributionId, {
             amount: input.amount,
             mode: input.mode,
             paymentDate: input.paymentDate,
             vendorPaymentId: newPaymentId,
           });
           settledLabel = ` — settles ${payerLabel(data, payerRefFor(contribution))}'s pledge directly`;
+        } else if (input.newPledgeFor) {
+          const contribution = await createAndSettlePledge(input.newPledgeFor, {
+            amount: input.amount,
+            mode: input.mode,
+            paymentDate: input.paymentDate,
+            vendorPaymentId: newPaymentId,
+          });
+          settledLabel = ` — marks ${payerLabel(data, payerRefFor(contribution))} as paid, settled directly`;
         }
         const paidByLabel = input.memberId ? ` (by ${memberName(input.memberId)})` : "";
         await logActivity(
@@ -864,13 +938,21 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
             await recomputeAfterRemoval(linked.contributionId, linked.id);
           }
           if (input.contributionId) {
-            const contribution = await applyContributionPayment(input.contributionId, {
+            const contribution = await applyContributionPaymentById(input.contributionId, {
               amount: input.amount,
               mode: input.mode,
               paymentDate: input.paymentDate,
               vendorPaymentId: paymentId,
             });
             settledLabel = ` — settles ${payerLabel(data, payerRefFor(contribution))}'s pledge directly`;
+          } else if (input.newPledgeFor) {
+            const contribution = await createAndSettlePledge(input.newPledgeFor, {
+              amount: input.amount,
+              mode: input.mode,
+              paymentDate: input.paymentDate,
+              vendorPaymentId: paymentId,
+            });
+            settledLabel = ` — marks ${payerLabel(data, payerRefFor(contribution))} as paid, settled directly`;
           }
         }
 

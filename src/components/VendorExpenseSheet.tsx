@@ -70,6 +70,8 @@ export function VendorExpenseSheet({
           await updateVendorExpense(expense.id, input);
           return;
         }
+        const pledgeSelection =
+          paidByKind === "resident" ? residentPayer : selfFunded ? settledPledge : null;
         const canRecordPayment =
           recordingPayment &&
           paidAmount > 0 &&
@@ -81,12 +83,8 @@ export function VendorExpenseSheet({
                 amount: paidAmount,
                 mode: paidMode,
                 memberId: paidByKind === "resident" ? undefined : paidById,
-                contributionId:
-                  paidByKind === "resident"
-                    ? residentPayer?.contributionId
-                    : selfFunded
-                      ? settledPledge?.contributionId
-                      : undefined,
+                contributionId: pledgeSelection?.contributionId,
+                newPledgeFor: pledgeSelection?.newPledgeFor,
                 paymentDate: paidDate,
                 selfFunded: paidByKind === "member" ? selfFunded : undefined,
               }
