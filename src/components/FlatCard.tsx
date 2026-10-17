@@ -381,6 +381,18 @@ export function PayerRow({
       </button>
       {!disabled && received && contribution && (
         <div className="space-y-1 px-3 pb-2.5">
+          {installments.length > 0 && contribution.moneyAmount > 0 && (
+            <div className="flex items-center gap-2 text-[0.68rem] text-ink-faint">
+              <span className="min-w-0 flex-1 truncate">
+                {contribution.paymentDate ? formatShortDate(contribution.paymentDate) : "—"} ·{" "}
+                {paymentModeLabels[contribution.paymentMode]}
+                {collectorName ? ` · to ${collectorName}` : ""}
+              </span>
+              <span className="shrink-0 tabular-nums text-ink-soft">
+                {formatINR(contribution.moneyAmount)}
+              </span>
+            </div>
+          )}
           {installments.map((p) => (
             <div key={p.id} className="flex items-center gap-2 text-[0.68rem] text-ink-faint">
               <span className="min-w-0 flex-1 truncate">

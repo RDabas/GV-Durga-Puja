@@ -138,9 +138,16 @@ export function ResidentPayerPicker({
               key={r.key}
               type="button"
               disabled={!r.contribution}
-              onClick={() =>
-                r.contribution && onChange({ contributionId: r.contribution.id, label: r.label })
-              }
+              // The search input is still focused (keyboard open on a phone)
+              // when this is tapped — on many mobile browsers, a plain click
+              // handler loses the race against the input's blur, so the
+              // first tap just dismisses the keyboard instead of selecting
+              // the row. Selecting on pointerdown fires before that blur can
+              // swallow it.
+              onPointerDown={(e) => {
+                e.preventDefault();
+                if (r.contribution) onChange({ contributionId: r.contribution.id, label: r.label });
+              }}
               className="flex w-full items-center justify-between gap-2 border-b border-border px-3 py-2 text-left text-[0.8rem] text-ink last:border-b-0 disabled:opacity-40"
             >
               <span className="min-w-0 flex-1 truncate">{r.label}</span>
