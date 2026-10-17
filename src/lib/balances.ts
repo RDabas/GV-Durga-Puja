@@ -19,6 +19,13 @@ export interface CommitteeBalance {
   carriedBank: number;
   balanceInHand: number;
   collectedByMode: PaymentBreakdownTotals;
+  receivedByMode: PaymentBreakdownTotals;
+  handedOverByMode: PaymentBreakdownTotals;
+  vendorPaidByMode: PaymentBreakdownTotals;
+  /** Physical cash currently in hand: cash collected/received/carried, minus cash handed over or paid out. */
+  cashBalance: number;
+  /** Digital balance currently in hand (UPI collected/received, plus any carried bank balance), minus UPI handed over or paid out. */
+  upiBalance: number;
 }
 
 /**
@@ -58,17 +65,15 @@ export function committeeBalances(
     // A self-funded payment came out of the member's own pocket (typically
     // offsetting their own resident pledge), never out of committee cash
     // they were holding, so it shouldn't dock their balance in hand.
-    const vendorPaid = vendorExpenses
+    const vendorPaymentsFrom = vendorExpenses
       .flatMap((e) => e.payments)
-      .filter((p) => p.memberId === member.id && !p.selfFunded)
-      .reduce((sum, p) => sum + p.amount, 0);
+      .filter((p) => p.memberId === member.id && !p.selfFunded);
+    const vendorPaid = vendorPaymentsFrom.reduce((sum, p) => sum + p.amount, 0);
 
-    const handedOver = transfers
-      .filter((t) => t.fromMemberId === member.id)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const received = transfers
-      .filter((t) => t.toMemberId === member.id)
-      .reduce((sum, t) => sum + t.amount, 0);
+    const handedOverFrom = transfers.filter((t) => t.fromMemberId === member.id);
+    const handedOver = handedOverFrom.reduce((sum, t) => sum + t.amount, 0);
+    const receivedFrom = transfers.filter((t) => t.toMemberId === member.id);
+    const received = receivedFrom.reduce((sum, t) => sum + t.amount, 0);
 
     const ownCarried = carriedFunds.filter((f) => f.memberId === member.id);
     const carriedCash = ownCarried
@@ -81,6 +86,39 @@ export function committeeBalances(
       .filter((f) => f.kind === "bank")
       .reduce((sum, f) => sum + f.amount, 0);
 
+    const collectedByMode = paymentModeBreakdown(
+      [...collectedFrom, ...outsideCollectionFrom].map((c) => ({
+        amount: c.moneyAmount,
+        mode: c.paymentMode,
+      })),
+    );
+    const receivedByMode = paymentModeBreakdown(
+      receivedFrom.map((t) => ({ amount: t.amount, mode: t.mode })),
+    );
+    const handedOverByMode = paymentModeBreakdown(
+      handedOverFrom.map((t) => ({ amount: t.amount, mode: t.mode })),
+    );
+    const vendorPaidByMode = paymentModeBreakdown(
+      vendorPaymentsFrom.map((p) => ({ amount: p.amount, mode: p.mode })),
+    );
+
+    // A carried bank balance isn't physical cash, so it joins the digital
+    // (UPI) side of the split rather than the cash side; a carried FD is
+    // neither — it's an illiquid asset, kept out of both and only folded
+    // into the overall balanceInHand total below.
+    const cashBalance =
+      (collectedByMode.cash ?? 0) +
+      (receivedByMode.cash ?? 0) +
+      carriedCash -
+      (handedOverByMode.cash ?? 0) -
+      (vendorPaidByMode.cash ?? 0);
+    const upiBalance =
+      (collectedByMode.upi ?? 0) +
+      (receivedByMode.upi ?? 0) +
+      carriedBank -
+      (handedOverByMode.upi ?? 0) -
+      (vendorPaidByMode.upi ?? 0);
+
     return {
       member,
       collected,
@@ -91,21 +129,13 @@ export function committeeBalances(
       carriedCash,
       carriedFd,
       carriedBank,
-      balanceInHand:
-        collected +
-        outsideCollectionReceived +
-        received +
-        carriedCash +
-        carriedFd +
-        carriedBank -
-        handedOver -
-        vendorPaid,
-      collectedByMode: paymentModeBreakdown(
-        [...collectedFrom, ...outsideCollectionFrom].map((c) => ({
-          amount: c.moneyAmount,
-          mode: c.paymentMode,
-        })),
-      ),
+      balanceInHand: cashBalance + upiBalance + carriedFd,
+      collectedByMode,
+      receivedByMode,
+      handedOverByMode,
+      vendorPaidByMode,
+      cashBalance,
+      upiBalance,
     };
   });
 }

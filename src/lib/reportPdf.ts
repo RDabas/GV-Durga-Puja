@@ -345,3 +345,259 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+/** Shares a PDF blob via the Web Share API where available, falling back to a plain download — shared by both report generators below. */
+async function shareOrDownloadBlob(blob: Blob, filename: string, shareText: string): Promise<void> {
+  const nav = navigator as Navigator & {
+    canShare?: (data: ShareData) => boolean;
+    share?: (data: ShareData) => Promise<void>;
+  };
+  if (nav.canShare && nav.share) {
+    const file = new File([blob], filename, { type: "application/pdf" });
+    if (nav.canShare({ files: [file] })) {
+      try {
+        await nav.share({ files: [file], title: filename, text: shareText });
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+      }
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * A per-collector PDF — what one committee member collected and spent, by
+ * payment mode, plus any fund transfers and their current balance in hand —
+ * meant to be shared directly with that member (or with the rest of the
+ * committee) as their individual accountability report, distinct from the
+ * all-members overview in generateAuditReportPdf above.
+ */
+export async function generateMemberReportPdf(store: PujaStore, memberId: string): Promise<void> {
+  const { activeYear, contributions, vendorExpenses, members, carriedFunds, fundTransfers } = store;
+
+  const member = members.find((m) => m.id === memberId);
+  if (!member) return;
+
+  const balance = committeeBalances(members, contributions, fundTransfers, vendorExpenses, carriedFunds).find(
+    (b) => b.member.id === memberId,
+  );
+  if (!balance) return;
+
+  const memberName = (id?: string) => members.find((m) => m.id === id)?.name ?? "—";
+
+  const vendorPayments = vendorExpenses
+    .flatMap((e) => e.payments.map((p) => ({ payment: p, expense: e })))
+    .filter(({ payment }) => payment.memberId === memberId)
+    .sort((a, b) => a.payment.paymentDate.localeCompare(b.payment.paymentDate));
+  const selfFundedTotal = vendorPayments
+    .filter(({ payment }) => payment.selfFunded)
+    .reduce((s, { payment }) => s + payment.amount, 0);
+
+  const handedOverRows = fundTransfers
+    .filter((t) => t.fromMemberId === memberId)
+    .sort((a, b) => a.transferDate.localeCompare(b.transferDate));
+  const receivedRows = fundTransfers
+    .filter((t) => t.toMemberId === memberId)
+    .sort((a, b) => a.transferDate.localeCompare(b.transferDate));
+
+  const doc = new jsPDF({ compress: true });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  let y = 18;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(...BRAND_RGB);
+  doc.text("GV Durga Puja", marginX, y);
+  y += 7;
+  doc.setFontSize(13);
+  doc.text(`Collector Report — ${member.name}`, marginX, y);
+  y += 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(...FAINT_RGB);
+  doc.text(dateRangeLabel(activeYear.shashthiDate, activeYear.dashamiDate), marginX, y);
+  doc.text(`Generated ${formatShortDate(today())}`, pageWidth - marginX, y, { align: "right" });
+  y += 7;
+
+  doc.setDrawColor(...BRAND_RGB);
+  doc.setLineWidth(0.6);
+  doc.line(marginX, y, pageWidth - marginX, y);
+  y += 8;
+
+  // --- Overview ---
+  y = sectionHeading(doc, "Overview", marginX, y);
+  const overviewRows: (string | number)[][] = [
+    ["Collected from houses", formatINR(balance.collected)],
+    ["Collected from outside collection", formatINR(balance.outsideCollectionReceived)],
+    ["Total collected", formatINR(balance.collected + balance.outsideCollectionReceived)],
+  ];
+  if (balance.received > 0) overviewRows.push(["Received from other members", formatINR(balance.received)]);
+  const carriedTotal = balance.carriedCash + balance.carriedFd + balance.carriedBank;
+  if (carriedTotal > 0) overviewRows.push(["Carried over from previous year", formatINR(carriedTotal)]);
+  overviewRows.push(["Paid to vendors (from committee funds)", formatINR(balance.vendorPaid)]);
+  if (balance.handedOver > 0) overviewRows.push(["Handed over to other members", formatINR(balance.handedOver)]);
+  overviewRows.push(["Balance currently in hand", formatINR(balance.balanceInHand)]);
+  autoTable(doc, {
+    startY: y,
+    theme: "plain",
+    margin: { left: marginX, right: marginX },
+    styles: { fontSize: 10, cellPadding: 1.4 },
+    columnStyles: { 0: { fontStyle: "bold" }, 1: { halign: "right" } },
+    body: overviewRows,
+  });
+  y = lastTableBottom(doc) + 8;
+
+  // --- Money collected, by mode ---
+  if (y > doc.internal.pageSize.getHeight() - 60) {
+    doc.addPage();
+    y = 18;
+  }
+  y = sectionHeading(doc, "Money collected — by mode", marginX, y);
+  autoTable(doc, {
+    startY: y,
+    theme: "grid",
+    margin: { left: marginX, right: marginX },
+    head: [["Cash", "UPI"]],
+    headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 10, halign: "center" },
+    styles: { fontSize: 11, cellPadding: 3, halign: "center", fontStyle: "bold" },
+    body: [[formatINR(balance.collectedByMode.cash ?? 0), formatINR(balance.collectedByMode.upi ?? 0)]],
+  });
+  y = lastTableBottom(doc) + 8;
+
+  // --- Vendor payments made ---
+  if (vendorPayments.length > 0) {
+    if (y > doc.internal.pageSize.getHeight() - 60) {
+      doc.addPage();
+      y = 18;
+    }
+    y = sectionHeading(doc, "Vendor payments made", marginX, y);
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: marginX, right: marginX },
+      head: [["Date", "Vendor", "Mode", "Amount"]],
+      headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9 },
+      styles: { fontSize: 9.5, cellPadding: 2 },
+      columnStyles: { 3: { halign: "right" } },
+      body: vendorPayments.map(({ payment, expense }) => [
+        formatShortDate(payment.paymentDate),
+        `${expense.vendor.name}${payment.selfFunded ? " (self-funded)" : ""}`,
+        payment.mode === "upi" ? "UPI" : "Cash",
+        formatINR(payment.amount),
+      ]),
+      foot: [[
+        "",
+        "Total",
+        "",
+        formatINR(vendorPayments.reduce((s, { payment }) => s + payment.amount, 0)),
+      ]],
+      footStyles: { fillColor: [245, 240, 242], textColor: INK_RGB, fontStyle: "bold", fontSize: 9.5 },
+    });
+    y = lastTableBottom(doc) + 2;
+    if (selfFundedTotal > 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...FAINT_RGB);
+      doc.text(
+        `Of this, ${formatINR(selfFundedTotal)} was self-funded and isn't deducted from the balance below.`,
+        marginX,
+        y + 4,
+      );
+      y += 4;
+    }
+    y += 8;
+  }
+
+  // --- Fund transfers ---
+  if (handedOverRows.length > 0 || receivedRows.length > 0) {
+    if (y > doc.internal.pageSize.getHeight() - 60) {
+      doc.addPage();
+      y = 18;
+    }
+    y = sectionHeading(doc, "Fund transfers", marginX, y);
+    const transferRows: (string | number)[][] = [
+      ...receivedRows.map((t) => [
+        formatShortDate(t.transferDate),
+        "Received from",
+        memberName(t.fromMemberId),
+        t.mode === "upi" ? "UPI" : "Cash",
+        formatINR(t.amount),
+      ]),
+      ...handedOverRows.map((t) => [
+        formatShortDate(t.transferDate),
+        "Handed over to",
+        memberName(t.toMemberId),
+        t.mode === "upi" ? "UPI" : "Cash",
+        formatINR(t.amount),
+      ]),
+    ].sort((a, b) => (a[0] as string).localeCompare(b[0] as string));
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: marginX, right: marginX },
+      head: [["Date", "Direction", "Member", "Mode", "Amount"]],
+      headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9 },
+      styles: { fontSize: 9.5, cellPadding: 2 },
+      columnStyles: { 4: { halign: "right" } },
+      body: transferRows,
+    });
+    y = lastTableBottom(doc) + 8;
+  }
+
+  // --- Balance in hand ---
+  if (y > doc.internal.pageSize.getHeight() - 60) {
+    doc.addPage();
+    y = 18;
+  }
+  y = sectionHeading(doc, "Balance currently in hand", marginX, y);
+  const balanceCols = ["Cash", "UPI"];
+  const balanceVals = [formatINR(balance.cashBalance), formatINR(balance.upiBalance)];
+  if (balance.carriedFd > 0) {
+    balanceCols.push("Carried FD");
+    balanceVals.push(formatINR(balance.carriedFd));
+  }
+  autoTable(doc, {
+    startY: y,
+    theme: "grid",
+    margin: { left: marginX, right: marginX },
+    head: [balanceCols],
+    headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 10, halign: "center" },
+    styles: { fontSize: 11, cellPadding: 3, halign: "center", fontStyle: "bold" },
+    body: [balanceVals],
+  });
+  y = lastTableBottom(doc) + 6;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10.5);
+  doc.setTextColor(...INK_RGB);
+  doc.text(`Total balance: ${formatINR(balance.balanceInHand)}`, marginX, y);
+
+  // Footer on every page, added last so pagination is already final.
+  const pageCount = doc.getNumberOfPages();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...FAINT_RGB);
+    doc.text("Generated from the GV Durga Puja app.", marginX, pageHeight - 8);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - marginX, pageHeight - 8, { align: "right" });
+  }
+
+  const filename = `GV Durga Puja ${activeYear.year} - ${member.name} Report.pdf`;
+  await shareOrDownloadBlob(
+    doc.output("blob"),
+    filename,
+    `GV Durga Puja ${activeYear.year} — collection & spend report for ${member.name}`,
+  );
+}

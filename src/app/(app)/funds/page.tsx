@@ -11,7 +11,7 @@ import { committeeBalances } from "@/lib/balances";
 import { carriedFundKindLabels } from "@/lib/carriedFund";
 import { exportPujaDataToExcel } from "@/lib/export";
 import { paymentModeLabels, sortedBreakdown } from "@/lib/payment";
-import { generateAuditReportPdf } from "@/lib/reportPdf";
+import { generateAuditReportPdf, generateMemberReportPdf } from "@/lib/reportPdf";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { OutsideCollectionType, PaymentMode } from "@/lib/types";
@@ -27,6 +27,27 @@ const outsideCollectionTypeShortLabels: Record<OutsideCollectionType, string> = 
   dandiya_pass: "Dandiya Pass",
   promotion: "Promotion",
 };
+
+/** Per-member "Share report" button — needs its own submitting/error state per row, so it's a separate component rather than inline JSX in the member list's .map(). */
+function MemberReportShareButton({ memberId }: { memberId: string }) {
+  const store = usePujaData();
+  const { submitting, error, run } = useAsyncAction();
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        run(() => generateMemberReportPdf(store, memberId));
+      }}
+      disabled={submitting}
+      title={error ?? "Share report"}
+      aria-label="Share collector report"
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ground-alt text-ink-soft transition active:scale-90 disabled:opacity-60"
+    >
+      <ShareIcon className="h-3 w-3" />
+    </button>
+  );
+}
 
 export default function FundsPage() {
   const store = usePujaData();
@@ -176,6 +197,8 @@ export default function FundsPage() {
               carriedBank,
               balanceInHand,
               collectedByMode,
+              cashBalance,
+              upiBalance,
             },
             i,
           ) => {
@@ -192,7 +215,7 @@ export default function FundsPage() {
                     <div className="truncate text-[0.88rem] font-semibold text-ink">
                       {member.name}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-3 text-[0.72rem] text-ink-faint">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.72rem] text-ink-faint">
                       <span>
                         Total
                         <b className="ml-1 font-semibold tabular-nums text-ink">
@@ -212,6 +235,20 @@ export default function FundsPage() {
                         </b>
                       </span>
                     </div>
+                    {(cashBalance !== 0 || upiBalance !== 0) && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {cashBalance !== 0 && (
+                          <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
+                            Balance cash {formatINR(cashBalance)}
+                          </span>
+                        )}
+                        {upiBalance !== 0 && (
+                          <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
+                            Balance UPI {formatINR(upiBalance)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {(collected > 0 || outsideCollectionReceived > 0) && (
                       <div className="mt-0.5 text-[0.68rem] text-ink-faint">
                         {collected > 0 && `from houses ${formatINR(collected)}`}
@@ -267,9 +304,12 @@ export default function FundsPage() {
                       </div>
                     )}
                   </div>
-                  <span className="shrink-0 text-right text-[0.88rem] font-bold tabular-nums text-ink">
-                    {formatINR(balanceInHand)}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span className="text-right text-[0.88rem] font-bold tabular-nums text-ink">
+                      {formatINR(balanceInHand)}
+                    </span>
+                    <MemberReportShareButton memberId={member.id} />
+                  </div>
                 </div>
 
                 {expandedMode && (
