@@ -46,7 +46,7 @@ export function ResidentPayerPicker({
   value: ResidentPayerSelection | null;
   onChange: (selection: ResidentPayerSelection | null) => void;
 }) {
-  const { houses, owners, exResidents, contributionFor } = usePujaData();
+  const { houses, owners, exResidents, contributionFor, ownerOf } = usePujaData();
   const [search, setSearch] = useState("");
 
   if (value) {
@@ -70,6 +70,11 @@ export function ResidentPayerPicker({
   const results: { key: string; label: string; contribution: Contribution | undefined }[] = !q
     ? []
     : [
+        // A flat's own contribution is only ever the tenant's — an
+        // owner-occupied flat (or one where it's the owner, not the
+        // tenant, who's settling this) has its pledge recorded against
+        // the owner instead, so a flat match surfaces both rows whenever
+        // they exist rather than only ever checking the tenant one.
         ...houses
           .filter(
             (h) =>
@@ -78,11 +83,28 @@ export function ResidentPayerPicker({
               h.tenantNames.some((n) => n.toLowerCase().includes(q)),
           )
           .slice(0, 8)
-          .map((h) => ({
-            key: `h-${h.id}`,
-            label: `${h.block}-${h.flatNo} — ${h.tenantNames.join(", ") || "Tenant"}`,
-            contribution: contributionFor({ houseId: h.id }),
-          })),
+          .flatMap((h) => {
+            const owner = ownerOf(h);
+            const rows: { key: string; label: string; contribution: Contribution | undefined }[] = [];
+            if (h.tenantNames.length > 0) {
+              rows.push({
+                key: `h-${h.id}-tenant`,
+                label: `${h.block}-${h.flatNo} — ${h.tenantNames.join(", ")} (Tenant)`,
+                contribution: contributionFor({ houseId: h.id }),
+              });
+            }
+            if (owner) {
+              rows.push({
+                key: `h-${h.id}-owner`,
+                label: `${h.block}-${h.flatNo} — ${owner.names.join(", ")} (Owner)`,
+                contribution: contributionFor({ ownerId: owner.id }),
+              });
+            }
+            if (rows.length === 0) {
+              rows.push({ key: `h-${h.id}`, label: `${h.block}-${h.flatNo}`, contribution: undefined });
+            }
+            return rows;
+          }),
         ...owners
           .filter((o) => o.names.some((n) => n.toLowerCase().includes(q)))
           .slice(0, 8)
