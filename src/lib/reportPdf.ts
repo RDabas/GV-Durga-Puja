@@ -50,6 +50,7 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
   const {
     activeYear,
     contributions,
+    contributionPayments,
     outsideCollections,
     vendorExpenses,
     members,
@@ -68,6 +69,7 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
     fundTransfers,
     vendorExpenses,
     carriedFunds,
+    contributionPayments,
   );
 
   const totalHouses = balances.reduce((s, b) => s + b.collected, 0);
@@ -382,14 +384,20 @@ async function shareOrDownloadBlob(blob: Blob, filename: string, shareText: stri
  * all-members overview in generateAuditReportPdf above.
  */
 export async function generateMemberReportPdf(store: PujaStore, memberId: string): Promise<void> {
-  const { activeYear, contributions, vendorExpenses, members, carriedFunds, fundTransfers } = store;
+  const { activeYear, contributions, contributionPayments, vendorExpenses, members, carriedFunds, fundTransfers } =
+    store;
 
   const member = members.find((m) => m.id === memberId);
   if (!member) return;
 
-  const balance = committeeBalances(members, contributions, fundTransfers, vendorExpenses, carriedFunds).find(
-    (b) => b.member.id === memberId,
-  );
+  const balance = committeeBalances(
+    members,
+    contributions,
+    fundTransfers,
+    vendorExpenses,
+    carriedFunds,
+    contributionPayments,
+  ).find((b) => b.member.id === memberId);
   if (!balance) return;
 
   const memberName = (id?: string) => members.find((m) => m.id === id)?.name ?? "—";

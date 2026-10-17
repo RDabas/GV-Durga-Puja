@@ -11,9 +11,11 @@ import {
 } from "react";
 import { pillLabels } from "@/components/Pill";
 import { formatINR, formatShortDate } from "@/lib/format";
+import { paymentModeLabels } from "@/lib/payment";
 import { createClient } from "@/lib/supabase/client";
 import {
   dbAddCarriedFund,
+  dbAddContributionPayment,
   dbAddFundTransfer,
   dbAddMember,
   dbAddVendorExpense,
@@ -23,6 +25,7 @@ import {
   dbDeleteVendorPayment,
   dbLogActivity,
   dbRemoveCarriedFund,
+  dbRemoveContributionPayment,
   dbRemoveFundTransfer,
   dbRemoveMember,
   dbSaveContribution,
@@ -36,11 +39,13 @@ import {
   dbSetPaidViaHouse,
   dbSetTenantDisabled,
   dbStartYear,
+  dbUpdateContributionPaymentByVendorPayment,
   dbUpdateMember,
   dbUpdateVendorExpense,
   dbUpdateVendorPayment,
   dbUpdateYear,
   fetchAllWithRetry,
+  type ContributionPaymentWrite,
   type LiveData,
 } from "@/lib/supabase/queries";
 import type {
@@ -79,13 +84,24 @@ export type ContributionInput = Omit<
 >;
 
 export interface PaymentInput {
-  memberId: string;
+  /** Unset when a resident paid the vendor directly — see contributionId. */
+  memberId?: string;
   amount: number;
   paymentDate: string;
   mode: PaymentMode;
   note?: string;
   /** Vendor payments only — paid from the member's own pocket, so it shouldn't reduce their balance in hand. */
   selfFunded?: boolean;
+  /** Vendor payments only, instead of memberId — a resident paid the vendor directly, settling this pledge. */
+  contributionId?: string;
+}
+
+export interface ContributionPaymentInput {
+  amount: number;
+  mode: PaymentMode;
+  paymentDate: string;
+  collectorId?: string;
+  note?: string;
 }
 
 export interface VendorExpenseInput {
@@ -173,12 +189,64 @@ function matchesPayer(c: Contribution, payer: PayerRef): boolean {
 function memberIsReferenced(data: LiveData, memberId: string): boolean {
   return (
     data.contributions.some((c) => c.collectorId === memberId) ||
+    data.contributionPayments.some((p) => p.collectorId === memberId) ||
     data.fundTransfers.some(
       (t) => t.fromMemberId === memberId || t.toMemberId === memberId,
     ) ||
     data.carriedFunds.some((f) => f.memberId === memberId) ||
     data.vendorExpenses.some((e) => e.payments.some((p) => p.memberId === memberId))
   );
+}
+
+/** Given an existing contribution, the PayerRef that originally created it — the inverse of matchesPayer. */
+function payerRefFor(c: Contribution): PayerRef {
+  if (c.houseId) return { houseId: c.houseId };
+  if (c.ownerId) return { ownerId: c.ownerId };
+  if (c.exResidentId) return { exResidentId: c.exResidentId };
+  return { outsideCollectionId: c.outsideCollectionId! };
+}
+
+/** A human-readable "who this is" for an activity-log summary — a flat label, an owner/ex-resident's name(s), or an outside-collection entry's name. */
+function payerLabel(data: LiveData, payer: PayerRef): string {
+  if ("houseId" in payer) {
+    const h = data.houses.find((x) => x.id === payer.houseId);
+    return h ? `${h.block}-${h.flatNo}` : "a flat";
+  }
+  if ("ownerId" in payer) {
+    return data.owners.find((o) => o.id === payer.ownerId)?.names.join(", ") ?? "an owner";
+  }
+  if ("exResidentId" in payer) {
+    return (
+      data.exResidents.find((r) => r.id === payer.exResidentId)?.names.join(", ") ?? "an ex-resident"
+    );
+  }
+  return (
+    data.outsideCollections.find((r) => r.id === payer.outsideCollectionId)?.name ??
+    "an outside collection entry"
+  );
+}
+
+/** The existing fields of a contribution, reshaped as a ContributionInput so a patch to just one or two fields can still pass the rest through unchanged. */
+function contributionPatchFrom(c: Contribution): ContributionInput {
+  return {
+    exResidentId: c.exResidentId,
+    outsideCollectionId: c.outsideCollectionId,
+    collectorId: c.collectorId,
+    assignedToMemberId: c.assignedToMemberId,
+    assignedToName: c.assignedToName,
+    moneyAmount: c.moneyAmount,
+    originalPledgeAmount: c.originalPledgeAmount,
+    bhogGroceryAmount: c.bhogGroceryAmount,
+    contributionKind: c.contributionKind,
+    paymentMode: c.paymentMode,
+    status: c.status,
+    paymentDate: c.paymentDate,
+    note: c.note,
+    followUpNote: c.followUpNote,
+    passPeopleCount: c.passPeopleCount,
+    passDay18: c.passDay18,
+    passDay19: c.passDay19,
+  };
 }
 
 export interface PujaStore extends Omit<LiveData, "years"> {
@@ -226,6 +294,9 @@ export interface PujaStore extends Omit<LiveData, "years"> {
   addFundTransfer: (input: FundTransferInput) => Promise<void>;
   removeFundTransfer: (transferId: string) => Promise<void>;
   saveContribution: (payer: PayerRef, input: ContributionInput) => Promise<void>;
+  /** An extra installment against a pledge beyond its primary payment — e.g. split across a second collector/mode. */
+  addContributionPayment: (contributionId: string, input: ContributionPaymentInput) => Promise<void>;
+  removeContributionPayment: (contributionId: string, paymentId: string) => Promise<void>;
   /**
    * Returns the new bill's id. Pass initialPayment when the bill is being
    * paid right away (fully or as the first installment) instead of a
@@ -328,6 +399,10 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
     }
 
     const yearContributions = inYear(data.contributions);
+    const yearContributionIds = new Set(yearContributions.map((c) => c.id));
+    const yearContributionPayments = data.contributionPayments.filter((p) =>
+      yearContributionIds.has(p.contributionId),
+    );
 
     // Standalone (not just an object property below) so the mutators further
     // down — also defined in this same object literal — can call it while
@@ -350,6 +425,89 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    /**
+     * Shared by addContributionPayment (a split-collector installment) and
+     * the resident-direct vendor-settlement path in addVendorPayment/
+     * addVendorExpense — inserts the installment, then recomputes the
+     * pledge the same way ContributionSheet's own promised -> partial
+     * transition already works by hand: moving off "promised" treats the
+     * old moneyAmount as the pledge target (originalPledgeAmount) and
+     * starts the received total fresh from this payment. Doesn't log
+     * activity or reload — callers do that once, after their own write.
+     */
+    const applyContributionPayment = async (
+      contributionId: string,
+      input: ContributionPaymentWrite,
+    ): Promise<Contribution> => {
+      const contribution = data.contributions.find((c) => c.id === contributionId);
+      if (!contribution) throw new Error("That pledge is no longer here.");
+      await dbAddContributionPayment(supabase, contributionId, input);
+
+      if (contribution.status === "promised") {
+        const pledge = contribution.moneyAmount;
+        const paidInFull = input.amount >= pledge;
+        await dbSaveContribution(supabase, activeYear.id, payerRefFor(contribution), contribution.id, {
+          ...contributionPatchFrom(contribution),
+          // This payment is already fully captured by the contribution_payments
+          // row just inserted above — leaving the primary slot at 0 (rather
+          // than duplicating the same amount there) keeps "moneyAmount + sum
+          // of extras" the single source of truth for the total received.
+          moneyAmount: 0,
+          // Kept even once paid in full (not dropped the way a manual
+          // ContributionSheet save would) — recomputeAfterRemoval needs it
+          // to revert correctly if this installment is later removed; the
+          // card only ever shows the pledge-progress line for "partial".
+          originalPledgeAmount: pledge,
+          paymentMode: input.mode,
+          paymentDate: input.paymentDate,
+          status: paidInFull ? "paid" : "partial",
+        });
+      } else if (contribution.originalPledgeAmount && contribution.status !== "paid") {
+        const existingExtras = data.contributionPayments
+          .filter((p) => p.contributionId === contributionId)
+          .reduce((sum, p) => sum + p.amount, 0);
+        const total = contribution.moneyAmount + existingExtras + input.amount;
+        if (total >= contribution.originalPledgeAmount) {
+          // Unlike ContributionSheet's manual save (which always drops the
+          // pledge once status leaves "partial"), originalPledgeAmount is
+          // kept here even once "paid" — recomputeAfterRemoval needs it to
+          // correctly revert the status if this installment is later
+          // removed. FlatCard.tsx only ever shows the pledge-progress line
+          // for an actual "partial" status, so this stays invisible to
+          // anyone looking at a fully paid pledge.
+          await dbSaveContribution(supabase, activeYear.id, payerRefFor(contribution), contribution.id, {
+            ...contributionPatchFrom(contribution),
+            status: "paid",
+          });
+        }
+      }
+      return contribution;
+    };
+
+    /**
+     * The reverse of applyContributionPayment's "paid" transition — used
+     * when an installment that had pushed a pledge to "paid" is removed or
+     * its linked vendor payment is deleted, so the pledge doesn't stay
+     * marked fully settled once the money backing that is gone.
+     */
+    const recomputeAfterRemoval = async (
+      contributionId: string,
+      removedPaymentId: string,
+    ): Promise<void> => {
+      const contribution = data.contributions.find((c) => c.id === contributionId);
+      if (!contribution?.originalPledgeAmount || contribution.status !== "paid") return;
+      const remainingExtras = data.contributionPayments
+        .filter((p) => p.contributionId === contributionId && p.id !== removedPaymentId)
+        .reduce((sum, p) => sum + p.amount, 0);
+      const total = contribution.moneyAmount + remainingExtras;
+      if (total < contribution.originalPledgeAmount) {
+        await dbSaveContribution(supabase, activeYear.id, payerRefFor(contribution), contribution.id, {
+          ...contributionPatchFrom(contribution),
+          status: "partial",
+        });
+      }
+    };
+
     return {
       years: data.years,
       activeYear,
@@ -361,6 +519,7 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       houses: data.houses,
       members: data.members,
       contributions: yearContributions,
+      contributionPayments: yearContributionPayments,
       fundTransfers: inYear(data.fundTransfers),
       carriedFunds: inYear(data.carriedFunds),
       vendorExpenses: inYear(data.vendorExpenses),
@@ -577,19 +736,7 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         const existing = yearContributions.find((c) => matchesPayer(c, payer));
         await dbSaveContribution(supabase, activeYear.id, payer, existing?.id, input);
 
-        const label =
-          "houseId" in payer
-            ? (() => {
-                const h = data.houses.find((x) => x.id === payer.houseId);
-                return h ? `${h.block}-${h.flatNo}` : "a flat";
-              })()
-            : "ownerId" in payer
-              ? (data.owners.find((o) => o.id === payer.ownerId)?.names.join(", ") ?? "an owner")
-              : "exResidentId" in payer
-                ? (data.exResidents.find((r) => r.id === payer.exResidentId)?.names.join(", ") ??
-                  "an ex-resident")
-                : (data.outsideCollections.find((r) => r.id === payer.outsideCollectionId)?.name ??
-                  "an outside collection entry");
+        const label = payerLabel(data, payer);
         let summary: string;
         if (!existing) {
           summary =
@@ -605,6 +752,27 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
         await logActivity("contribution.save", summary, activeYear.id);
         await load();
       },
+      addContributionPayment: async (contributionId, input) => {
+        const contribution = await applyContributionPayment(contributionId, input);
+        await logActivity(
+          "contribution_payment.add",
+          `added a ${formatINR(input.amount)} ${paymentModeLabels[input.mode]} installment for ${payerLabel(data, payerRefFor(contribution))}${input.collectorId ? ` (collected by ${memberName(input.collectorId)})` : ""}`,
+          activeYear.id,
+        );
+        await load();
+      },
+      removeContributionPayment: async (contributionId, paymentId) => {
+        const contribution = data.contributions.find((c) => c.id === contributionId);
+        const payment = data.contributionPayments.find((p) => p.id === paymentId);
+        await dbRemoveContributionPayment(supabase, paymentId);
+        await recomputeAfterRemoval(contributionId, paymentId);
+        await logActivity(
+          "contribution_payment.remove",
+          `removed a ${formatINR(payment?.amount ?? 0)} installment for ${contribution ? payerLabel(data, payerRefFor(contribution)) : "a pledge"}`,
+          activeYear.id,
+        );
+        await load();
+      },
       addVendorExpense: async (input, initialPayment) => {
         const expenseId = await dbAddVendorExpense(supabase, activeYear.id, input);
         await logActivity(
@@ -613,10 +781,20 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
           activeYear.id,
         );
         if (initialPayment) {
-          await dbAddVendorPayment(supabase, expenseId, initialPayment);
+          const newPaymentId = await dbAddVendorPayment(supabase, expenseId, initialPayment);
+          let settledLabel = "";
+          if (initialPayment.contributionId) {
+            const contribution = await applyContributionPayment(initialPayment.contributionId, {
+              amount: initialPayment.amount,
+              mode: initialPayment.mode,
+              paymentDate: initialPayment.paymentDate,
+              vendorPaymentId: newPaymentId,
+            });
+            settledLabel = ` — settles ${payerLabel(data, payerRefFor(contribution))}'s pledge directly`;
+          }
           await logActivity(
             "vendor_payment.add",
-            `paid ${formatINR(initialPayment.amount)} to vendor ${input.vendorName}${initialPayment.selfFunded ? " (self-funded)" : ""} (by ${memberName(initialPayment.memberId)})`,
+            `paid ${formatINR(initialPayment.amount)} to vendor ${input.vendorName}${initialPayment.selfFunded ? " (self-funded)" : ""}${initialPayment.contributionId ? settledLabel : ` (by ${memberName(initialPayment.memberId)})`}`,
             activeYear.id,
           );
         }
@@ -638,10 +816,20 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       },
       addVendorPayment: async (expenseId, input) => {
         const expense = data.vendorExpenses.find((e) => e.id === expenseId);
-        await dbAddVendorPayment(supabase, expenseId, input);
+        const newPaymentId = await dbAddVendorPayment(supabase, expenseId, input);
+        let settledLabel = "";
+        if (input.contributionId) {
+          const contribution = await applyContributionPayment(input.contributionId, {
+            amount: input.amount,
+            mode: input.mode,
+            paymentDate: input.paymentDate,
+            vendorPaymentId: newPaymentId,
+          });
+          settledLabel = ` — settles ${payerLabel(data, payerRefFor(contribution))}'s pledge directly`;
+        }
         await logActivity(
           "vendor_payment.add",
-          `paid ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"}${input.selfFunded ? " (self-funded)" : ""} (by ${memberName(input.memberId)})`,
+          `paid ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"}${input.selfFunded ? " (self-funded)" : ""}${input.contributionId ? settledLabel : ` (by ${memberName(input.memberId)})`}`,
           expense?.yearId,
         );
         await load();
@@ -649,9 +837,17 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       updateVendorPayment: async (expenseId, paymentId, input) => {
         const expense = data.vendorExpenses.find((e) => e.id === expenseId);
         await dbUpdateVendorPayment(supabase, paymentId, input);
+        const linked = data.contributionPayments.find((p) => p.vendorPaymentId === paymentId);
+        if (linked) {
+          await dbUpdateContributionPaymentByVendorPayment(supabase, paymentId, {
+            amount: input.amount,
+            mode: input.mode,
+            paymentDate: input.paymentDate,
+          });
+        }
         await logActivity(
           "vendor_payment.update",
-          `corrected a payment of ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"} (by ${memberName(input.memberId)})`,
+          `corrected a payment of ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"}${linked ? "" : ` (by ${memberName(input.memberId)})`}`,
           expense?.yearId,
         );
         await load();
@@ -659,7 +855,9 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       deleteVendorPayment: async (expenseId, paymentId) => {
         const expense = data.vendorExpenses.find((e) => e.id === expenseId);
         const payment = expense?.payments.find((p) => p.id === paymentId);
+        const linked = data.contributionPayments.find((p) => p.vendorPaymentId === paymentId);
         await dbDeleteVendorPayment(supabase, paymentId);
+        if (linked) await recomputeAfterRemoval(linked.contributionId, linked.id);
         await logActivity(
           "vendor_payment.delete",
           `removed a payment of ${formatINR(payment?.amount ?? 0)} to vendor ${expense?.vendor.name ?? "?"}`,

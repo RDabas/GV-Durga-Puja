@@ -1,10 +1,12 @@
-import type { ReactNode } from "react";
-import type { Contribution, ContributionStatus, House, Owner } from "@/lib/types";
+import { useState, type ReactNode } from "react";
+import type { Contribution, ContributionPayment, ContributionStatus, House, Owner, PaymentMode } from "@/lib/types";
 import { IssueReceiptChip, RequestContributionChip } from "@/components/IssueReceiptButton";
 import { Pill } from "@/components/Pill";
 import { PaymentTag } from "@/components/PaymentBreakdown";
+import { SplitPaymentSheet } from "@/components/SplitPaymentSheet";
 import { formatINR, formatShortDate, pledgeProgressLabel, today } from "@/lib/format";
-import type { PreviousYearInfo } from "@/lib/store";
+import { paymentModeLabels } from "@/lib/payment";
+import { usePujaData, type PreviousYearInfo } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 
 function summarise(names: string[]): string {
@@ -35,6 +37,8 @@ export function paymentActionChipFor(
   towardsOverride?: string,
   /** Shown as the receipt's title instead of the generic "Receipt of Contribution" — e.g. "Dandiya Night Pass". */
   slipTitle?: string,
+  /** Installments beyond the primary payment (split across a second collector) — see extraPaymentsFor below. */
+  extraPayments?: { amount: number; mode: PaymentMode; paymentDate: string; collectorName?: string }[],
 ): ReactNode {
   const payer = { name: payerName, context, refCode };
   const status = contribution?.status;
@@ -52,6 +56,7 @@ export function paymentActionChipFor(
           originalPledgeAmount: contribution!.originalPledgeAmount,
           towardsOverride,
           slipTitle,
+          extraPayments,
         }}
       />
     );
@@ -68,6 +73,23 @@ export function paymentActionChipFor(
     return <RequestContributionChip payer={payer} request={{ kind: "pending" }} />;
   }
   return undefined;
+}
+
+/** The extraPayments shape paymentActionChipFor's receipt expects, resolved from the raw contribution_payments rows — shared by every card that wraps PayerRow. */
+export function extraPaymentsFor(
+  contribution: Contribution | undefined,
+  contributionPayments: ContributionPayment[],
+  memberName: (id?: string) => string | undefined,
+): { amount: number; mode: PaymentMode; paymentDate: string; collectorName?: string }[] {
+  if (!contribution) return [];
+  return contributionPayments
+    .filter((p) => p.contributionId === contribution.id)
+    .map((p) => ({
+      amount: p.amount,
+      mode: p.mode,
+      paymentDate: p.paymentDate,
+      collectorName: p.collectorId ? memberName(p.collectorId) : undefined,
+    }));
 }
 
 /**
@@ -140,6 +162,25 @@ export function DisableToggleButton({
       className={`shrink-0 rounded-full px-2.5 py-1 text-[0.66rem] font-bold whitespace-nowrap transition active:scale-95 disabled:opacity-60 ${tone}`}
     >
       {submitting ? "…" : error ? "Retry" : disabled ? "Enable" : "Disable"}
+    </button>
+  );
+}
+
+/** Small "Remove" link next to a split-installment row — mirrors VendorCard's RemovePaymentButton. */
+function RemoveInstallmentButton({ onRemove }: { onRemove: () => Promise<void> }) {
+  const { submitting, error, run } = useAsyncAction();
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (window.confirm("Remove this installment? This can't be undone.")) run(onRemove);
+      }}
+      disabled={submitting}
+      title={error ?? undefined}
+      className="shrink-0 text-[0.64rem] font-semibold text-critical"
+    >
+      {submitting ? "…" : error ? "Retry" : "Remove"}
     </button>
   );
 }
@@ -220,8 +261,20 @@ export function PayerRow({
   extraBadge?: ReactNode;
   onClick: () => void;
 }) {
+  const { contributionPayments, memberName, addContributionPayment, removeContributionPayment } =
+    usePujaData();
+  const [splitting, setSplitting] = useState(false);
   const status = contribution?.status ?? "not_visited";
   const hasHeaderRow = Boolean(headerAction || receiptAction);
+  const received = status === "paid" || status === "partial";
+  const installments = contribution
+    ? contributionPayments.filter((p) => p.contributionId === contribution.id)
+    : [];
+  // The primary payment plus any split/vendor-settled extras — the actual
+  // total received, since contribution.moneyAmount alone only ever tracks
+  // the primary one.
+  const totalMoneyReceived =
+    (contribution?.moneyAmount ?? 0) + installments.reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <div className={disabled ? "opacity-50" : ""}>
@@ -296,19 +349,19 @@ export function PayerRow({
         {!disabled && (
           <>
             <span className="block text-[0.88rem] font-bold tabular-nums text-ink">
-              {contribution?.originalPledgeAmount != null
+              {contribution?.status === "partial" && contribution.originalPledgeAmount != null
                 ? formatINR(contribution.originalPledgeAmount)
-                : contribution && contribution.moneyAmount > 0
-                  ? formatINR(contribution.moneyAmount)
+                : totalMoneyReceived > 0
+                  ? formatINR(totalMoneyReceived)
                   : contribution && contribution.bhogGroceryAmount > 0
                     ? formatINR(contribution.bhogGroceryAmount)
                     : "—"}
             </span>
-            {contribution?.originalPledgeAmount != null && (
+            {contribution?.status === "partial" && contribution.originalPledgeAmount != null && (
               <span className="mt-0.5 block whitespace-nowrap text-[0.7rem] font-semibold tabular-nums text-gold">
                 {pledgeProgressLabel(
                   contribution.status,
-                  contribution.moneyAmount,
+                  totalMoneyReceived,
                   contribution.originalPledgeAmount,
                 )}
               </span>
@@ -326,6 +379,40 @@ export function PayerRow({
         ))}
       </span>
       </button>
+      {!disabled && received && contribution && (
+        <div className="space-y-1 px-3 pb-2.5">
+          {installments.map((p) => (
+            <div key={p.id} className="flex items-center gap-2 text-[0.68rem] text-ink-faint">
+              <span className="min-w-0 flex-1 truncate">
+                split · {formatShortDate(p.paymentDate)} · {paymentModeLabels[p.mode]} ·{" "}
+                {p.collectorId ? `to ${memberName(p.collectorId)}` : "settled via vendor payment"}
+              </span>
+              <span className="shrink-0 tabular-nums text-ink-soft">{formatINR(p.amount)}</span>
+              {p.collectorId && (
+                <RemoveInstallmentButton
+                  onRemove={() => removeContributionPayment(contribution.id, p.id)}
+                />
+              )}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSplitting(true);
+            }}
+            className="text-[0.68rem] font-semibold text-brand"
+          >
+            + Split payment
+          </button>
+          <SplitPaymentSheet
+            open={splitting}
+            payerName={names}
+            onSubmit={(input) => addContributionPayment(contribution.id, input)}
+            onClose={() => setSplitting(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -370,6 +457,7 @@ export function FlatCard({
   /** Offered whenever a tenant is on file — excludes them from this year's totals/follow-up without discarding their record. */
   onToggleTenantDisabled?: () => Promise<void>;
 }) {
+  const { contributionPayments, memberName } = usePujaData();
   // A disabled owner/tenant's status is excluded — same as everywhere else
   // they're "not considered" — so their card doesn't get accented by a stale
   // status.
@@ -440,6 +528,9 @@ export function FlatCard({
             `${house.block}-${house.flatNo} · Owner`,
             `${house.block}-${house.flatNo}`,
             ownerCollector,
+            undefined,
+            undefined,
+            extraPaymentsFor(ownerContribution, contributionPayments, memberName),
           )}
           onClick={onEditOwner}
         />
@@ -464,6 +555,9 @@ export function FlatCard({
               `${house.block}-${house.flatNo} · Tenant`,
               `${house.block}-${house.flatNo}`,
               tenantCollector,
+              undefined,
+              undefined,
+              extraPaymentsFor(tenantContribution, contributionPayments, memberName),
             )}
             onClick={onEditTenant}
           />

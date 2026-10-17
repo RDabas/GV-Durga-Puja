@@ -10,6 +10,11 @@ import {
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
+import {
+  residentPayerLabel,
+  ResidentPayerPicker,
+  type ResidentPayerSelection,
+} from "@/components/ResidentPayerPicker";
 import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import { today } from "@/lib/format";
@@ -41,16 +46,17 @@ export function PaymentSheet({
   subtitle?: string;
   /** e.g. "Received by" for a sponsor, "Paid by" for a vendor. */
   memberLabel: string;
-  /** Vendor payments only — a committee member who is also a resident can pay a bill straight out of their own pocket. */
+  /** Vendor payments only — a committee member who is also a resident can pay a bill straight out of their own pocket, or a resident can pay the vendor directly (see ResidentPayerPicker). */
   allowSelfFunded?: boolean;
-  /** Present to edit an existing payment in place; absent to record a new one. */
-  payment?: PaymentInput;
+  /** Present to edit an existing payment in place; absent to record a new one. An id lets a resident-direct payment resolve which pledge it's already linked to. */
+  payment?: PaymentInput & { id?: string };
   /** Pre-fills amount/mode/date, from a payment screenshot scanned before this sheet opened (see the "Scan payment" button on the Vendors page). */
   initialScan?: ScannedPayment;
   onSubmit: (input: PaymentInput) => Promise<void>;
   onClose: () => void;
 }) {
-  const { members } = usePujaData();
+  const store = usePujaData();
+  const { members, contributions, contributionPayments } = store;
   const [amount, setAmount] = useState(payment?.amount ?? initialScan?.amount ?? 0);
   const [mode, setMode] = useState<PaymentMode>(payment?.mode ?? initialScan?.mode ?? "upi");
   const [memberId, setMemberId] = useState(payment?.memberId ?? members[0]?.id ?? "");
@@ -59,20 +65,41 @@ export function PaymentSheet({
   );
   const [note, setNote] = useState(payment?.note ?? "");
   const [selfFunded, setSelfFunded] = useState(payment?.selfFunded ?? false);
+
+  // A payment being edited with no memberId was paid by a resident directly
+  // — resolve which pledge it's already linked to, via the matching
+  // contribution_payments row, so the picker opens pre-filled instead of
+  // forcing the correction to start the search over.
+  const existingLink = payment?.id
+    ? contributionPayments.find((p) => p.vendorPaymentId === payment.id)
+    : undefined;
+  const existingLinkedContribution = existingLink
+    ? contributions.find((c) => c.id === existingLink.contributionId)
+    : undefined;
+  const [payerKind, setPayerKind] = useState<"member" | "resident">(
+    payment && !payment.memberId ? "resident" : "member",
+  );
+  const [residentPayer, setResidentPayer] = useState<ResidentPayerSelection | null>(
+    existingLinkedContribution
+      ? { contributionId: existingLinkedContribution.id, label: residentPayerLabel(store, existingLinkedContribution) }
+      : null,
+  );
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (amount <= 0 || !memberId) return;
+    if (amount <= 0) return;
+    if (payerKind === "resident" ? !residentPayer : !memberId) return;
     run(
       () =>
         onSubmit({
           amount,
           mode,
-          memberId,
+          memberId: payerKind === "resident" ? undefined : memberId,
+          contributionId: payerKind === "resident" ? residentPayer?.contributionId : undefined,
           paymentDate,
           note: note.trim() || undefined,
-          selfFunded: allowSelfFunded ? selfFunded : undefined,
+          selfFunded: allowSelfFunded && payerKind === "member" ? selfFunded : undefined,
         }),
       () => {
         setAmount(0);
@@ -98,13 +125,32 @@ export function PaymentSheet({
           <OptionGroup value={mode} onChange={setMode} options={modeOptions} />
         </Field>
 
-        <Field label={memberLabel}>
-          <OptionGroup
-            value={memberId}
-            onChange={setMemberId}
-            options={members.map((m) => ({ value: m.id, label: m.name }))}
-          />
-        </Field>
+        {allowSelfFunded && (
+          <Field label="Paid by">
+            <OptionGroup
+              value={payerKind}
+              onChange={setPayerKind}
+              options={[
+                { value: "member", label: "A committee member" },
+                { value: "resident", label: "A resident directly" },
+              ]}
+            />
+          </Field>
+        )}
+
+        {payerKind === "resident" ? (
+          <Field label="Which resident">
+            <ResidentPayerPicker value={residentPayer} onChange={setResidentPayer} />
+          </Field>
+        ) : (
+          <Field label={memberLabel}>
+            <OptionGroup
+              value={memberId}
+              onChange={setMemberId}
+              options={members.map((m) => ({ value: m.id, label: m.name }))}
+            />
+          </Field>
+        )}
 
         <Field label="Date">
           <TextInput
@@ -122,7 +168,7 @@ export function PaymentSheet({
           />
         </Field>
 
-        {allowSelfFunded && (
+        {allowSelfFunded && payerKind === "member" && (
           <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
             <input
               type="checkbox"
@@ -135,6 +181,13 @@ export function PaymentSheet({
               balance in hand.
             </span>
           </label>
+        )}
+
+        {payerKind === "resident" && (
+          <p className="text-[0.75rem] text-ink-faint">
+            Settles part of their pledge directly — won&rsquo;t count against any committee
+            member&rsquo;s balance in hand.
+          </p>
         )}
 
         <FormError message={error} />

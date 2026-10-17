@@ -149,6 +149,26 @@ export interface Contribution {
   passDay19?: boolean;
 }
 
+/**
+ * An extra installment against a contribution, beyond its own moneyAmount
+ * (the primary/first payment) — a contribution with no payments here was
+ * paid in one go, as always. Covers two cases: a payment split across more
+ * than one collector/mode for the same pledge (collectorId set), or part of
+ * the pledge settled by a resident paying a vendor bill directly rather
+ * than handing cash/UPI to a collector (collectorId unset, vendorPaymentId
+ * links back to that vendor payment).
+ */
+export interface ContributionPayment {
+  id: string;
+  contributionId: string;
+  amount: number;
+  paymentDate: string;
+  mode: PaymentMode;
+  collectorId?: string;
+  vendorPaymentId?: string;
+  note?: string;
+}
+
 export interface Vendor {
   id: string;
   name: string;
@@ -160,8 +180,13 @@ export interface Vendor {
 export interface VendorPayment {
   id: string;
   vendorExpenseId: string;
-  /** Which committee member handed this over — it comes out of their balance in hand, unless selfFunded. */
-  memberId: string;
+  /**
+   * Which committee member handed this over — it comes out of their balance
+   * in hand, unless selfFunded. Unset when a resident paid the vendor
+   * directly instead, never passing through a committee member's hands (see
+   * ContributionPayment.vendorPaymentId, which links back to this payment).
+   */
+  memberId?: string;
   amount: number;
   paymentDate: string;
   mode: PaymentMode;

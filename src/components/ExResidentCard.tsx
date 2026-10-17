@@ -1,6 +1,6 @@
-import { cardAccent, DisableToggleButton, PayerRow, paymentActionChipFor } from "@/components/FlatCard";
+import { cardAccent, DisableToggleButton, extraPaymentsFor, PayerRow, paymentActionChipFor } from "@/components/FlatCard";
 import type { Contribution, ExResident } from "@/lib/types";
-import type { PreviousYearInfo } from "@/lib/store";
+import { usePujaData, type PreviousYearInfo } from "@/lib/store";
 
 /**
  * One card per ex-resident — not tied to any flat/block, so no floor/block
@@ -25,6 +25,7 @@ export function ExResidentCard({
   onEdit: () => void;
   onToggleDisabled: () => Promise<void>;
 }) {
+  const { contributionPayments, memberName } = usePujaData();
   const status = contribution?.status ?? "not_visited";
   const accent = cardAccent[exResident.disabled ? "not_visited" : status];
 
@@ -53,6 +54,9 @@ export function ExResidentCard({
           "Ex Resident",
           `EXR-${exResident.id.slice(0, 6)}`,
           collectorName,
+          undefined,
+          undefined,
+          extraPaymentsFor(contribution, contributionPayments, memberName),
         )}
         onClick={onEdit}
       />

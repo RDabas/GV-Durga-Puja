@@ -33,6 +33,20 @@ export interface ReceiptPaymentDetails {
   towardsOverride?: string;
   /** Shown as the document's title instead of the generic "Receipt of Contribution" — e.g. "Dandiya Night Pass". */
   slipTitle?: string;
+  /**
+   * Installments beyond the primary payment above — e.g. part of this
+   * pledge paid in cash to one collector and part in UPI to another. When
+   * present, the receipt shows a breakdown table covering every payment
+   * instead of a single payment-mode line, mirroring the vendor
+   * consolidated receipt below. Absent or empty renders byte-for-byte the
+   * same single-payment receipt as always.
+   */
+  extraPayments?: {
+    amount: number;
+    mode: PaymentMode;
+    paymentDate: string;
+    collectorName?: string;
+  }[];
 }
 
 /** Either a specific pledge still owed ("promised") or a plain, no-figure ask ("pending" — nothing's been discussed yet). */
@@ -273,7 +287,9 @@ export async function generateReceiptPdf(
   payment: ReceiptPaymentDetails,
   year: PujaYear,
 ): Promise<void> {
-  const totalAmount = payment.moneyAmount + payment.bhogGroceryAmount;
+  const extraMoneyAmount = payment.extraPayments?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
+  const totalMoneyReceived = payment.moneyAmount + extraMoneyAmount;
+  const totalAmount = totalMoneyReceived + payment.bhogGroceryAmount;
   const reference = `GVDP/${payer.refCode}/${compactDate(payment.paymentDate)}`;
 
   const doc = new jsPDF({ compress: true });
@@ -284,26 +300,27 @@ export async function generateReceiptPdf(
   y = drawPayerBlock(doc, y, "Received with thanks from", payer);
 
   const isPartPayment =
-    payment.originalPledgeAmount != null && payment.originalPledgeAmount > payment.moneyAmount;
+    payment.originalPledgeAmount != null && payment.originalPledgeAmount > totalMoneyReceived;
+  const hasSplitPayments = (payment.extraPayments?.length ?? 0) > 0;
 
   const rows: (string | number)[][] = [];
   if (isPartPayment) {
     rows.push(["Total amount pledged", formatINR(payment.originalPledgeAmount!)]);
   }
-  if (payment.moneyAmount > 0 && payment.bhogGroceryAmount > 0) {
-    rows.push(["Cash / UPI contribution", formatINR(payment.moneyAmount)]);
+  if (totalMoneyReceived > 0 && payment.bhogGroceryAmount > 0) {
+    rows.push(["Cash / UPI contribution", formatINR(totalMoneyReceived)]);
     rows.push(["Bhog & groceries (in-kind)", formatINR(payment.bhogGroceryAmount)]);
   }
   rows.push([isPartPayment ? "Amount received now" : "Amount received", formatINR(totalAmount)]);
   rows.push(["In words", `Rupees ${numberToIndianWords(totalAmount)} Only`]);
   if (isPartPayment) {
-    rows.push(["Balance pending", formatINR(payment.originalPledgeAmount! - payment.moneyAmount)]);
+    rows.push(["Balance pending", formatINR(payment.originalPledgeAmount! - totalMoneyReceived)]);
   }
-  if (payment.moneyAmount > 0) {
+  if (payment.moneyAmount > 0 && !hasSplitPayments) {
     rows.push(["Payment mode", paymentModeLabels[payment.paymentMode]]);
   }
   rows.push(["Towards", payment.towardsOverride ?? `Durga Puja Celebration ${year.year}`]);
-  if (payment.collectorName) {
+  if (payment.collectorName && !hasSplitPayments) {
     rows.push(["Received by", `${payment.collectorName}, on behalf of GV Durga Puja Committee`]);
   }
 
@@ -315,7 +332,47 @@ export async function generateReceiptPdf(
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 }, 1: {} },
     body: rows,
   });
-  y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
+  y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
+  if (hasSplitPayments) {
+    const allPayments = [
+      // The primary slot is 0 whenever every payment came in through an
+      // installment (e.g. the pledge was settled entirely via split/
+      // resident-direct payments, never a payment recorded directly on the
+      // contribution itself) — skip it rather than show a stray Rs. 0 row.
+      ...(payment.moneyAmount > 0
+        ? [
+            {
+              amount: payment.moneyAmount,
+              mode: payment.paymentMode,
+              paymentDate: payment.paymentDate,
+              collectorName: payment.collectorName,
+            },
+          ]
+        : []),
+      ...payment.extraPayments!,
+    ].sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X },
+      head: [["Date", "Mode", "Received by", "Amount"]],
+      headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9 },
+      styles: { fontSize: 9.5, cellPadding: 2 },
+      columnStyles: { 3: { halign: "right" } },
+      body: allPayments.map((p) => [
+        formatShortDate(p.paymentDate),
+        paymentModeLabels[p.mode],
+        p.collectorName ?? "Settled via vendor payment",
+        formatINR(p.amount),
+      ]),
+      foot: [["", "", "Total received", formatINR(totalMoneyReceived)]],
+      footStyles: { fillColor: [235, 237, 245], textColor: INK_RGB, fontStyle: "bold", fontSize: 9.5 },
+    });
+    y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+  } else {
+    y += 12;
+  }
 
   await closeDocumentFrame(doc, pageWidth, y, year.year, "This is a system-generated receipt from the GV Durga Puja app.");
 

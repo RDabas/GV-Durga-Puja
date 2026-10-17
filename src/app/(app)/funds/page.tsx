@@ -54,6 +54,7 @@ export default function FundsPage() {
   const {
     members,
     contributions,
+    contributionPayments,
     fundTransfers,
     vendorExpenses,
     carriedFunds,
@@ -90,51 +91,62 @@ export default function FundsPage() {
     fundTransfers,
     vendorExpenses,
     carriedFunds,
+    contributionPayments,
   );
 
-  /** Who a member's total for one payment mode is actually made up of (houses and outside collection together) — flat and amount, for tapping a Cash/UPI chip. */
+  /** Who a member's total for one payment mode is actually made up of (houses and outside collection together, plus any split/resident-settled installments) — flat and amount, for tapping a Cash/UPI chip. */
   function contributorsFor(memberId: string, mode: PaymentMode) {
-    const list = contributions
+    const primaryEntries = contributions
       .filter((c) => c.collectorId === memberId && c.paymentMode === mode)
-      .map((c) => {
-        const house = c.houseId
-          ? houses.find((h) => h.id === c.houseId)
-          : (c.ownerId ? ownerPrimaryHouse(c.ownerId) : undefined);
-        const owner = c.ownerId ? owners.find((o) => o.id === c.ownerId) : undefined;
-        const exResident = c.exResidentId
-          ? exResidents.find((r) => r.id === c.exResidentId)
-          : undefined;
-        const outsideCollection = c.outsideCollectionId
-          ? outsideCollections.find((r) => r.id === c.outsideCollectionId)
-          : undefined;
-        const name = c.houseId
-          ? house?.tenantNames.join(", ") || "Tenant"
-          : c.ownerId
-            ? (owner?.names.join(", ") ?? "Owner")
-            : c.exResidentId
-              ? (exResident?.names.join(", ") ?? "Ex Resident")
-              : (outsideCollection?.name ?? "Outside Collection");
-        const flatLabel = house
-          ? `${house.block}-${house.flatNo}`
-          : c.exResidentId
-            ? "Ex Resident"
-            : outsideCollection
-              ? outsideCollectionTypeShortLabels[outsideCollection.type]
-              : "—";
-        return {
-          key: c.id,
-          name,
-          flatLabel,
-          // Kept separate from flatLabel so flat sorting orders by real
-          // block/floor/flat-number instead of the display string.
-          block: house?.block ?? "",
-          floor: house?.floor ?? 0,
-          flatNo: house?.flatNo ?? "",
-          amount: c.moneyAmount,
-          mode: c.paymentMode,
-          paymentDate: c.paymentDate,
-        };
+      .map((c) => ({ key: c.id, contribution: c, amount: c.moneyAmount, paymentDate: c.paymentDate }));
+    const extraEntries = contributionPayments
+      .filter((p) => p.collectorId === memberId && p.mode === mode)
+      .flatMap((p) => {
+        const contribution = contributions.find((c) => c.id === p.contributionId);
+        return contribution
+          ? [{ key: p.id, contribution, amount: p.amount, paymentDate: p.paymentDate }]
+          : [];
       });
+
+    const list = [...primaryEntries, ...extraEntries].map(({ key, contribution: c, amount, paymentDate }) => {
+      const house = c.houseId
+        ? houses.find((h) => h.id === c.houseId)
+        : (c.ownerId ? ownerPrimaryHouse(c.ownerId) : undefined);
+      const owner = c.ownerId ? owners.find((o) => o.id === c.ownerId) : undefined;
+      const exResident = c.exResidentId
+        ? exResidents.find((r) => r.id === c.exResidentId)
+        : undefined;
+      const outsideCollection = c.outsideCollectionId
+        ? outsideCollections.find((r) => r.id === c.outsideCollectionId)
+        : undefined;
+      const name = c.houseId
+        ? house?.tenantNames.join(", ") || "Tenant"
+        : c.ownerId
+          ? (owner?.names.join(", ") ?? "Owner")
+          : c.exResidentId
+            ? (exResident?.names.join(", ") ?? "Ex Resident")
+            : (outsideCollection?.name ?? "Outside Collection");
+      const flatLabel = house
+        ? `${house.block}-${house.flatNo}`
+        : c.exResidentId
+          ? "Ex Resident"
+          : outsideCollection
+            ? outsideCollectionTypeShortLabels[outsideCollection.type]
+            : "—";
+      return {
+        key,
+        name,
+        flatLabel,
+        // Kept separate from flatLabel so flat sorting orders by real
+        // block/floor/flat-number instead of the display string.
+        block: house?.block ?? "",
+        floor: house?.floor ?? 0,
+        flatNo: house?.flatNo ?? "",
+        amount,
+        mode,
+        paymentDate,
+      };
+    });
 
     const dir = sort.dir === "asc" ? 1 : -1;
     return list.sort((a, b) => {

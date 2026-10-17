@@ -6,6 +6,7 @@ import type {
   CommitteeMember,
   Contribution,
   ContributionKind,
+  ContributionPayment,
   ContributionStatus,
   ExResident,
   FundTransfer,
@@ -126,6 +127,17 @@ interface CarriedFundRow {
   note: string | null;
 }
 
+interface ContributionPaymentRow {
+  id: string;
+  contribution_id: string;
+  amount: number;
+  payment_date: string;
+  mode: PaymentMode;
+  collector_id: string | null;
+  vendor_payment_id: string | null;
+  note: string | null;
+}
+
 interface VendorRow {
   id: string;
   name: string;
@@ -137,7 +149,7 @@ interface VendorRow {
 interface VendorPaymentRow {
   id: string;
   vendor_expense_id: string;
-  member_id: string;
+  member_id: string | null;
   amount: number;
   payment_date: string;
   mode: PaymentMode;
@@ -262,6 +274,17 @@ const mapCarriedFund = (r: CarriedFundRow): CarriedFund => ({
   note: r.note ?? undefined,
 });
 
+const mapContributionPayment = (r: ContributionPaymentRow): ContributionPayment => ({
+  id: r.id,
+  contributionId: r.contribution_id,
+  amount: r.amount,
+  paymentDate: r.payment_date,
+  mode: r.mode,
+  collectorId: r.collector_id ?? undefined,
+  vendorPaymentId: r.vendor_payment_id ?? undefined,
+  note: r.note ?? undefined,
+});
+
 const mapVendor = (r: VendorRow): Vendor => ({
   id: r.id,
   name: r.name,
@@ -273,7 +296,7 @@ const mapVendor = (r: VendorRow): Vendor => ({
 const mapVendorPayment = (r: VendorPaymentRow): VendorPayment => ({
   id: r.id,
   vendorExpenseId: r.vendor_expense_id,
-  memberId: r.member_id,
+  memberId: r.member_id ?? undefined,
   amount: r.amount,
   paymentDate: r.payment_date,
   mode: r.mode,
@@ -310,6 +333,7 @@ export interface LiveData {
   houses: House[];
   members: CommitteeMember[];
   contributions: Contribution[];
+  contributionPayments: ContributionPayment[];
   fundTransfers: FundTransfer[];
   carriedFunds: CarriedFund[];
   vendorExpenses: VendorExpense[];
@@ -357,6 +381,7 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
     houses,
     members,
     contributions,
+    contributionPayments,
     fundTransfers,
     carriedFunds,
     vendorExpenses,
@@ -372,6 +397,7 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
       supabase.from("houses").select("*").order("block").order("floor").order("flat_no"),
       supabase.from("committee_members").select("*").order("name", { ascending: true }),
       supabase.from("contributions").select("*"),
+      supabase.from("contribution_payments").select("*"),
       supabase.from("fund_transfers").select("*"),
       supabase.from("carried_funds").select("*"),
       supabase.from("vendor_expenses").select("*, vendors(*), vendor_payments(*)"),
@@ -390,6 +416,10 @@ export async function fetchAll(supabase: SupabaseClient): Promise<LiveData> {
     houses: unwrap<HouseRow[]>(houses, "houses").map(mapHouse),
     members: unwrap<MemberRow[]>(members, "members").map(mapMember),
     contributions: unwrap<ContributionRow[]>(contributions, "contributions").map(mapContribution),
+    contributionPayments: unwrap<ContributionPaymentRow[]>(
+      contributionPayments,
+      "contributionPayments",
+    ).map(mapContributionPayment),
     fundTransfers: unwrap<FundTransferRow[]>(fundTransfers, "fundTransfers").map(mapFundTransfer),
     carriedFunds: unwrap<CarriedFundRow[]>(carriedFunds, "carriedFunds").map(mapCarriedFund),
     vendorExpenses: unwrap<VendorExpenseRow[]>(vendorExpenses, "vendorExpenses").map(mapVendorExpense),
@@ -767,12 +797,15 @@ export async function dbSaveContribution(
 }
 
 interface PaymentWrite {
-  memberId: string;
+  /** Unset when a resident paid the vendor directly — see contributionId. */
+  memberId?: string;
   amount: number;
   paymentDate: string;
   mode: PaymentMode;
   note?: string;
   selfFunded?: boolean;
+  /** Set only when memberId is unset — which pledge this payment settles directly. */
+  contributionId?: string;
 }
 
 /** Returns the new bill's id, so callers can immediately record a payment against it. */
@@ -839,21 +872,26 @@ export async function dbDeleteVendorExpense(
   if (error) throw new Error(error.message);
 }
 
+/** Returns the new payment's id, so callers can link a resident-direct settlement back to it (see dbAddContributionPayment). */
 export async function dbAddVendorPayment(
   supabase: SupabaseClient,
   expenseId: string,
   input: PaymentWrite,
-): Promise<void> {
-  const { error } = await supabase.from("vendor_payments").insert({
-    vendor_expense_id: expenseId,
-    member_id: input.memberId,
-    amount: input.amount,
-    payment_date: input.paymentDate,
-    mode: input.mode,
-    note: input.note ?? null,
-    self_funded: input.selfFunded ?? false,
-  });
-  if (error) throw new Error(error.message);
+): Promise<string> {
+  const inserted = await supabase
+    .from("vendor_payments")
+    .insert({
+      vendor_expense_id: expenseId,
+      member_id: input.memberId ?? null,
+      amount: input.amount,
+      payment_date: input.paymentDate,
+      mode: input.mode,
+      note: input.note ?? null,
+      self_funded: input.selfFunded ?? false,
+    })
+    .select("id")
+    .single();
+  return unwrap<{ id: string }>(inserted, "insert vendor_payment").id;
 }
 
 /** Corrects a vendor payment entered wrong — amount, mode, date, who paid, etc. */
@@ -865,7 +903,7 @@ export async function dbUpdateVendorPayment(
   const result = await supabase
     .from("vendor_payments")
     .update({
-      member_id: input.memberId,
+      member_id: input.memberId ?? null,
       amount: input.amount,
       payment_date: input.paymentDate,
       mode: input.mode,
@@ -877,11 +915,59 @@ export async function dbUpdateVendorPayment(
   assertUpdated(result, "update vendor payment");
 }
 
+/** Cascades to delete any linked contribution_payments row too (see contribution_payments.vendor_payment_id). */
 export async function dbDeleteVendorPayment(
   supabase: SupabaseClient,
   paymentId: string,
 ): Promise<void> {
   const { error } = await supabase.from("vendor_payments").delete().eq("id", paymentId);
+  if (error) throw new Error(error.message);
+}
+
+export interface ContributionPaymentWrite {
+  amount: number;
+  paymentDate: string;
+  mode: PaymentMode;
+  collectorId?: string;
+  vendorPaymentId?: string;
+  note?: string;
+}
+
+export async function dbAddContributionPayment(
+  supabase: SupabaseClient,
+  contributionId: string,
+  input: ContributionPaymentWrite,
+): Promise<void> {
+  const { error } = await supabase.from("contribution_payments").insert({
+    contribution_id: contributionId,
+    amount: input.amount,
+    payment_date: input.paymentDate,
+    mode: input.mode,
+    collector_id: input.collectorId ?? null,
+    vendor_payment_id: input.vendorPaymentId ?? null,
+    note: input.note ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Keeps a resident-direct settlement's amount/mode/date in sync when the linked vendor payment is corrected. */
+export async function dbUpdateContributionPaymentByVendorPayment(
+  supabase: SupabaseClient,
+  vendorPaymentId: string,
+  input: { amount: number; mode: PaymentMode; paymentDate: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("contribution_payments")
+    .update({ amount: input.amount, mode: input.mode, payment_date: input.paymentDate })
+    .eq("vendor_payment_id", vendorPaymentId);
+  if (error) throw new Error(error.message);
+}
+
+export async function dbRemoveContributionPayment(
+  supabase: SupabaseClient,
+  paymentId: string,
+): Promise<void> {
+  const { error } = await supabase.from("contribution_payments").delete().eq("id", paymentId);
   if (error) throw new Error(error.message);
 }
 

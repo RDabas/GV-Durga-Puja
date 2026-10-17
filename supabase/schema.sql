@@ -217,11 +217,12 @@ create table vendor_expenses (
 
 -- Zero rows = nothing paid yet; one row = paid in full; many rows = installments.
 -- member_id records which committee member handed this over — it comes out
--- of their balance in hand.
+-- of their balance in hand. member_id is null when a resident paid the
+-- vendor directly instead (see contribution_payments.vendor_payment_id).
 create table vendor_payments (
   id uuid primary key default gen_random_uuid(),
   vendor_expense_id uuid not null references vendor_expenses(id) on delete cascade,
-  member_id uuid not null references committee_members(id),
+  member_id uuid references committee_members(id),
   amount numeric(10, 2) not null,
   payment_date date not null default current_date,
   mode payment_mode not null default 'upi',
@@ -230,6 +231,24 @@ create table vendor_payments (
   -- pledge) rather than committee cash, so it shouldn't reduce their balance
   -- in hand the way a normal vendor payment does.
   self_funded boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Extra installments against a contribution beyond its own money_amount (the
+-- primary/first payment) — a contribution with no rows here was paid in one
+-- go, as always. collector_id is null when the installment instead settles
+-- part of the pledge by paying a vendor directly (vendor_payment_id set);
+-- deleting that vendor payment cascades here too, keeping the pledge total
+-- in sync automatically.
+create table contribution_payments (
+  id uuid primary key default gen_random_uuid(),
+  contribution_id uuid not null references contributions(id) on delete cascade,
+  amount numeric(10, 2) not null,
+  payment_date date not null default current_date,
+  mode payment_mode not null default 'upi',
+  collector_id uuid references committee_members(id),
+  vendor_payment_id uuid references vendor_payments(id) on delete cascade,
+  note text,
   created_at timestamptz not null default now()
 );
 
@@ -267,6 +286,7 @@ alter table carried_funds enable row level security;
 alter table vendors enable row level security;
 alter table vendor_expenses enable row level security;
 alter table vendor_payments enable row level security;
+alter table contribution_payments enable row level security;
 alter table activity_log enable row level security;
 
 create function is_committee_member() returns boolean
@@ -374,6 +394,18 @@ create policy "committee can read vendor_payments" on vendor_payments
   for select using (is_committee_member());
 create policy "admins manage vendor_payments" on vendor_payments
   for all using (is_committee_admin()) with check (is_committee_admin());
+
+-- Same access pattern as contributions itself (not vendor_payments' admin-only
+-- policy) — collectors, not just admins, record a split installment or a
+-- resident's direct vendor settlement the same way they record any payment.
+create policy "committee can read contribution_payments" on contribution_payments
+  for select using (is_committee_member());
+create policy "committee can add contribution_payments" on contribution_payments
+  for insert with check (is_committee_member());
+create policy "committee can update contribution_payments" on contribution_payments
+  for update using (is_committee_member());
+create policy "admins delete contribution_payments" on contribution_payments
+  for delete using (is_committee_admin());
 
 create policy "committee can read activity_log" on activity_log
   for select using (is_committee_member());

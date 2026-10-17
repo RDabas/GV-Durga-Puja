@@ -3,6 +3,7 @@ import type {
   CarriedFund,
   CommitteeMember,
   Contribution,
+  ContributionPayment,
   FundTransfer,
   VendorExpense,
 } from "@/lib/types";
@@ -45,22 +46,39 @@ export function committeeBalances(
   transfers: FundTransfer[],
   vendorExpenses: VendorExpense[],
   carriedFunds: CarriedFund[] = [],
+  contributionPayments: ContributionPayment[] = [],
 ): CommitteeBalance[] {
+  const contributionById = new Map(contributions.map((c) => [c.id, c]));
+
   return members.map((member) => {
     const collectedFrom = contributions.filter(
       (c) =>
         c.collectorId === member.id && c.paymentMode !== "pending" && c.outsideCollectionId == null,
     );
-    const collected = collectedFrom.reduce((sum, c) => sum + c.moneyAmount, 0);
+    // Extra installments (split across a second collector, or a resident
+    // settling part of their pledge by paying a vendor directly — those
+    // have no collectorId at all, so they never attribute here) collected
+    // by this member, split the same way by whether their parent pledge is
+    // a house/owner/ex-resident or an outside-collection entry.
+    const extraCollectedFrom = contributionPayments.filter((p) => {
+      if (p.collectorId !== member.id) return false;
+      return contributionById.get(p.contributionId)?.outsideCollectionId == null;
+    });
+    const collected =
+      collectedFrom.reduce((sum, c) => sum + c.moneyAmount, 0) +
+      extraCollectedFrom.reduce((sum, p) => sum + p.amount, 0);
 
     const outsideCollectionFrom = contributions.filter(
       (c) =>
         c.collectorId === member.id && c.paymentMode !== "pending" && c.outsideCollectionId != null,
     );
-    const outsideCollectionReceived = outsideCollectionFrom.reduce(
-      (sum, c) => sum + c.moneyAmount,
-      0,
-    );
+    const extraOutsideCollectionFrom = contributionPayments.filter((p) => {
+      if (p.collectorId !== member.id) return false;
+      return contributionById.get(p.contributionId)?.outsideCollectionId != null;
+    });
+    const outsideCollectionReceived =
+      outsideCollectionFrom.reduce((sum, c) => sum + c.moneyAmount, 0) +
+      extraOutsideCollectionFrom.reduce((sum, p) => sum + p.amount, 0);
 
     // A self-funded payment came out of the member's own pocket (typically
     // offsetting their own resident pledge), never out of committee cash
@@ -86,12 +104,16 @@ export function committeeBalances(
       .filter((f) => f.kind === "bank")
       .reduce((sum, f) => sum + f.amount, 0);
 
-    const collectedByMode = paymentModeBreakdown(
-      [...collectedFrom, ...outsideCollectionFrom].map((c) => ({
+    const collectedByMode = paymentModeBreakdown([
+      ...[...collectedFrom, ...outsideCollectionFrom].map((c) => ({
         amount: c.moneyAmount,
         mode: c.paymentMode,
       })),
-    );
+      ...[...extraCollectedFrom, ...extraOutsideCollectionFrom].map((p) => ({
+        amount: p.amount,
+        mode: p.mode,
+      })),
+    ]);
     const receivedByMode = paymentModeBreakdown(
       receivedFrom.map((t) => ({ amount: t.amount, mode: t.mode })),
     );

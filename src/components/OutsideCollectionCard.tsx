@@ -1,7 +1,14 @@
 import { useState } from "react";
-import { cardAccent, DisableToggleButton, PayerRow, paymentActionChipFor } from "@/components/FlatCard";
+import {
+  cardAccent,
+  DisableToggleButton,
+  extraPaymentsFor,
+  PayerRow,
+  paymentActionChipFor,
+} from "@/components/FlatCard";
 import { FormError } from "@/components/FormControls";
 import { Pill, pillLabels } from "@/components/Pill";
+import { usePujaData } from "@/lib/store";
 import { useAsyncAction } from "@/lib/useAsyncAction";
 import type { Contribution, OutsideCollection } from "@/lib/types";
 
@@ -45,6 +52,7 @@ export function OutsideCollectionCard({
   /** Only ever offered once the entry is already disabled — a permanent delete, not a toggle. */
   onDelete?: () => Promise<void>;
 }) {
+  const { contributionPayments, memberName } = usePujaData();
   const status = contribution?.status ?? "not_visited";
   const accent = cardAccent[outsideCollection.disabled ? "not_visited" : status];
   const [confirming, setConfirming] = useState(false);
@@ -86,6 +94,7 @@ export function OutsideCollectionCard({
             ? `Dandiya Night Pass — ${passHint(contribution)}`
             : undefined,
           outsideCollection.type === "dandiya_pass" ? "Dandiya Night Pass" : undefined,
+          extraPaymentsFor(contribution, contributionPayments, memberName),
         )}
         onClick={onEdit}
       />

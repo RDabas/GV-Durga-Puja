@@ -5,15 +5,24 @@ import { Pill, type PillTone } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
 import { FormError } from "@/components/FormControls";
 import { VendorConsolidatedReceiptChip } from "@/components/IssueReceiptButton";
+import { residentPayerLabel } from "@/components/ResidentPayerPicker";
 import { formatINR, formatShortDate } from "@/lib/format";
 import { paymentModeBreakdown, paymentModeLabels } from "@/lib/payment";
 import { useAsyncAction } from "@/lib/useAsyncAction";
-import { usePujaData } from "@/lib/store";
+import { usePujaData, type PujaStore } from "@/lib/store";
 
 function statusFor(paid: number, total: number): PillTone {
   if (paid <= 0) return "not_paid";
   if (paid >= total) return "paid_full";
   return "installment";
+}
+
+/** "paid by" display name for a vendor payment — the committee member who handed it over, or, when a resident paid the vendor directly, the resident's name via the linked contribution_payments row. */
+function paidByLabel(store: PujaStore, p: VendorPayment): string {
+  if (p.memberId) return store.memberName(p.memberId) ?? "?";
+  const link = store.contributionPayments.find((cp) => cp.vendorPaymentId === p.id);
+  const contribution = link ? store.contributions.find((c) => c.id === link.contributionId) : undefined;
+  return contribution ? `${residentPayerLabel(store, contribution)} (resident)` : "a resident";
 }
 
 /** Small "Remove" link next to a payment history row — a sibling of the row's own tap-to-edit button, not nested inside it. */
@@ -50,7 +59,7 @@ export function VendorCard({
   onEdit?: () => void;
   onDelete?: () => Promise<void>;
 }) {
-  const { memberName } = usePujaData();
+  const store = usePujaData();
   const [confirming, setConfirming] = useState(false);
   const { submitting, error, run } = useAsyncAction();
   const paid = expense.payments.reduce((sum, p) => sum + p.amount, 0);
@@ -77,7 +86,7 @@ export function VendorCard({
                 amount: p.amount,
                 mode: p.mode,
                 paymentDate: p.paymentDate,
-                paidByName: memberName(p.memberId),
+                paidByName: paidByLabel(store, p),
                 selfFunded: p.selfFunded,
               }))}
               billTotal={expense.totalAmount}
@@ -122,13 +131,13 @@ export function VendorCard({
                   className="min-w-0 flex-1 text-left transition active:opacity-70"
                 >
                   {formatShortDate(p.paymentDate)} · {paymentModeLabels[p.mode]} · paid by{" "}
-                  <span className="font-semibold text-ink-soft">{memberName(p.memberId)}</span>
+                  <span className="font-semibold text-ink-soft">{paidByLabel(store, p)}</span>
                   {p.selfFunded && " · self-funded"}
                 </button>
               ) : (
                 <span className="min-w-0 flex-1">
                   {formatShortDate(p.paymentDate)} · {paymentModeLabels[p.mode]} · paid by{" "}
-                  <span className="font-semibold text-ink-soft">{memberName(p.memberId)}</span>
+                  <span className="font-semibold text-ink-soft">{paidByLabel(store, p)}</span>
                   {p.selfFunded && " · self-funded"}
                 </span>
               )}

@@ -10,6 +10,7 @@ import {
   SubmitButton,
   TextInput,
 } from "@/components/FormControls";
+import { ResidentPayerPicker, type ResidentPayerSelection } from "@/components/ResidentPayerPicker";
 import { today } from "@/lib/format";
 import { modeOptions } from "@/lib/contributionForm";
 import type { ScannedPayment } from "@/lib/scanPayment";
@@ -47,6 +48,8 @@ export function VendorExpenseSheet({
   const [paidById, setPaidById] = useState(members[0]?.id ?? "");
   const [paidDate, setPaidDate] = useState(initialScan?.paymentDate ?? today());
   const [selfFunded, setSelfFunded] = useState(false);
+  const [paidByKind, setPaidByKind] = useState<"member" | "resident">("member");
+  const [residentPayer, setResidentPayer] = useState<ResidentPayerSelection | null>(null);
 
   const { submitting, error, run } = useAsyncAction();
 
@@ -64,15 +67,20 @@ export function VendorExpenseSheet({
           await updateVendorExpense(expense.id, input);
           return;
         }
+        const canRecordPayment =
+          recordingPayment &&
+          paidAmount > 0 &&
+          (paidByKind === "resident" ? residentPayer : paidById);
         await addVendorExpense(
           input,
-          recordingPayment && paidAmount > 0 && paidById
+          canRecordPayment
             ? {
                 amount: paidAmount,
                 mode: paidMode,
-                memberId: paidById,
+                memberId: paidByKind === "resident" ? undefined : paidById,
+                contributionId: paidByKind === "resident" ? residentPayer?.contributionId : undefined,
                 paymentDate: paidDate,
-                selfFunded,
+                selfFunded: paidByKind === "member" ? selfFunded : undefined,
               }
             : undefined,
         );
@@ -142,11 +150,27 @@ export function VendorExpenseSheet({
                 </Field>
                 <Field label="Paid by">
                   <OptionGroup
-                    value={paidById}
-                    onChange={setPaidById}
-                    options={members.map((m) => ({ value: m.id, label: m.name }))}
+                    value={paidByKind}
+                    onChange={setPaidByKind}
+                    options={[
+                      { value: "member", label: "A committee member" },
+                      { value: "resident", label: "A resident directly" },
+                    ]}
                   />
                 </Field>
+                {paidByKind === "resident" ? (
+                  <Field label="Which resident">
+                    <ResidentPayerPicker value={residentPayer} onChange={setResidentPayer} />
+                  </Field>
+                ) : (
+                  <Field label="Committee member">
+                    <OptionGroup
+                      value={paidById}
+                      onChange={setPaidById}
+                      options={members.map((m) => ({ value: m.id, label: m.name }))}
+                    />
+                  </Field>
+                )}
                 <Field label="Date">
                   <TextInput
                     type="date"
@@ -154,18 +178,25 @@ export function VendorExpenseSheet({
                     onChange={(e) => setPaidDate(e.target.value)}
                   />
                 </Field>
-                <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
-                  <input
-                    type="checkbox"
-                    checked={selfFunded}
-                    onChange={(e) => setSelfFunded(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-                  />
-                  <span className="text-[0.8rem] text-ink-soft">
-                    Paid from their own pocket, not committee cash — won&rsquo;t count against
-                    their balance in hand.
-                  </span>
-                </label>
+                {paidByKind === "member" ? (
+                  <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+                    <input
+                      type="checkbox"
+                      checked={selfFunded}
+                      onChange={(e) => setSelfFunded(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                    />
+                    <span className="text-[0.8rem] text-ink-soft">
+                      Paid from their own pocket, not committee cash — won&rsquo;t count against
+                      their balance in hand.
+                    </span>
+                  </label>
+                ) : (
+                  <p className="text-[0.75rem] text-ink-faint">
+                    Settles part of their pledge directly — won&rsquo;t count against any
+                    committee member&rsquo;s balance in hand.
+                  </p>
+                )}
               </>
             )}
           </>

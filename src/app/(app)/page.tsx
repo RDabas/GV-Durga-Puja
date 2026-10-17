@@ -144,6 +144,7 @@ export default function DashboardPage() {
     years,
     activeYear,
     contributions,
+    contributionPayments,
     outsideCollections,
     vendorExpenses,
     houses,
@@ -858,6 +859,14 @@ export default function DashboardPage() {
           )}
           {sortedFollowUps.map((entry, i) => {
             const hasPledgeLine = entry.contribution?.originalPledgeAmount != null;
+            // The primary payment plus any split/vendor-settled extras — see
+            // the same combined total FlatCard.tsx computes for its own
+            // pledge-progress line.
+            const totalMoneyReceived =
+              (entry.contribution?.moneyAmount ?? 0) +
+              contributionPayments
+                .filter((p) => p.contributionId === entry.contribution?.id)
+                .reduce((sum, p) => sum + p.amount, 0);
             const lastYear = lastYearAmountFor(entry);
             const thisYear = thisYearAmountFor(entry);
             return (
@@ -892,7 +901,7 @@ export default function DashboardPage() {
                     <div className="mt-0.5 text-[0.72rem] font-semibold text-gold">
                       {pledgeProgressLabel(
                         entry.contribution!.status,
-                        entry.contribution!.moneyAmount,
+                        totalMoneyReceived,
                         entry.contribution!.originalPledgeAmount!,
                       )}
                     </div>

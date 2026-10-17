@@ -44,6 +44,7 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
     activeYear,
     houses,
     contributions,
+    contributionPayments,
     outsideCollections,
     vendorExpenses,
     members,
@@ -193,6 +194,7 @@ export async function exportPujaDataToExcel(store: PujaStore): Promise<void> {
     fundTransfers,
     vendorExpenses,
     carriedFunds,
+    contributionPayments,
   );
   const balancesSheet = workbook.addWorksheet("Money Holders");
   balancesSheet.columns = [
