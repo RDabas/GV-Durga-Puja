@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { CarriedFundSheet } from "@/components/CarriedFundSheet";
 import { FundTransferSheet } from "@/components/FundTransferSheet";
 import { MembersSheet } from "@/components/MembersSheet";
@@ -235,20 +235,6 @@ export default function FundsPage() {
                         </b>
                       </span>
                     </div>
-                    {(cashBalance !== 0 || upiBalance !== 0) && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {cashBalance !== 0 && (
-                          <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
-                            Balance cash {formatINR(cashBalance)}
-                          </span>
-                        )}
-                        {upiBalance !== 0 && (
-                          <span className="rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums text-ink-soft">
-                            Balance UPI {formatINR(upiBalance)}
-                          </span>
-                        )}
-                      </div>
-                    )}
                     {(collected > 0 || outsideCollectionReceived > 0) && (
                       <div className="mt-0.5 text-[0.68rem] text-ink-faint">
                         {collected > 0 && `from houses ${formatINR(collected)}`}
@@ -266,22 +252,36 @@ export default function FundsPage() {
                         {handedOver > 0 && `handed over ${formatINR(handedOver)}`}
                       </div>
                     )}
-                    {sortedBreakdown(collectedByMode).length > 0 && (
+                    {(sortedBreakdown(collectedByMode).length > 0 ||
+                      cashBalance !== 0 ||
+                      upiBalance !== 0) && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
-                        {sortedBreakdown(collectedByMode).map(([mode, amount]) => (
-                          <button
-                            key={mode}
-                            type="button"
-                            onClick={() =>
-                              setExpanded(
-                                expandedMode === mode ? null : { memberId: member.id, mode },
-                              )
-                            }
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums whitespace-nowrap transition active:scale-95 ${paymentModeChipStyles[mode]} ${expandedMode === mode ? "ring-2 ring-offset-1 ring-ink/30" : ""}`}
-                          >
-                            {paymentModeLabels[mode]} {formatINR(amount)}
-                          </button>
-                        ))}
+                        {(["cash", "upi"] as const).map((mode) => {
+                          const collectedAmount = collectedByMode[mode] ?? 0;
+                          const balance = mode === "cash" ? cashBalance : upiBalance;
+                          return (
+                            <Fragment key={mode}>
+                              {collectedAmount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpanded(
+                                      expandedMode === mode ? null : { memberId: member.id, mode },
+                                    )
+                                  }
+                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums whitespace-nowrap transition active:scale-95 ${paymentModeChipStyles[mode]} ${expandedMode === mode ? "ring-2 ring-offset-1 ring-ink/30" : ""}`}
+                                >
+                                  {paymentModeLabels[mode]} Collected {formatINR(collectedAmount)}
+                                </button>
+                              )}
+                              {balance !== 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-ground-alt px-2 py-0.5 text-[0.66rem] font-semibold tabular-nums whitespace-nowrap text-ink-soft">
+                                  {paymentModeLabels[mode]} Balance {formatINR(balance)}
+                                </span>
+                              )}
+                            </Fragment>
+                          );
+                        })}
                       </div>
                     )}
                     {carried > 0 && (
