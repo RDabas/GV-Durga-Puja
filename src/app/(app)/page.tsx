@@ -6,12 +6,14 @@ import { ExResidentSheet } from "@/components/ExResidentSheet";
 import { Pill, pillLabels } from "@/components/Pill";
 import { ProgressBar } from "@/components/ProgressBar";
 import { CoinsIcon, SponsorsIcon, VendorsIcon } from "@/components/icons";
+import { totalReceivedFor } from "@/lib/balances";
 import { knownBlocks } from "@/lib/directory";
 import { formatINR, pledgeProgressLabel, promisedContribution } from "@/lib/format";
 import { usePujaData } from "@/lib/store";
 import type {
   Block,
   Contribution,
+  ContributionPayment,
   ContributionStatus,
   ExResident,
   House,
@@ -79,11 +81,15 @@ function isExResidentFollowUp(e: FollowUpEntry): e is Extract<FollowUpEntry, { k
 }
 
 /** How much this entry brought in this year — only paid/partial/promised have a known figure. */
-function thisYearAmountFor(entry: FollowUpEntry): number {
+function thisYearAmountFor(entry: FollowUpEntry, contributionPayments: ContributionPayment[]): number {
   const c = entry.contribution;
   if (!c) return 0;
   const money =
-    c.status === "paid" || c.status === "partial" || c.status === "promised" ? c.moneyAmount : 0;
+    c.status === "paid" || c.status === "partial"
+      ? totalReceivedFor(c, contributionPayments)
+      : c.status === "promised"
+        ? c.moneyAmount
+        : 0;
   return money + c.bhogGroceryAmount;
 }
 
@@ -104,6 +110,7 @@ function followUpDescription(
   status: ContributionStatus,
   contribution: Contribution | undefined,
   memberName: (memberId?: string) => string | undefined,
+  contributionPayments: ContributionPayment[],
 ): string {
   const assignee = memberName(contribution?.assignedToMemberId) ?? contribution?.assignedToName;
   const assignedTag = assignee ? `assigned to ${assignee}` : undefined;
@@ -127,7 +134,7 @@ function followUpDescription(
         .filter(Boolean)
         .join(" · ");
     case "partial":
-      return `Partial — ${formatINR(contribution?.moneyAmount ?? 0)} so far`;
+      return `Partial — ${formatINR(totalReceivedFor(contribution, contributionPayments))} so far`;
     case "bhog_only":
       return `Bhog / groceries only — ${formatINR(contribution?.bhogGroceryAmount ?? 0)}`;
     case "wont_pay":
@@ -184,7 +191,7 @@ export default function DashboardPage() {
   );
   const outsideCollectionReceived = activeOutsideCollections.reduce((sum, entry) => {
     const c = contributionFor({ outsideCollectionId: entry.id });
-    return sum + (c && (c.status === "paid" || c.status === "partial") ? c.moneyAmount : 0);
+    return sum + (c && (c.status === "paid" || c.status === "partial") ? totalReceivedFor(c, contributionPayments) : 0);
   }, 0);
   const outsideCollectionPromised = activeOutsideCollections.reduce((sum, entry) => {
     const c = contributionFor({ outsideCollectionId: entry.id });
@@ -200,12 +207,12 @@ export default function DashboardPage() {
     const totals = new Map<OutsideCollectionType, number>();
     for (const entry of activeOutsideCollections) {
       const c = contributionFor({ outsideCollectionId: entry.id });
-      const received = c && (c.status === "paid" || c.status === "partial") ? c.moneyAmount : 0;
+      const received = c && (c.status === "paid" || c.status === "partial") ? totalReceivedFor(c, contributionPayments) : 0;
       if (received <= 0) continue;
       totals.set(entry.type, (totals.get(entry.type) ?? 0) + received);
     }
     return [...totals.entries()].sort((a, b) => b[1] - a[1]);
-  }, [activeOutsideCollections, contributionFor]);
+  }, [activeOutsideCollections, contributionFor, contributionPayments]);
   const vendorPaid = vendorExpenses.reduce(
     (sum, e) => sum + e.payments.reduce((s, p) => s + p.amount, 0),
     0,
@@ -309,7 +316,11 @@ export default function DashboardPage() {
   // money and netting off what's gone out to vendors.
   const residentPaidOverall = followUpEntries
     .filter((e) => e.status === "paid" || e.status === "partial" || e.status === "bhog_only")
-    .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
+    .reduce(
+      (sum, e) =>
+        sum + totalReceivedFor(e.contribution, contributionPayments) + (e.contribution?.bhogGroceryAmount ?? 0),
+      0,
+    );
   const totalCollected = residentPaidOverall + outsideCollectionReceived;
   const balance = totalCollected - vendorPaid;
 
@@ -323,7 +334,11 @@ export default function DashboardPage() {
       : followUpEntries.filter((e) => e.block === moneyBlockFilter);
   const paidAmount = moneyEntries
     .filter((e) => e.status === "paid" || e.status === "partial" || e.status === "bhog_only")
-    .reduce((sum, e) => sum + (e.contribution?.moneyAmount ?? 0) + (e.contribution?.bhogGroceryAmount ?? 0), 0);
+    .reduce(
+      (sum, e) =>
+        sum + totalReceivedFor(e.contribution, contributionPayments) + (e.contribution?.bhogGroceryAmount ?? 0),
+      0,
+    );
   const promisedAmount = moneyEntries.reduce(
     (sum, e) =>
       sum +
@@ -479,7 +494,10 @@ export default function DashboardPage() {
       const sortedExResidents = [...exResidentEntries].sort((a, b) => a.name.localeCompare(b.name));
       return [...sortedFlats, ...sortedExResidents];
     }
-    const metric = followUpSort.field === "lastYear" ? lastYearAmountFor : thisYearAmountFor;
+    const metric =
+      followUpSort.field === "lastYear"
+        ? lastYearAmountFor
+        : (entry: FollowUpEntry) => thisYearAmountFor(entry, contributionPayments);
     return [...followUps].sort((a, b) => dir * (metric(a) - metric(b)));
   })();
 
@@ -862,13 +880,9 @@ export default function DashboardPage() {
             // The primary payment plus any split/vendor-settled extras — see
             // the same combined total FlatCard.tsx computes for its own
             // pledge-progress line.
-            const totalMoneyReceived =
-              (entry.contribution?.moneyAmount ?? 0) +
-              contributionPayments
-                .filter((p) => p.contributionId === entry.contribution?.id)
-                .reduce((sum, p) => sum + p.amount, 0);
+            const totalMoneyReceived = totalReceivedFor(entry.contribution, contributionPayments);
             const lastYear = lastYearAmountFor(entry);
-            const thisYear = thisYearAmountFor(entry);
+            const thisYear = thisYearAmountFor(entry, contributionPayments);
             return (
               <button
                 type="button"
@@ -895,7 +909,7 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <div className="mt-0.5 truncate text-[0.75rem] text-ink-faint">
-                    {followUpDescription(entry.status, entry.contribution, memberName)}
+                    {followUpDescription(entry.status, entry.contribution, memberName, contributionPayments)}
                   </div>
                   {hasPledgeLine && (
                     <div className="mt-0.5 text-[0.72rem] font-semibold text-gold">

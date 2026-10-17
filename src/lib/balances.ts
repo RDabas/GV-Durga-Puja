@@ -8,6 +8,25 @@ import type {
   VendorExpense,
 } from "@/lib/types";
 
+/**
+ * A contribution's own moneyAmount only ever tracks its primary payment —
+ * add any split/vendor-settled installments (contribution_payments) for the
+ * real total actually received. Safe to call for any status: "promised"
+ * never has installments (a payment moves it off "promised" the moment one
+ * comes in), so this is a no-op addition for anything that isn't actually
+ * paid/partial.
+ */
+export function totalReceivedFor(
+  contribution: Contribution | undefined,
+  contributionPayments: ContributionPayment[],
+): number {
+  if (!contribution) return 0;
+  const extras = contributionPayments
+    .filter((p) => p.contributionId === contribution.id)
+    .reduce((sum, p) => sum + p.amount, 0);
+  return contribution.moneyAmount + extras;
+}
+
 export interface CommitteeBalance {
   member: CommitteeMember;
   collected: number;

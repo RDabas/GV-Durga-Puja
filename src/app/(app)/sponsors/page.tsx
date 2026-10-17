@@ -6,18 +6,22 @@ import { OutsideCollectionCard } from "@/components/OutsideCollectionCard";
 import { OutsideCollectionSheet } from "@/components/OutsideCollectionSheet";
 import { PlusIcon } from "@/components/icons";
 import { statusRank } from "@/components/FlatCard";
+import { totalReceivedFor } from "@/lib/balances";
 import { usePujaData } from "@/lib/store";
-import type { Contribution, OutsideCollection } from "@/lib/types";
+import type { Contribution, ContributionPayment, OutsideCollection } from "@/lib/types";
 
 /** Current-year figure for an entry — same paid/partial/promised convention used elsewhere, plus any Bhog/groceries value regardless of money status. */
-function amountFor(contribution: Contribution | undefined): number {
+function amountFor(
+  contribution: Contribution | undefined,
+  contributionPayments: ContributionPayment[],
+): number {
   if (!contribution) return 0;
   const money =
-    contribution.status === "paid" ||
-    contribution.status === "partial" ||
-    contribution.status === "promised"
-      ? contribution.moneyAmount
-      : 0;
+    contribution.status === "paid" || contribution.status === "partial"
+      ? totalReceivedFor(contribution, contributionPayments)
+      : contribution.status === "promised"
+        ? contribution.moneyAmount
+        : 0;
   return money + contribution.bhogGroceryAmount;
 }
 
@@ -25,6 +29,7 @@ export default function OutsideCollectionPage() {
   const {
     outsideCollections,
     contributionFor,
+    contributionPayments,
     memberName,
     setOutsideCollectionDisabled,
     deleteOutsideCollection,
@@ -63,8 +68,8 @@ export default function OutsideCollectionPage() {
     if (sort.field === "amount") {
       return (
         dir *
-        (amountFor(contributionFor({ outsideCollectionId: a.id })) -
-          amountFor(contributionFor({ outsideCollectionId: b.id })))
+        (amountFor(contributionFor({ outsideCollectionId: a.id }), contributionPayments) -
+          amountFor(contributionFor({ outsideCollectionId: b.id }), contributionPayments))
       );
     }
     if (sort.field === "status") {

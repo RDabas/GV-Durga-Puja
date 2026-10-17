@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { PujaStore } from "@/lib/store";
-import { committeeBalances } from "@/lib/balances";
+import { committeeBalances, totalReceivedFor } from "@/lib/balances";
 import { formatShortDate, today } from "@/lib/format";
 import {
   formatINRForPdf as formatINR,
@@ -109,9 +109,10 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
   const outsideTotals = new Map<string, number>();
   for (const oc of outsideCollections) {
     const c = contributionFor({ outsideCollectionId: oc.id });
-    if (!c || c.paymentMode === "pending" || c.moneyAmount <= 0) continue;
+    const received = totalReceivedFor(c, contributionPayments);
+    if (!c || c.paymentMode === "pending" || received <= 0) continue;
     const key = outsideCollectionTypeLabels[oc.type];
-    outsideTotals.set(key, (outsideTotals.get(key) ?? 0) + c.moneyAmount);
+    outsideTotals.set(key, (outsideTotals.get(key) ?? 0) + received);
   }
 
   // Door-to-door collection by block — a tenant always pays per flat, but an
@@ -127,7 +128,7 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
   for (const house of houses) {
     const tenantContribution = contributionFor({ houseId: house.id });
     if (tenantContribution && tenantContribution.paymentMode !== "pending") {
-      addToBlock(house.block, tenantContribution.moneyAmount);
+      addToBlock(house.block, totalReceivedFor(tenantContribution, contributionPayments));
     }
   }
   for (const owner of owners) {
@@ -135,13 +136,13 @@ export async function generateAuditReportPdf(store: PujaStore): Promise<void> {
     if (!primary) continue;
     const ownerContribution = contributionFor({ ownerId: owner.id });
     if (ownerContribution && ownerContribution.paymentMode !== "pending") {
-      addToBlock(primary.block, ownerContribution.moneyAmount);
+      addToBlock(primary.block, totalReceivedFor(ownerContribution, contributionPayments));
     }
   }
   let exResidentTotal = 0;
   for (const r of exResidents) {
     const c = contributionFor({ exResidentId: r.id });
-    if (c && c.paymentMode !== "pending") exResidentTotal += c.moneyAmount;
+    if (c && c.paymentMode !== "pending") exResidentTotal += totalReceivedFor(c, contributionPayments);
   }
 
   const doc = new jsPDF({ compress: true });

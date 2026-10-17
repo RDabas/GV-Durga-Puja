@@ -6,9 +6,10 @@ import { ExResidentCard } from "@/components/ExResidentCard";
 import { ExResidentSheet } from "@/components/ExResidentSheet";
 import { FlatCard } from "@/components/FlatCard";
 import { PlusIcon, RefreshIcon } from "@/components/icons";
+import { totalReceivedFor } from "@/lib/balances";
 import { knownBlocks } from "@/lib/directory";
 import { usePujaData } from "@/lib/store";
-import type { Block, Contribution, ExResident, House } from "@/lib/types";
+import type { Block, Contribution, ContributionPayment, ExResident, House } from "@/lib/types";
 import type { PreviousYearInfo } from "@/lib/store";
 
 const allBlocks: Block[] = ["A", "B", "C", "D", "E", "F", "G"];
@@ -33,14 +34,17 @@ function sumPreviousYear(entries: PreviousYearInfo[] | undefined): number {
 }
 
 /** Same paid/partial/promised + Bhog convention used on the dashboard and Outside Collection tab. */
-function thisYearAmount(contribution: Contribution | undefined): number {
+function thisYearAmount(
+  contribution: Contribution | undefined,
+  contributionPayments: ContributionPayment[],
+): number {
   if (!contribution) return 0;
   const money =
-    contribution.status === "paid" ||
-    contribution.status === "partial" ||
-    contribution.status === "promised"
-      ? contribution.moneyAmount
-      : 0;
+    contribution.status === "paid" || contribution.status === "partial"
+      ? totalReceivedFor(contribution, contributionPayments)
+      : contribution.status === "promised"
+        ? contribution.moneyAmount
+        : 0;
   return money + contribution.bhogGroceryAmount;
 }
 
@@ -49,6 +53,7 @@ export default function CollectPage() {
     houses,
     exResidents,
     contributionFor,
+    contributionPayments,
     ownerOf,
     ownerFlatCount,
     ownerPrimaryHouse,
@@ -95,15 +100,15 @@ export default function CollectPage() {
   function houseThisYearAmount(house: House): number {
     const owner = ownerOf(house);
     return (
-      thisYearAmount(contributionFor({ houseId: house.id })) +
-      (owner ? thisYearAmount(contributionFor({ ownerId: owner.id })) : 0)
+      thisYearAmount(contributionFor({ houseId: house.id }), contributionPayments) +
+      (owner ? thisYearAmount(contributionFor({ ownerId: owner.id }), contributionPayments) : 0)
     );
   }
   function exResidentLastYearAmount(exResident: ExResident): number {
     return sumPreviousYear(previousYearInfo[exResident.id]);
   }
   function exResidentThisYearAmount(exResident: ExResident): number {
-    return thisYearAmount(contributionFor({ exResidentId: exResident.id }));
+    return thisYearAmount(contributionFor({ exResidentId: exResident.id }), contributionPayments);
   }
 
   const dir = sort.dir === "asc" ? 1 : -1;
