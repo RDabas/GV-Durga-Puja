@@ -79,10 +79,18 @@ export function PaymentSheet({
   const [payerKind, setPayerKind] = useState<"member" | "resident">(
     payment && !payment.memberId ? "resident" : "member",
   );
+  const existingLinkedSelection: ResidentPayerSelection | null = existingLinkedContribution
+    ? { contributionId: existingLinkedContribution.id, label: residentPayerLabel(store, existingLinkedContribution) }
+    : null;
   const [residentPayer, setResidentPayer] = useState<ResidentPayerSelection | null>(
-    existingLinkedContribution
-      ? { contributionId: existingLinkedContribution.id, label: residentPayerLabel(store, existingLinkedContribution) }
-      : null,
+    payment && !payment.memberId ? existingLinkedSelection : null,
+  );
+  // A committee member can self-fund a vendor payment that settles their own
+  // (or anyone else's) pledge directly — distinct from the "resident
+  // directly" toggle above, since here a committee member still physically
+  // handed the money to the vendor, it just didn't come out of committee cash.
+  const [settledPledge, setSettledPledge] = useState<ResidentPayerSelection | null>(
+    payment && payment.memberId ? existingLinkedSelection : null,
   );
   const { submitting, error, run } = useAsyncAction();
 
@@ -90,13 +98,19 @@ export function PaymentSheet({
     e.preventDefault();
     if (amount <= 0) return;
     if (payerKind === "resident" ? !residentPayer : !memberId) return;
+    const contributionId =
+      payerKind === "resident"
+        ? residentPayer?.contributionId
+        : selfFunded
+          ? settledPledge?.contributionId
+          : undefined;
     run(
       () =>
         onSubmit({
           amount,
           mode,
           memberId: payerKind === "resident" ? undefined : memberId,
-          contributionId: payerKind === "resident" ? residentPayer?.contributionId : undefined,
+          contributionId,
           paymentDate,
           note: note.trim() || undefined,
           selfFunded: allowSelfFunded && payerKind === "member" ? selfFunded : undefined,
@@ -105,6 +119,7 @@ export function PaymentSheet({
         setAmount(0);
         setNote("");
         setSelfFunded(false);
+        setSettledPledge(null);
         onClose();
       },
     );
@@ -169,18 +184,25 @@ export function PaymentSheet({
         </Field>
 
         {allowSelfFunded && payerKind === "member" && (
-          <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
-            <input
-              type="checkbox"
-              checked={selfFunded}
-              onChange={(e) => setSelfFunded(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-            />
-            <span className="text-[0.8rem] text-ink-soft">
-              Paid from their own pocket, not committee cash — won&rsquo;t count against their
-              balance in hand.
-            </span>
-          </label>
+          <>
+            <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+              <input
+                type="checkbox"
+                checked={selfFunded}
+                onChange={(e) => setSelfFunded(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              />
+              <span className="text-[0.8rem] text-ink-soft">
+                Paid from their own pocket, not committee cash — won&rsquo;t count against their
+                balance in hand.
+              </span>
+            </label>
+            {selfFunded && (
+              <Field label="Settles a resident's pledge? (optional)">
+                <ResidentPayerPicker value={settledPledge} onChange={setSettledPledge} />
+              </Field>
+            )}
+          </>
         )}
 
         {payerKind === "resident" && (

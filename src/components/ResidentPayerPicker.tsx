@@ -86,14 +86,18 @@ export function ResidentPayerPicker({
           .flatMap((h) => {
             const owner = ownerOf(h);
             const rows: { key: string; label: string; contribution: Contribution | undefined }[] = [];
-            if (h.tenantNames.length > 0) {
+            // Disabled (moved out / no longer current) — excluded the same
+            // way they're left out of this year's totals and follow-up
+            // lists everywhere else, so a stale duplicate record never
+            // shows up as if it were still selectable.
+            if (h.tenantNames.length > 0 && !h.tenantDisabled) {
               rows.push({
                 key: `h-${h.id}-tenant`,
                 label: `${h.block}-${h.flatNo} — ${h.tenantNames.join(", ")} (Tenant)`,
                 contribution: contributionFor({ houseId: h.id }),
               });
             }
-            if (owner) {
+            if (owner && !owner.disabled) {
               rows.push({
                 key: `h-${h.id}-owner`,
                 label: `${h.block}-${h.flatNo} — ${owner.names.join(", ")} (Owner)`,
@@ -106,7 +110,7 @@ export function ResidentPayerPicker({
             return rows;
           }),
         ...owners
-          .filter((o) => o.names.some((n) => n.toLowerCase().includes(q)))
+          .filter((o) => !o.disabled && o.names.some((n) => n.toLowerCase().includes(q)))
           .slice(0, 8)
           .map((o) => ({
             key: `o-${o.id}`,
@@ -114,7 +118,7 @@ export function ResidentPayerPicker({
             contribution: contributionFor({ ownerId: o.id }),
           })),
         ...exResidents
-          .filter((r) => r.names.some((n) => n.toLowerCase().includes(q)))
+          .filter((r) => !r.disabled && r.names.some((n) => n.toLowerCase().includes(q)))
           .slice(0, 8)
           .map((r) => ({
             key: `e-${r.id}`,

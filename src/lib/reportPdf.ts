@@ -9,7 +9,7 @@ import {
   PDF_INK_RGB as INK_RGB,
   PDF_FAINT_RGB as FAINT_RGB,
 } from "@/lib/pdfFormat";
-import type { OutsideCollectionType } from "@/lib/types";
+import type { Contribution, OutsideCollectionType } from "@/lib/types";
 
 const outsideCollectionTypeLabels: Record<OutsideCollectionType, string> = {
   outsider: "Outsider",
@@ -385,8 +385,20 @@ async function shareOrDownloadBlob(blob: Blob, filename: string, shareText: stri
  * all-members overview in generateAuditReportPdf above.
  */
 export async function generateMemberReportPdf(store: PujaStore, memberId: string): Promise<void> {
-  const { activeYear, contributions, contributionPayments, vendorExpenses, members, carriedFunds, fundTransfers } =
-    store;
+  const {
+    activeYear,
+    contributions,
+    contributionPayments,
+    vendorExpenses,
+    members,
+    carriedFunds,
+    fundTransfers,
+    houses,
+    owners,
+    exResidents,
+    outsideCollections,
+    ownerPrimaryHouse,
+  } = store;
 
   const member = members.find((m) => m.id === memberId);
   if (!member) return;
@@ -402,6 +414,49 @@ export async function generateMemberReportPdf(store: PujaStore, memberId: string
   if (!balance) return;
 
   const memberName = (id?: string) => members.find((m) => m.id === id)?.name ?? "—";
+
+  // Who this member actually collected from — their primary contribution
+  // rows plus any split installment collected by them — for the detailed
+  // list at the end of the report, mirroring the Funds tab's own
+  // Cash/UPI chip drill-down but covering every payment in one place.
+  function payerInfoFor(c: Contribution): { name: string; flatLabel: string } {
+    const house = c.houseId
+      ? houses.find((h) => h.id === c.houseId)
+      : c.ownerId
+        ? ownerPrimaryHouse(c.ownerId)
+        : undefined;
+    const owner = c.ownerId ? owners.find((o) => o.id === c.ownerId) : undefined;
+    const exResident = c.exResidentId ? exResidents.find((r) => r.id === c.exResidentId) : undefined;
+    const outsideCollection = c.outsideCollectionId
+      ? outsideCollections.find((r) => r.id === c.outsideCollectionId)
+      : undefined;
+    const name = c.houseId
+      ? house?.tenantNames.join(", ") || "Tenant"
+      : c.ownerId
+        ? (owner?.names.join(", ") ?? "Owner")
+        : c.exResidentId
+          ? (exResident?.names.join(", ") ?? "Ex Resident")
+          : (outsideCollection?.name ?? "Outside Collection");
+    const flatLabel = house
+      ? `${house.block}-${house.flatNo}`
+      : c.exResidentId
+        ? "Ex Resident"
+        : outsideCollection
+          ? outsideCollectionTypeLabels[outsideCollection.type]
+          : "—";
+    return { name, flatLabel };
+  }
+  const collectedDetailRows = [
+    ...contributions
+      .filter((c) => c.collectorId === memberId && c.paymentMode !== "pending")
+      .map((c) => ({ date: c.paymentDate ?? "", mode: c.paymentMode, amount: c.moneyAmount, ...payerInfoFor(c) })),
+    ...contributionPayments
+      .filter((p) => p.collectorId === memberId)
+      .flatMap((p) => {
+        const c = contributions.find((x) => x.id === p.contributionId);
+        return c ? [{ date: p.paymentDate, mode: p.mode, amount: p.amount, ...payerInfoFor(c) }] : [];
+      }),
+  ].sort((a, b) => a.date.localeCompare(b.date));
 
   const vendorPayments = vendorExpenses
     .flatMap((e) => e.payments.map((p) => ({ payment: p, expense: e })))
@@ -590,6 +645,41 @@ export async function generateMemberReportPdf(store: PujaStore, memberId: string
   doc.setFontSize(10.5);
   doc.setTextColor(...INK_RGB);
   doc.text(`Total balance: ${formatINR(balance.balanceInHand)}`, marginX, y);
+  y += 14;
+
+  // --- Money collected — detail (every payer, last so the report reads
+  // summary-first, then the full backing list) ---
+  if (collectedDetailRows.length > 0) {
+    if (y > doc.internal.pageSize.getHeight() - 60) {
+      doc.addPage();
+      y = 18;
+    }
+    y = sectionHeading(doc, "Money collected — detail", marginX, y);
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: marginX, right: marginX },
+      head: [["Date", "Flat", "From", "Mode", "Amount"]],
+      headStyles: { fillColor: BRAND_RGB, textColor: 255, fontSize: 9 },
+      styles: { fontSize: 9, cellPadding: 2 },
+      columnStyles: { 4: { halign: "right" } },
+      body: collectedDetailRows.map((r) => [
+        r.date ? formatShortDate(r.date) : "—",
+        r.flatLabel,
+        r.name,
+        r.mode === "upi" ? "UPI" : "Cash",
+        formatINR(r.amount),
+      ]),
+      foot: [[
+        "",
+        "",
+        "",
+        "Total",
+        formatINR(collectedDetailRows.reduce((s, r) => s + r.amount, 0)),
+      ]],
+      footStyles: { fillColor: [245, 240, 242], textColor: INK_RGB, fontStyle: "bold", fontSize: 9 },
+    });
+  }
 
   // Footer on every page, added last so pagination is already final.
   const pageCount = doc.getNumberOfPages();

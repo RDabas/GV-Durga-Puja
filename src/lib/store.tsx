@@ -92,7 +92,13 @@ export interface PaymentInput {
   note?: string;
   /** Vendor payments only — paid from the member's own pocket, so it shouldn't reduce their balance in hand. */
   selfFunded?: boolean;
-  /** Vendor payments only, instead of memberId — a resident paid the vendor directly, settling this pledge. */
+  /**
+   * Vendor payments only — which pledge this payment settles directly,
+   * instead of coming out of committee cash. Either on its own (a resident
+   * paid the vendor directly, memberId unset) or alongside memberId +
+   * selfFunded (a committee member who's also a resident paid out of their
+   * own pocket and it's settling their — or someone else's — own pledge).
+   */
   contributionId?: string;
 }
 
@@ -792,9 +798,10 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
             });
             settledLabel = ` — settles ${payerLabel(data, payerRefFor(contribution))}'s pledge directly`;
           }
+          const paidByLabel = initialPayment.memberId ? ` (by ${memberName(initialPayment.memberId)})` : "";
           await logActivity(
             "vendor_payment.add",
-            `paid ${formatINR(initialPayment.amount)} to vendor ${input.vendorName}${initialPayment.selfFunded ? " (self-funded)" : ""}${initialPayment.contributionId ? settledLabel : ` (by ${memberName(initialPayment.memberId)})`}`,
+            `paid ${formatINR(initialPayment.amount)} to vendor ${input.vendorName}${initialPayment.selfFunded ? " (self-funded)" : ""}${paidByLabel}${settledLabel}`,
             activeYear.id,
           );
         }
@@ -827,9 +834,10 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
           });
           settledLabel = ` — settles ${payerLabel(data, payerRefFor(contribution))}'s pledge directly`;
         }
+        const paidByLabel = input.memberId ? ` (by ${memberName(input.memberId)})` : "";
         await logActivity(
           "vendor_payment.add",
-          `paid ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"}${input.selfFunded ? " (self-funded)" : ""}${input.contributionId ? settledLabel : ` (by ${memberName(input.memberId)})`}`,
+          `paid ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"}${input.selfFunded ? " (self-funded)" : ""}${paidByLabel}${settledLabel}`,
           expense?.yearId,
         );
         await load();
@@ -837,17 +845,39 @@ export function PujaDataProvider({ children }: { children: ReactNode }) {
       updateVendorPayment: async (expenseId, paymentId, input) => {
         const expense = data.vendorExpenses.find((e) => e.id === expenseId);
         await dbUpdateVendorPayment(supabase, paymentId, input);
+
         const linked = data.contributionPayments.find((p) => p.vendorPaymentId === paymentId);
-        if (linked) {
+        let settledLabel = "";
+        if (linked && input.contributionId === linked.contributionId) {
+          // Same pledge still linked — just keep its amount/mode/date in sync.
           await dbUpdateContributionPaymentByVendorPayment(supabase, paymentId, {
             amount: input.amount,
             mode: input.mode,
             paymentDate: input.paymentDate,
           });
+        } else {
+          // The link was added, removed, or now points elsewhere — tear down
+          // the old one first (if any) so the old pledge's total doesn't
+          // keep counting a payment that's no longer linked to it.
+          if (linked) {
+            await dbRemoveContributionPayment(supabase, linked.id);
+            await recomputeAfterRemoval(linked.contributionId, linked.id);
+          }
+          if (input.contributionId) {
+            const contribution = await applyContributionPayment(input.contributionId, {
+              amount: input.amount,
+              mode: input.mode,
+              paymentDate: input.paymentDate,
+              vendorPaymentId: paymentId,
+            });
+            settledLabel = ` — settles ${payerLabel(data, payerRefFor(contribution))}'s pledge directly`;
+          }
         }
+
+        const paidByLabel = input.memberId ? ` (by ${memberName(input.memberId)})` : "";
         await logActivity(
           "vendor_payment.update",
-          `corrected a payment of ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"}${linked ? "" : ` (by ${memberName(input.memberId)})`}`,
+          `corrected a payment of ${formatINR(input.amount)} to vendor ${expense?.vendor.name ?? "?"}${paidByLabel}${settledLabel}`,
           expense?.yearId,
         );
         await load();

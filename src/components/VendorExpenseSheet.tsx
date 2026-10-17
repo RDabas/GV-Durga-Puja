@@ -50,6 +50,9 @@ export function VendorExpenseSheet({
   const [selfFunded, setSelfFunded] = useState(false);
   const [paidByKind, setPaidByKind] = useState<"member" | "resident">("member");
   const [residentPayer, setResidentPayer] = useState<ResidentPayerSelection | null>(null);
+  // A committee member can self-fund this out of their own pocket and still
+  // have it settle a resident's (often their own) pledge directly.
+  const [settledPledge, setSettledPledge] = useState<ResidentPayerSelection | null>(null);
 
   const { submitting, error, run } = useAsyncAction();
 
@@ -78,7 +81,12 @@ export function VendorExpenseSheet({
                 amount: paidAmount,
                 mode: paidMode,
                 memberId: paidByKind === "resident" ? undefined : paidById,
-                contributionId: paidByKind === "resident" ? residentPayer?.contributionId : undefined,
+                contributionId:
+                  paidByKind === "resident"
+                    ? residentPayer?.contributionId
+                    : selfFunded
+                      ? settledPledge?.contributionId
+                      : undefined,
                 paymentDate: paidDate,
                 selfFunded: paidByKind === "member" ? selfFunded : undefined,
               }
@@ -179,18 +187,25 @@ export function VendorExpenseSheet({
                   />
                 </Field>
                 {paidByKind === "member" ? (
-                  <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
-                    <input
-                      type="checkbox"
-                      checked={selfFunded}
-                      onChange={(e) => setSelfFunded(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-                    />
-                    <span className="text-[0.8rem] text-ink-soft">
-                      Paid from their own pocket, not committee cash — won&rsquo;t count against
-                      their balance in hand.
-                    </span>
-                  </label>
+                  <>
+                    <label className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-sunken p-3">
+                      <input
+                        type="checkbox"
+                        checked={selfFunded}
+                        onChange={(e) => setSelfFunded(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                      />
+                      <span className="text-[0.8rem] text-ink-soft">
+                        Paid from their own pocket, not committee cash — won&rsquo;t count against
+                        their balance in hand.
+                      </span>
+                    </label>
+                    {selfFunded && (
+                      <Field label="Settles a resident's pledge? (optional)">
+                        <ResidentPayerPicker value={settledPledge} onChange={setSettledPledge} />
+                      </Field>
+                    )}
+                  </>
                 ) : (
                   <p className="text-[0.75rem] text-ink-faint">
                     Settles part of their pledge directly — won&rsquo;t count against any
