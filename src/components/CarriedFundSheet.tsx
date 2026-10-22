@@ -31,10 +31,19 @@ export function CarriedFundSheet({ open, onClose }: { open: boolean; onClose: ()
   const { submitting, error, run } = useAsyncAction();
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (amount <= 0 || !memberId) return;
+    if (!memberId) {
+      setValidationError("Pick who's holding this.");
+      return;
+    }
+    if (amount <= 0) {
+      setValidationError("Enter an amount greater than zero.");
+      return;
+    }
+    setValidationError(null);
     run(() => addCarriedFund({ memberId, kind, amount, note: note.trim() || undefined }), () => {
       setAmount(0);
       setNote("");
@@ -116,7 +125,7 @@ export function CarriedFundSheet({ open, onClose }: { open: boolean; onClose: ()
             placeholder="e.g. bank name, FD maturity date"
           />
         </Field>
-        <FormError message={error} />
+        <FormError message={validationError ?? error} />
         <SubmitButton disabled={submitting} submitting={submitting}>Add</SubmitButton>
       </form>
     </Sheet>

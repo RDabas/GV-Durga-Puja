@@ -92,12 +92,23 @@ export function PaymentSheet({
   const [settledPledge, setSettledPledge] = useState<ResidentPayerSelection | null>(
     payment && payment.memberId ? existingLinkedSelection : null,
   );
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (amount <= 0) return;
-    if (payerKind === "resident" ? !residentPayer : !memberId) return;
+    // Surfacing these instead of a silent no-op — otherwise a tap that
+    // doesn't satisfy validation looks identical to one that saved but
+    // just hasn't shown its result yet.
+    if (amount <= 0) {
+      setValidationError("Enter an amount greater than zero.");
+      return;
+    }
+    if (payerKind === "resident" ? !residentPayer : !memberId) {
+      setValidationError(payerKind === "resident" ? "Pick which resident paid." : "Pick who it was paid by.");
+      return;
+    }
+    setValidationError(null);
     const pledgeSelection = payerKind === "resident" ? residentPayer : selfFunded ? settledPledge : null;
     run(
       () =>
@@ -208,7 +219,7 @@ export function PaymentSheet({
           </p>
         )}
 
-        <FormError message={error} />
+        <FormError message={validationError ?? error} />
         <SubmitButton disabled={submitting} submitting={submitting}>
           {payment ? "Save" : "Record payment"}
         </SubmitButton>

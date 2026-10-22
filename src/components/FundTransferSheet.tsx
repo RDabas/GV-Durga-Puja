@@ -33,12 +33,21 @@ export function FundTransferSheet({ open, onClose }: { open: boolean; onClose: (
   const { submitting, error, run } = useAsyncAction();
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const history = [...fundTransfers].sort((a, b) => b.transferDate.localeCompare(a.transferDate));
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (amount <= 0 || !fromMemberId || !toMemberId || fromMemberId === toMemberId) return;
+    if (!fromMemberId || !toMemberId || fromMemberId === toMemberId) {
+      setValidationError("From and To must be different people.");
+      return;
+    }
+    if (amount <= 0) {
+      setValidationError("Enter an amount greater than zero.");
+      return;
+    }
+    setValidationError(null);
     run(
       () =>
         addFundTransfer({
@@ -155,7 +164,7 @@ export function FundTransferSheet({ open, onClose }: { open: boolean; onClose: (
           />
         </Field>
 
-        <FormError message={error} />
+        <FormError message={validationError ?? error} />
         <SubmitButton disabled={submitting} submitting={submitting}>
           Record hand-over
         </SubmitButton>

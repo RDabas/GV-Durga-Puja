@@ -54,11 +54,30 @@ export function VendorExpenseSheet({
   // have it settle a resident's (often their own) pledge directly.
   const [settledPledge, setSettledPledge] = useState<ResidentPayerSelection | null>(null);
 
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!vendorName.trim()) return;
+    if (!vendorName.trim()) {
+      setValidationError("Enter the vendor's name.");
+      return;
+    }
+    // "Already paid" being checked but not actually recordable (no amount,
+    // or no payer picked) used to silently drop the whole payment — the
+    // bill would save fine with no sign that the payment part never made
+    // it in. Block the save instead, so it's obvious before anything's lost.
+    if (recordingPayment) {
+      if (paidAmount <= 0) {
+        setValidationError("Enter the amount already paid, or uncheck “Already paid”.");
+        return;
+      }
+      if (paidByKind === "resident" ? !residentPayer : !paidById) {
+        setValidationError(paidByKind === "resident" ? "Pick which resident paid." : "Pick who it was paid by.");
+        return;
+      }
+    }
+    setValidationError(null);
     const input = {
       vendorName: vendorName.trim(),
       serviceType: serviceType.trim() || "Other",
@@ -215,7 +234,7 @@ export function VendorExpenseSheet({
           </>
         )}
 
-        <FormError message={error} />
+        <FormError message={validationError ?? error} />
         <SubmitButton disabled={submitting} submitting={submitting}>
           {expense ? "Save" : "Add bill"}
         </SubmitButton>

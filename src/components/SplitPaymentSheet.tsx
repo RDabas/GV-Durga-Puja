@@ -32,11 +32,24 @@ export function SplitPaymentSheet({
   const [collectorId, setCollectorId] = useState(members[0]?.id ?? "");
   const [paymentDate, setPaymentDate] = useState(today());
   const [note, setNote] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { submitting, error, run } = useAsyncAction();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (amount <= 0 || !collectorId) return;
+    // A silent no-op here (as this used to be) is indistinguishable from a
+    // real submission that just didn't show its result yet — surface the
+    // problem instead of leaving someone tapping "Add installment" with no
+    // feedback at all.
+    if (amount <= 0) {
+      setValidationError("Enter an amount greater than zero.");
+      return;
+    }
+    if (!collectorId) {
+      setValidationError("Choose who collected this.");
+      return;
+    }
+    setValidationError(null);
     run(
       () => onSubmit({ amount, mode, collectorId, paymentDate, note: note.trim() || undefined }),
       () => {
@@ -79,7 +92,7 @@ export function SplitPaymentSheet({
           <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
         </Field>
 
-        <FormError message={error} />
+        <FormError message={validationError ?? error} />
         <SubmitButton disabled={submitting} submitting={submitting}>
           Add installment
         </SubmitButton>
